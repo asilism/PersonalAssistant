@@ -58,6 +58,7 @@ class Orchestrator:
         self.settings = None
         self.planner = None
         self.dispatcher = None
+        self.mcp_executor = None
 
         # Build the graph
         self.graph = None
@@ -65,9 +66,21 @@ class Orchestrator:
     async def _initialize(self):
         """Initialize settings and components"""
         if not self.settings:
-            self.settings = await self.config_loader.get_settings(self.user_id, self.tenant)
+            # Initialize MCP executor and discover tools
+            from .mcp_executor import MCPExecutor
+
+            self.mcp_executor = MCPExecutor()
+            await self.mcp_executor.initialize_servers()
+            mcp_tools = await self.mcp_executor.discover_tools()
+
+            print(f"[Orchestrator] Discovered {len(mcp_tools)} MCP tools")
+
+            # Get settings with MCP tools
+            self.settings = await self.config_loader.get_settings(
+                self.user_id, self.tenant, mcp_tools=mcp_tools
+            )
             self.planner = Planner(self.settings)
-            self.dispatcher = TaskDispatcher(self.tracker)
+            self.dispatcher = TaskDispatcher(self.tracker, self.mcp_executor)
 
     def _build_graph(self) -> StateGraph:
         """Build the LangGraph state machine"""
