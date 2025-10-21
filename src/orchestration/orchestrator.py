@@ -89,18 +89,18 @@ class Orchestrator:
         workflow = StateGraph(OrchestrationState)
 
         # Add nodes
-        workflow.add_node("plan", self._plan_node)
+        workflow.add_node("planning", self._plan_node)
         workflow.add_node("dispatch", self._dispatch_node)
         workflow.add_node("decide", self._decide_node)
         workflow.add_node("finalize", self._finalize_node)
         workflow.add_node("error", self._error_node)
 
         # Set entry point
-        workflow.set_entry_point("plan")
+        workflow.set_entry_point("planning")
 
         # Add edges
         workflow.add_conditional_edges(
-            "plan",
+            "planning",
             self._route_after_plan,
             {
                 "dispatch": "dispatch",
