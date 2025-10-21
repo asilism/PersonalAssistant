@@ -93,7 +93,7 @@ class Orchestrator:
         workflow.add_node("dispatch", self._dispatch_node)
         workflow.add_node("decide", self._decide_node)
         workflow.add_node("finalize", self._finalize_node)
-        workflow.add_node("error", self._error_node)
+        workflow.add_node("error_handler", self._error_node)
 
         # Set entry point
         workflow.set_entry_point("planning")
@@ -104,7 +104,7 @@ class Orchestrator:
             self._route_after_plan,
             {
                 "dispatch": "dispatch",
-                "error": "error"
+                "error_handler": "error_handler"
             }
         )
 
@@ -113,7 +113,7 @@ class Orchestrator:
             self._route_after_dispatch,
             {
                 "decide": "decide",
-                "error": "error"
+                "error_handler": "error_handler"
             }
         )
 
@@ -123,13 +123,13 @@ class Orchestrator:
             {
                 "dispatch": "dispatch",
                 "finalize": "finalize",
-                "error": "error",
+                "error_handler": "error_handler",
                 "end": END
             }
         )
 
         workflow.add_edge("finalize", END)
-        workflow.add_edge("error", END)
+        workflow.add_edge("error_handler", END)
 
         return workflow.compile()
 
@@ -195,9 +195,9 @@ class Orchestrator:
         if state_type == StateType.DISPATCH.value:
             return "dispatch"
         elif state_type == StateType.ERROR.value:
-            return "error"
+            return "error_handler"
         else:
-            return "error"
+            return "error_handler"
 
     def _route_after_dispatch(self, state: OrchestrationState) -> str:
         """Route after dispatch"""
@@ -206,9 +206,9 @@ class Orchestrator:
         if state_type == StateType.PLAN_OR_DECIDE.value:
             return "decide"
         elif state_type == StateType.ERROR.value:
-            return "error"
+            return "error_handler"
         else:
-            return "error"
+            return "error_handler"
 
     def _route_after_decide(self, state: OrchestrationState) -> str:
         """Route after decision"""
@@ -219,12 +219,12 @@ class Orchestrator:
         elif state_type == StateType.FINAL.value:
             return "finalize"
         elif state_type == StateType.ERROR.value:
-            return "error"
+            return "error_handler"
         elif state_type == StateType.HUMAN_IN_THE_LOOP.value:
             # For now, treat as final
             return "end"
         else:
-            return "error"
+            return "error_handler"
 
     def _to_pydantic_state(self, state: OrchestrationState) -> State:
         """Convert OrchestrationState to Pydantic State"""
