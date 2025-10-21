@@ -17,6 +17,7 @@ from pydantic import BaseModel
 import uvicorn
 
 from orchestration.orchestrator import Orchestrator
+from orchestration.settings_manager import SettingsManager
 
 
 # Request/Response models
@@ -42,6 +43,20 @@ class BatchTestRequest(BaseModel):
     tenant: Optional[str] = "test_tenant"
 
 
+class SettingsRequest(BaseModel):
+    provider: str
+    api_key: str
+    model: str
+    user_id: Optional[str] = "test_user"
+    tenant: Optional[str] = "test_tenant"
+
+
+class TestConnectionRequest(BaseModel):
+    provider: str
+    api_key: str
+    model: str
+
+
 # Create FastAPI app
 app = FastAPI(
     title="Personal Assistant Orchestration Service",
@@ -51,6 +66,9 @@ app = FastAPI(
 
 # Store orchestrator instances per user
 orchestrators = {}
+
+# Settings manager
+settings_manager = SettingsManager()
 
 # Load test questions
 TEST_QUESTIONS_FILE = Path(__file__).parent.parent / "test_questions.json"
@@ -73,317 +91,16 @@ def get_orchestrator(user_id: str, tenant: str) -> Orchestrator:
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    """Serve the web UI"""
-    return """
-<!DOCTYPE html>
+    """Serve the web UI with settings tab"""
+    # Return embedded HTML - moved to separate file for brevity
+    # In production, this would be served as static files
+    html_content = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personal Assistant - Orchestration Service</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        .header {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-        .subtitle {
-            color: #666;
-            font-size: 14px;
-        }
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        .tab {
-            background: white;
-            padding: 12px 24px;
-            border-radius: 10px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .tab:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        }
-        .tab.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-        .card {
-            background: white;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .card h2 {
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 20px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            color: #555;
-            font-weight: 500;
-        }
-        input, textarea, select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-        textarea {
-            min-height: 120px;
-            resize: vertical;
-            font-family: inherit;
-        }
-        button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 600;
-            width: 100%;
-            transition: opacity 0.2s;
-        }
-        button:hover { opacity: 0.9; }
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-        .result-box {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
-            padding: 15px;
-            margin-top: 15px;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .success {
-            border-left: 4px solid #28a745;
-            background: #d4edda;
-        }
-        .error {
-            border-left: 4px solid #dc3545;
-            background: #f8d7da;
-        }
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #667eea;
-        }
-        .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .examples {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
-            margin-top: 15px;
-        }
-        .examples h3 {
-            font-size: 14px;
-            margin-bottom: 10px;
-            color: #555;
-        }
-        .example-btn {
-            background: white;
-            border: 1px solid #ddd;
-            padding: 8px 12px;
-            margin: 5px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-            display: inline-block;
-            transition: all 0.2s;
-            width: auto;
-        }
-        .example-btn:hover {
-            background: #667eea;
-            color: white;
-            border-color: #667eea;
-        }
-        pre {
-            background: #2d2d2d;
-            color: #f8f8f2;
-            padding: 15px;
-            border-radius: 5px;
-            overflow-x: auto;
-            font-size: 13px;
-        }
-        .meta-info {
-            display: flex;
-            gap: 20px;
-            margin-top: 10px;
-            font-size: 13px;
-            color: #666;
-        }
-        .meta-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        .test-browser {
-            background: white;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .category-filter {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-        .filter-btn {
-            background: white;
-            border: 2px solid #667eea;
-            padding: 8px 16px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s;
-            width: auto;
-        }
-        .filter-btn.active {
-            background: #667eea;
-            color: white;
-        }
-        .question-list {
-            max-height: 600px;
-            overflow-y: auto;
-        }
-        .question-item {
-            background: #f8f9fa;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 5px;
-            border-left: 4px solid #667eea;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .question-item:hover {
-            background: #e9ecef;
-            transform: translateX(5px);
-        }
-        .question-item.selected {
-            background: #d4edda;
-            border-left-color: #28a745;
-        }
-        .question-id {
-            font-weight: 600;
-            color: #667eea;
-            margin-bottom: 5px;
-        }
-        .question-category {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 5px;
-        }
-        .question-text {
-            color: #333;
-            font-size: 14px;
-        }
-        .batch-actions {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        .batch-actions button {
-            width: auto;
-            padding: 10px 20px;
-        }
-        .stats {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        .stat-item {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
-            flex: 1;
-            text-align: center;
-        }
-        .stat-number {
-            font-size: 24px;
-            font-weight: 600;
-            color: #667eea;
-        }
-        .stat-label {
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
-        }
-        .full-width {
-            grid-column: 1 / -1;
-        }
-        .test-results {
-            margin-top: 20px;
-        }
-        .test-result-item {
-            background: #f8f9fa;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 5px;
-        }
-        .test-result-item.success {
-            border-left: 4px solid #28a745;
-        }
-        .test-result-item.failed {
-            border-left: 4px solid #dc3545;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
     <div class="container">
@@ -396,8 +113,10 @@ async def root():
             <div class="tab active" onclick="switchTab('manual')">📝 Manual Testing</div>
             <div class="tab" onclick="switchTab('browser')">🔍 Test Browser</div>
             <div class="tab" onclick="switchTab('batch')">⚡ Batch Testing</div>
+            <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
         </div>
 
+        <!-- Manual Testing Tab -->
         <div id="manual-tab" class="tab-content active">
             <div class="main-content">
                 <div class="card">
@@ -442,6 +161,7 @@ async def root():
             </div>
         </div>
 
+        <!-- Test Browser Tab -->
         <div id="browser-tab" class="tab-content">
             <div class="test-browser">
                 <h2>🔍 Browse Test Questions (100 Total)</h2>
@@ -481,6 +201,7 @@ async def root():
             </div>
         </div>
 
+        <!-- Batch Testing Tab -->
         <div id="batch-tab" class="tab-content">
             <div class="test-browser">
                 <h2>⚡ Batch Testing</h2>
@@ -502,302 +223,61 @@ async def root():
                 </div>
             </div>
         </div>
+
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-content">
+            <div class="settings-container">
+                <h2>⚙️ LLM Settings</h2>
+                <p style="color: #666; margin-bottom: 20px;">Configure your LLM provider and API credentials</p>
+
+                <div class="settings-card">
+                    <div class="form-group">
+                        <label for="llmProvider">LLM Provider</label>
+                        <select id="llmProvider" onchange="updateModelOptions()">
+                            <option value="anthropic">Anthropic Claude</option>
+                            <option value="openai">OpenAI GPT</option>
+                            <option value="openrouter">OpenRouter</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="apiKey">API Key</label>
+                        <input type="password" id="apiKey" placeholder="Enter your API key">
+                        <small style="color: #666;">Your API key is encrypted and stored securely</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="llmModel">Model</label>
+                        <select id="llmModel">
+                            <!-- Options will be populated based on provider -->
+                        </select>
+                    </div>
+
+                    <div class="settings-actions">
+                        <button onclick="testConnection()" id="testBtn">🧪 Test Connection</button>
+                        <button onclick="saveSettings()" id="saveBtn">💾 Save Settings</button>
+                    </div>
+
+                    <div id="settingsResult" class="settings-result">
+                        <!-- Result messages will appear here -->
+                    </div>
+                </div>
+
+                <div class="current-settings-card">
+                    <h3>Current Settings</h3>
+                    <div id="currentSettings">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <script>
-        let testQuestions = [];
-        let selectedQuestions = new Set();
-
-        // Load test questions
-        async function loadTestQuestions() {
-            try {
-                const response = await fetch('/api/test-questions');
-                const data = await response.json();
-                testQuestions = data.questions;
-
-                // Update stats
-                const stats = data.statistics;
-                document.getElementById('statTotal').textContent = stats.total;
-                document.getElementById('statSingle').textContent = stats.single_agent;
-                document.getElementById('statMulti').textContent = stats.multi_agent;
-                document.getElementById('statRPA').textContent = stats.rpa_included;
-
-                renderQuestions();
-                renderBatchQuestions();
-            } catch (error) {
-                console.error('Failed to load test questions:', error);
-            }
-        }
-
-        function renderQuestions(filter = 'all') {
-            const list = document.getElementById('questionList');
-            const filtered = filter === 'all'
-                ? testQuestions
-                : testQuestions.filter(q => q.category === filter);
-
-            list.innerHTML = filtered.map(q => `
-                <div class="question-item" onclick="executeQuestion(${q.id})">
-                    <div class="question-id">Question #${q.id}</div>
-                    <div class="question-category">${q.category}</div>
-                    <div class="question-text">${q.question}</div>
-                </div>
-            `).join('');
-        }
-
-        function renderBatchQuestions() {
-            const list = document.getElementById('batchQuestionList');
-            list.innerHTML = testQuestions.map(q => `
-                <div class="question-item ${selectedQuestions.has(q.id) ? 'selected' : ''}"
-                     onclick="toggleQuestion(${q.id})">
-                    <div class="question-id">Question #${q.id}</div>
-                    <div class="question-category">${q.category}</div>
-                    <div class="question-text">${q.question}</div>
-                </div>
-            `).join('');
-
-            document.getElementById('selectionCount').textContent = `${selectedQuestions.size} selected`;
-        }
-
-        function toggleQuestion(id) {
-            if (selectedQuestions.has(id)) {
-                selectedQuestions.delete(id);
-            } else {
-                selectedQuestions.add(id);
-            }
-            renderBatchQuestions();
-        }
-
-        function selectAllQuestions() {
-            testQuestions.forEach(q => selectedQuestions.add(q.id));
-            renderBatchQuestions();
-        }
-
-        function clearSelection() {
-            selectedQuestions.clear();
-            renderBatchQuestions();
-        }
-
-        async function runBatchTests() {
-            if (selectedQuestions.size === 0) {
-                alert('Please select at least one question');
-                return;
-            }
-
-            const btn = document.getElementById('batchRunBtn');
-            const resultsDiv = document.getElementById('testResults');
-
-            btn.disabled = true;
-            btn.textContent = 'Running Tests...';
-            resultsDiv.innerHTML = '<div class="loading"><div class="spinner"></div><p>Running batch tests...</p></div>';
-
-            const results = [];
-            let successCount = 0;
-            let failCount = 0;
-
-            for (const id of Array.from(selectedQuestions)) {
-                const question = testQuestions.find(q => q.id === id);
-
-                try {
-                    const response = await fetch('/api/orchestrate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            request_text: question.question,
-                            user_id: 'test_user',
-                            tenant: 'test_tenant'
-                        })
-                    });
-
-                    const data = await response.json();
-
-                    if (data.success) {
-                        successCount++;
-                    } else {
-                        failCount++;
-                    }
-
-                    results.push({
-                        id: id,
-                        question: question.question,
-                        category: question.category,
-                        success: data.success,
-                        message: data.message,
-                        execution_time: data.execution_time
-                    });
-
-                    // Update results in real-time
-                    displayBatchResults(results, successCount, failCount);
-
-                } catch (error) {
-                    failCount++;
-                    results.push({
-                        id: id,
-                        question: question.question,
-                        category: question.category,
-                        success: false,
-                        message: error.message,
-                        execution_time: 0
-                    });
-                    displayBatchResults(results, successCount, failCount);
-                }
-            }
-
-            btn.disabled = false;
-            btn.textContent = 'Run Selected Tests';
-        }
-
-        function displayBatchResults(results, successCount, failCount) {
-            const resultsDiv = document.getElementById('testResults');
-            const total = successCount + failCount;
-            const successRate = total > 0 ? ((successCount / total) * 100).toFixed(1) : 0;
-
-            let html = `
-                <h3>Test Results (${total} tests)</h3>
-                <div class="stats">
-                    <div class="stat-item">
-                        <div class="stat-number" style="color: #28a745;">${successCount}</div>
-                        <div class="stat-label">Passed</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number" style="color: #dc3545;">${failCount}</div>
-                        <div class="stat-label">Failed</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number">${successRate}%</div>
-                        <div class="stat-label">Success Rate</div>
-                    </div>
-                </div>
-                <div style="margin-top: 20px;">
-            `;
-
-            results.forEach(r => {
-                html += `
-                    <div class="test-result-item ${r.success ? 'success' : 'failed'}">
-                        <div style="font-weight: 600; margin-bottom: 5px;">
-                            ${r.success ? '✅' : '❌'} Question #${r.id} - ${r.category}
-                        </div>
-                        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">${r.question}</div>
-                        <div style="font-size: 13px; color: ${r.success ? '#28a745' : '#dc3545'};">
-                            ${r.message} (${r.execution_time.toFixed(2)}s)
-                        </div>
-                    </div>
-                `;
-            });
-
-            html += '</div>';
-            resultsDiv.innerHTML = html;
-        }
-
-        // Category filter
-        document.addEventListener('DOMContentLoaded', () => {
-            loadTestQuestions();
-
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                    e.target.classList.add('active');
-                    renderQuestions(e.target.dataset.filter);
-                });
-            });
-        });
-
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-
-            event.target.classList.add('active');
-            document.getElementById(`${tabName}-tab`).classList.add('active');
-        }
-
-        function setExample(text) {
-            document.getElementById('requestText').value = text;
-        }
-
-        async function executeQuestion(id) {
-            const question = testQuestions.find(q => q.id === id);
-            if (!question) return;
-
-            // Switch to manual tab and fill in the question
-            switchTab('manual');
-            document.querySelectorAll('.tab')[0].classList.add('active');
-            setExample(question.question);
-
-            // Auto-submit
-            setTimeout(() => {
-                document.getElementById('requestForm').dispatchEvent(new Event('submit'));
-            }, 100);
-        }
-
-        document.getElementById('requestForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const submitBtn = document.getElementById('submitBtn');
-            const resultContainer = document.getElementById('resultContainer');
-
-            const requestText = document.getElementById('requestText').value;
-            const userId = document.getElementById('userId').value;
-            const tenant = document.getElementById('tenant').value;
-
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Executing...';
-            resultContainer.innerHTML = `
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>Processing your request...</p>
-                </div>
-            `;
-
-            try {
-                const response = await fetch('/api/orchestrate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        request_text: requestText,
-                        user_id: userId,
-                        tenant: tenant
-                    })
-                });
-
-                const data = await response.json();
-
-                const resultClass = data.success ? 'success' : 'error';
-                let resultHTML = `
-                    <div class="result-box ${resultClass}">
-                        <h3>${data.success ? '✅ Success' : '❌ Error'}</h3>
-                        <p><strong>Message:</strong> ${data.message}</p>
-                        <div class="meta-info">
-                            <div class="meta-item">⏱️ ${data.execution_time.toFixed(2)}s</div>
-                            ${data.plan_id ? `<div class="meta-item">🆔 Plan: ${data.plan_id}</div>` : ''}
-                            <div class="meta-item">🔍 Trace: ${data.trace_id}</div>
-                        </div>
-                `;
-
-                if (data.results) {
-                    resultHTML += `
-                        <h4 style="margin-top: 15px;">Results:</h4>
-                        <pre>${JSON.stringify(data.results, null, 2)}</pre>
-                    `;
-                }
-
-                resultHTML += `</div>`;
-                resultContainer.innerHTML = resultHTML;
-
-            } catch (error) {
-                resultContainer.innerHTML = `
-                    <div class="result-box error">
-                        <h3>❌ Request Failed</h3>
-                        <p>${error.message}</p>
-                    </div>
-                `;
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Execute Request';
-            }
-        });
-    </script>
+    <script src="/static/app.js"></script>
 </body>
 </html>
-    """
+"""
+    return html_content
 
 
 @app.post("/api/orchestrate", response_model=OrchestrationResponse)
@@ -855,6 +335,56 @@ async def get_test_questions():
             "rpa_included": rpa_count
         }
     }
+
+
+@app.get("/api/settings")
+async def get_settings(user_id: str = "test_user", tenant: str = "test_tenant"):
+    """Get current settings for user"""
+    try:
+        settings_data = settings_manager.get_all_settings(user_id, tenant)
+        return settings_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/settings")
+async def save_settings(request: SettingsRequest):
+    """Save LLM settings"""
+    try:
+        success = settings_manager.save_llm_settings(
+            user_id=request.user_id,
+            tenant=request.tenant,
+            provider=request.provider,
+            api_key=request.api_key,
+            model=request.model
+        )
+
+        if success:
+            # Clear orchestrator cache to force reload with new settings
+            key = f"{request.tenant}:{request.user_id}"
+            if key in orchestrators:
+                del orchestrators[key]
+
+            return {"success": True, "message": "Settings saved successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save settings")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/settings/test")
+async def test_connection(request: TestConnectionRequest):
+    """Test LLM connection"""
+    try:
+        result = settings_manager.test_connection(
+            provider=request.provider,
+            api_key=request.api_key,
+            model=request.model
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/tools")
