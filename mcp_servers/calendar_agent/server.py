@@ -115,6 +115,7 @@ async def list_tools() -> List[Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: Any) -> List[TextContent]:
     """Handle tool calls"""
+    global events_db
 
     if name == "create_event":
         event_id = f"event_{len(events_db) + 1}"
@@ -200,7 +201,6 @@ async def call_tool(name: str, arguments: Any) -> List[TextContent]:
     elif name == "delete_event":
         event_id = arguments["event_id"]
         original_count = len(events_db)
-        global events_db
         events_db = [e for e in events_db if e["id"] != event_id]
 
         if len(events_db) < original_count:

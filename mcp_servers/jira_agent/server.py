@@ -120,6 +120,7 @@ async def list_tools() -> List[Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: Any) -> List[TextContent]:
     """Handle tool calls"""
+    global issues_db
 
     if name == "create_issue":
         issue_num = len(issues_db) + 1
@@ -208,7 +209,6 @@ async def call_tool(name: str, arguments: Any) -> List[TextContent]:
     elif name == "delete_issue":
         issue_key = arguments["issue_key"]
         original_count = len(issues_db)
-        global issues_db
         issues_db = [i for i in issues_db if i["key"] != issue_key]
 
         if len(issues_db) < original_count:
