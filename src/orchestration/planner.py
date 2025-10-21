@@ -4,6 +4,7 @@ Planner - Plans task execution using LLM
 
 import json
 import uuid
+import os
 from typing import Optional
 from anthropic import Anthropic
 
@@ -18,6 +19,7 @@ from .types import (
     AggregatedGroupResults,
     PlanState
 )
+from .llm_client import create_llm_client, LLMClient
 
 
 class Planner:
@@ -25,7 +27,18 @@ class Planner:
 
     def __init__(self, settings: OrchestrationSettings):
         self.settings = settings
-        self.client = Anthropic(api_key=settings.llm_api_key)
+
+        # Determine LLM provider
+        llm_provider = os.getenv("LLM_PROVIDER", "anthropic")
+
+        # Create LLM client
+        self.llm_client: LLMClient = create_llm_client(
+            api_key=settings.llm_api_key,
+            model=settings.llm_model,
+            provider=llm_provider
+        )
+
+        print(f"[Planner] Using {llm_provider} with model {settings.llm_model}")
 
     async def invoke(self, state: State) -> State:
         """
@@ -79,14 +92,11 @@ Return ONLY the JSON array, no other text.
 
         try:
             # Call LLM
-            response = self.client.messages.create(
-                model=self.settings.llm_model,
-                max_tokens=4096,
-                messages=[{"role": "user", "content": prompt}]
+            content = await self.llm_client.generate(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=4096
             )
-
-            # Parse response
-            content = response.content[0].text.strip()
+            content = content.strip()
 
             # Remove markdown code blocks if present
             if content.startswith("```"):
@@ -175,13 +185,11 @@ Return ONLY the JSON, no other text.
 """
 
         try:
-            response = self.client.messages.create(
-                model=self.settings.llm_model,
-                max_tokens=4096,
-                messages=[{"role": "user", "content": prompt}]
+            content = await self.llm_client.generate(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=4096
             )
-
-            content = response.content[0].text.strip()
+            content = content.strip()
 
             # Remove markdown code blocks if present
             if content.startswith("```"):

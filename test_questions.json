@@ -1,0 +1,704 @@
+{
+  "single_agent_questions": [
+    {
+      "id": 1,
+      "category": "Mail - Single",
+      "agent": "mail",
+      "question": "Send an email to john@example.com with subject 'Project Update' and body 'The project is on track'",
+      "expected_tools": ["send_email"]
+    },
+    {
+      "id": 2,
+      "category": "Mail - Single",
+      "agent": "mail",
+      "question": "Read all unread emails from my inbox",
+      "expected_tools": ["read_emails"]
+    },
+    {
+      "id": 3,
+      "category": "Mail - Single",
+      "agent": "mail",
+      "question": "Search for emails containing the word 'meeting'",
+      "expected_tools": ["search_emails"]
+    },
+    {
+      "id": 4,
+      "category": "Mail - Single",
+      "agent": "mail",
+      "question": "Delete the email with ID email_1",
+      "expected_tools": ["delete_email"]
+    },
+    {
+      "id": 5,
+      "category": "Mail - Single",
+      "agent": "mail",
+      "question": "Show me the email with ID email_2",
+      "expected_tools": ["get_email"]
+    },
+    {
+      "id": 6,
+      "category": "Mail - Single",
+      "agent": "mail",
+      "question": "Send a thank you email to sarah@example.com for her help on the presentation",
+      "expected_tools": ["send_email"]
+    },
+    {
+      "id": 7,
+      "category": "Mail - Single",
+      "agent": "mail",
+      "question": "Find all emails from boss@example.com",
+      "expected_tools": ["search_emails"]
+    },
+    {
+      "id": 8,
+      "category": "Calendar - Single",
+      "agent": "calendar",
+      "question": "Create a meeting event for tomorrow at 2 PM titled 'Team Standup'",
+      "expected_tools": ["create_event"]
+    },
+    {
+      "id": 9,
+      "category": "Calendar - Single",
+      "agent": "calendar",
+      "question": "Show me the details of event_1",
+      "expected_tools": ["read_event"]
+    },
+    {
+      "id": 10,
+      "category": "Calendar - Single",
+      "agent": "calendar",
+      "question": "List all my events for this week",
+      "expected_tools": ["list_events"]
+    },
+    {
+      "id": 11,
+      "category": "Calendar - Single",
+      "agent": "calendar",
+      "question": "Update event_1 to start at 3 PM instead of 2 PM",
+      "expected_tools": ["update_event"]
+    },
+    {
+      "id": 12,
+      "category": "Calendar - Single",
+      "agent": "calendar",
+      "question": "Delete the event event_2 from my calendar",
+      "expected_tools": ["delete_event"]
+    },
+    {
+      "id": 13,
+      "category": "Calendar - Single",
+      "agent": "calendar",
+      "question": "Schedule a one-on-one with my manager for Friday at 10 AM",
+      "expected_tools": ["create_event"]
+    },
+    {
+      "id": 14,
+      "category": "Calendar - Single",
+      "agent": "calendar",
+      "question": "Change the location of event_1 to 'Conference Room B'",
+      "expected_tools": ["update_event"]
+    },
+    {
+      "id": 15,
+      "category": "Jira - Single",
+      "agent": "jira",
+      "question": "Create a new bug issue with title 'Login page not responsive on mobile'",
+      "expected_tools": ["create_issue"]
+    },
+    {
+      "id": 16,
+      "category": "Jira - Single",
+      "agent": "jira",
+      "question": "Show me the details of issue PROJ-1",
+      "expected_tools": ["read_issue"]
+    },
+    {
+      "id": 17,
+      "category": "Jira - Single",
+      "agent": "jira",
+      "question": "Search for all issues with status 'In Progress'",
+      "expected_tools": ["search_issues"]
+    },
+    {
+      "id": 18,
+      "category": "Jira - Single",
+      "agent": "jira",
+      "question": "Update issue PROJ-1 status to 'Done'",
+      "expected_tools": ["update_issue"]
+    },
+    {
+      "id": 19,
+      "category": "Jira - Single",
+      "agent": "jira",
+      "question": "Delete issue PROJ-2 from the project",
+      "expected_tools": ["delete_issue"]
+    },
+    {
+      "id": 20,
+      "category": "Jira - Single",
+      "agent": "jira",
+      "question": "Create a task for implementing user authentication with high priority",
+      "expected_tools": ["create_issue"]
+    },
+    {
+      "id": 21,
+      "category": "Jira - Single",
+      "agent": "jira",
+      "question": "Find all issues assigned to john@example.com",
+      "expected_tools": ["search_issues"]
+    },
+    {
+      "id": 22,
+      "category": "Jira - Single",
+      "agent": "jira",
+      "question": "Change the priority of PROJ-1 to Critical",
+      "expected_tools": ["update_issue"]
+    },
+    {
+      "id": 23,
+      "category": "Calculator - Single",
+      "agent": "calculator",
+      "question": "Calculate 156 + 289 + 432",
+      "expected_tools": ["add"]
+    },
+    {
+      "id": 24,
+      "category": "Calculator - Single",
+      "agent": "calculator",
+      "question": "What is 1000 minus 237?",
+      "expected_tools": ["subtract"]
+    },
+    {
+      "id": 25,
+      "category": "Calculator - Single",
+      "agent": "calculator",
+      "question": "Multiply 25 by 48",
+      "expected_tools": ["multiply"]
+    },
+    {
+      "id": 26,
+      "category": "Calculator - Single",
+      "agent": "calculator",
+      "question": "Divide 3456 by 12",
+      "expected_tools": ["divide"]
+    },
+    {
+      "id": 27,
+      "category": "Calculator - Single",
+      "agent": "calculator",
+      "question": "Calculate 2 to the power of 10",
+      "expected_tools": ["power"]
+    },
+    {
+      "id": 28,
+      "category": "Calculator - Single",
+      "agent": "calculator",
+      "question": "What is 567 times 89?",
+      "expected_tools": ["multiply"]
+    },
+    {
+      "id": 29,
+      "category": "Calculator - Single",
+      "agent": "calculator",
+      "question": "Add up these numbers: 45, 67, 89, 123",
+      "expected_tools": ["add"]
+    },
+    {
+      "id": 30,
+      "category": "Calculator - Single",
+      "agent": "calculator",
+      "question": "Calculate 5 raised to the power of 3",
+      "expected_tools": ["power"]
+    },
+    {
+      "id": 31,
+      "category": "Multi-Agent",
+      "agents": ["mail", "calendar"],
+      "question": "Send an email to team@example.com about tomorrow's meeting at 2 PM and create the calendar event",
+      "expected_tools": ["send_email", "create_event"]
+    },
+    {
+      "id": 32,
+      "category": "Multi-Agent",
+      "agents": ["jira", "mail"],
+      "question": "Create a bug report for the login issue and send an email to the dev team about it",
+      "expected_tools": ["create_issue", "send_email"]
+    },
+    {
+      "id": 33,
+      "category": "Multi-Agent",
+      "agents": ["calendar", "mail"],
+      "question": "Check my calendar for next week and send a summary email to my manager",
+      "expected_tools": ["list_events", "send_email"]
+    },
+    {
+      "id": 34,
+      "category": "Multi-Agent",
+      "agents": ["calculator", "mail"],
+      "question": "Calculate the total of 1500, 2300, and 890, then email the result to finance@example.com",
+      "expected_tools": ["add", "send_email"]
+    },
+    {
+      "id": 35,
+      "category": "Multi-Agent",
+      "agents": ["jira", "calendar"],
+      "question": "Create a sprint planning meeting for Friday and create corresponding Jira tasks for the meeting agenda",
+      "expected_tools": ["create_event", "create_issue"]
+    },
+    {
+      "id": 36,
+      "category": "Multi-Agent",
+      "agents": ["mail", "jira"],
+      "question": "Search for emails about bugs and create Jira issues for any untracked problems",
+      "expected_tools": ["search_emails", "create_issue"]
+    },
+    {
+      "id": 37,
+      "category": "Multi-Agent",
+      "agents": ["calendar", "jira"],
+      "question": "Update the project deadline in Jira to next Monday and schedule a review meeting",
+      "expected_tools": ["update_issue", "create_event"]
+    },
+    {
+      "id": 38,
+      "category": "Multi-Agent",
+      "agents": ["calculator", "jira"],
+      "question": "Calculate the total story points (13, 8, 21, 5) and update the sprint issue with the total",
+      "expected_tools": ["add", "update_issue"]
+    },
+    {
+      "id": 39,
+      "category": "Multi-Agent",
+      "agents": ["mail", "calendar", "jira"],
+      "question": "Schedule a bug triage meeting, create a Jira issue for tracking, and send invites to the team",
+      "expected_tools": ["create_event", "create_issue", "send_email"]
+    },
+    {
+      "id": 40,
+      "category": "Multi-Agent",
+      "agents": ["calculator", "mail"],
+      "question": "Calculate monthly expenses (rent: 2000, utilities: 300, food: 800) and email the breakdown",
+      "expected_tools": ["add", "send_email"]
+    },
+    {
+      "id": 41,
+      "category": "Multi-Agent",
+      "agents": ["jira", "mail"],
+      "question": "Get the status of PROJ-1 and email an update to stakeholders@example.com",
+      "expected_tools": ["read_issue", "send_email"]
+    },
+    {
+      "id": 42,
+      "category": "Multi-Agent",
+      "agents": ["calendar", "calculator"],
+      "question": "List all meetings this week and calculate the total hours spent in meetings",
+      "expected_tools": ["list_events", "add"]
+    },
+    {
+      "id": 43,
+      "category": "Multi-Agent",
+      "agents": ["mail", "jira"],
+      "question": "Find all high priority Jira issues and send a summary email to the project manager",
+      "expected_tools": ["search_issues", "send_email"]
+    },
+    {
+      "id": 44,
+      "category": "Multi-Agent",
+      "agents": ["calendar", "mail"],
+      "question": "Reschedule event_1 to next Tuesday and notify all attendees via email",
+      "expected_tools": ["update_event", "send_email"]
+    },
+    {
+      "id": 45,
+      "category": "Multi-Agent",
+      "agents": ["calculator", "calendar"],
+      "question": "Calculate how many days until 2025-12-31 and create a countdown event",
+      "expected_tools": ["subtract", "create_event"]
+    },
+    {
+      "id": 46,
+      "category": "Multi-Agent",
+      "agents": ["jira", "calculator"],
+      "question": "Find all open issues, count them, and multiply by average 2 hours per issue to estimate workload",
+      "expected_tools": ["search_issues", "multiply"]
+    },
+    {
+      "id": 47,
+      "category": "Multi-Agent",
+      "agents": ["mail", "calendar", "calculator"],
+      "question": "Count my meetings this week, calculate total hours, and email the summary to my manager",
+      "expected_tools": ["list_events", "multiply", "send_email"]
+    },
+    {
+      "id": 48,
+      "category": "Multi-Agent",
+      "agents": ["jira", "calendar", "mail"],
+      "question": "Create a release planning issue, schedule the planning meeting, and send invites to the team",
+      "expected_tools": ["create_issue", "create_event", "send_email"]
+    },
+    {
+      "id": 49,
+      "category": "Multi-Agent",
+      "agents": ["calculator", "jira"],
+      "question": "Calculate the completion rate: 15 done out of 23 total issues, then update the project summary",
+      "expected_tools": ["divide", "update_issue"]
+    },
+    {
+      "id": 50,
+      "category": "Multi-Agent",
+      "agents": ["mail", "jira"],
+      "question": "Search emails for feature requests and create corresponding Jira stories",
+      "expected_tools": ["search_emails", "create_issue"]
+    },
+    {
+      "id": 51,
+      "category": "Multi-Agent",
+      "agents": ["calendar", "mail"],
+      "question": "Cancel event_2 and send cancellation emails to all attendees",
+      "expected_tools": ["delete_event", "send_email"]
+    },
+    {
+      "id": 52,
+      "category": "Multi-Agent",
+      "agents": ["jira", "mail"],
+      "question": "Mark PROJ-1 as completed and notify the team via email",
+      "expected_tools": ["update_issue", "send_email"]
+    },
+    {
+      "id": 53,
+      "category": "Multi-Agent",
+      "agents": ["calculator", "mail"],
+      "question": "Calculate the project budget split (40% dev, 30% design, 30% testing) from $10000 and email breakdown",
+      "expected_tools": ["multiply", "send_email"]
+    },
+    {
+      "id": 54,
+      "category": "Multi-Agent",
+      "agents": ["calendar", "jira"],
+      "question": "Schedule daily standups for next week and create a Jira epic to track the sprint",
+      "expected_tools": ["create_event", "create_issue"]
+    },
+    {
+      "id": 55,
+      "category": "Multi-Agent",
+      "agents": ["mail", "calculator"],
+      "question": "Read emails about invoices, sum up the amounts, and reply with the total",
+      "expected_tools": ["search_emails", "add", "send_email"]
+    },
+    {
+      "id": 56,
+      "category": "Multi-Agent",
+      "agents": ["jira", "calendar"],
+      "question": "Find all issues due this week and add them to my calendar as tasks",
+      "expected_tools": ["search_issues", "create_event"]
+    },
+    {
+      "id": 57,
+      "category": "Multi-Agent",
+      "agents": ["calculator", "jira", "mail"],
+      "question": "Calculate velocity (completed points: 45, sprint length: 2 weeks), update sprint report, and email results",
+      "expected_tools": ["divide", "update_issue", "send_email"]
+    },
+    {
+      "id": 58,
+      "category": "Multi-Agent",
+      "agents": ["calendar", "calculator"],
+      "question": "Find my availability next week and calculate total free hours",
+      "expected_tools": ["list_events", "subtract"]
+    },
+    {
+      "id": 59,
+      "category": "Multi-Agent",
+      "agents": ["mail", "jira", "calendar"],
+      "question": "Search for emails about the product launch, create a launch tracking issue, and schedule a kickoff meeting",
+      "expected_tools": ["search_emails", "create_issue", "create_event"]
+    },
+    {
+      "id": 60,
+      "category": "Multi-Agent",
+      "agents": ["calculator", "mail"],
+      "question": "Calculate quarterly revenue (Q1: 50000, Q2: 62000, Q3: 71000) and email report to executives",
+      "expected_tools": ["add", "send_email"]
+    },
+    {
+      "id": 61,
+      "category": "RPA Included",
+      "agents": ["rpa", "mail"],
+      "question": "Search for the latest technology news and send a summary email to team@example.com",
+      "expected_tools": ["search_latest_news", "send_email"]
+    },
+    {
+      "id": 62,
+      "category": "RPA Included",
+      "agents": ["rpa", "calendar"],
+      "question": "Search for AI news, write a report about it, and schedule a meeting to discuss the findings",
+      "expected_tools": ["search_latest_news", "write_report", "create_event"]
+    },
+    {
+      "id": 63,
+      "category": "RPA Included",
+      "agents": ["rpa", "jira"],
+      "question": "Write a weekly progress report and create a Jira task for reviewing it",
+      "expected_tools": ["write_report", "create_issue"]
+    },
+    {
+      "id": 64,
+      "category": "RPA Included",
+      "agents": ["rpa", "mail"],
+      "question": "Collect attendance for the team meeting and email the summary to the organizer",
+      "expected_tools": ["collect_attendance", "send_email"]
+    },
+    {
+      "id": 65,
+      "category": "RPA Included",
+      "agents": ["rpa"],
+      "question": "Search for the latest news about artificial intelligence",
+      "expected_tools": ["search_latest_news"]
+    },
+    {
+      "id": 66,
+      "category": "RPA Included",
+      "agents": ["rpa"],
+      "question": "Generate a project status report with sections for progress, blockers, and next steps",
+      "expected_tools": ["write_report"]
+    },
+    {
+      "id": 67,
+      "category": "RPA Included",
+      "agents": ["rpa"],
+      "question": "Record attendance for 'Q4 Planning Meeting' - mark john@example.com as attending",
+      "expected_tools": ["collect_attendance"]
+    },
+    {
+      "id": 68,
+      "category": "RPA Included",
+      "agents": ["rpa", "mail", "calendar"],
+      "question": "Search tech news, write a briefing report, schedule a discussion, and send invites",
+      "expected_tools": ["search_latest_news", "write_report", "create_event", "send_email"]
+    },
+    {
+      "id": 69,
+      "category": "RPA Included",
+      "agents": ["rpa", "jira"],
+      "question": "Search for industry news and create Jira tasks for any relevant action items",
+      "expected_tools": ["search_latest_news", "create_issue"]
+    },
+    {
+      "id": 70,
+      "category": "RPA Included",
+      "agents": ["rpa", "calculator", "mail"],
+      "question": "Get attendance count for 'Team Meeting', calculate attendance rate from 20 invites, and email results",
+      "expected_tools": ["collect_attendance", "divide", "send_email"]
+    },
+    {
+      "id": 71,
+      "category": "RPA Included",
+      "agents": ["rpa", "mail"],
+      "question": "Write a monthly summary report and email it to stakeholders@example.com",
+      "expected_tools": ["write_report", "send_email"]
+    },
+    {
+      "id": 72,
+      "category": "RPA Included",
+      "agents": ["rpa", "calendar", "jira"],
+      "question": "Search for product launch news, create a competitive analysis issue, and schedule review meeting",
+      "expected_tools": ["search_latest_news", "create_issue", "create_event"]
+    },
+    {
+      "id": 73,
+      "category": "RPA Included",
+      "agents": ["rpa", "jira", "mail"],
+      "question": "Collect attendance summary, create a Jira task for follow-ups with absent members, and email the list",
+      "expected_tools": ["collect_attendance", "create_issue", "send_email"]
+    },
+    {
+      "id": 74,
+      "category": "RPA Included",
+      "agents": ["rpa", "mail"],
+      "question": "Search for latest cybersecurity news and send urgent alerts to security@example.com",
+      "expected_tools": ["search_latest_news", "send_email"]
+    },
+    {
+      "id": 75,
+      "category": "RPA Included",
+      "agents": ["rpa", "calendar"],
+      "question": "Write a sprint retrospective report and schedule the next sprint planning",
+      "expected_tools": ["write_report", "create_event"]
+    },
+    {
+      "id": 76,
+      "category": "RPA Included",
+      "agents": ["rpa"],
+      "question": "Collect and show attendance summary for 'All Hands Meeting'",
+      "expected_tools": ["collect_attendance"]
+    },
+    {
+      "id": 77,
+      "category": "RPA Included",
+      "agents": ["rpa", "jira"],
+      "question": "Write a technical documentation report and create a Jira task for peer review",
+      "expected_tools": ["write_report", "create_issue"]
+    },
+    {
+      "id": 78,
+      "category": "RPA Included",
+      "agents": ["rpa", "mail", "jira"],
+      "question": "Search for competitor news, create tracking issues, and email analysis to product@example.com",
+      "expected_tools": ["search_latest_news", "create_issue", "send_email"]
+    },
+    {
+      "id": 79,
+      "category": "RPA Included",
+      "agents": ["rpa", "calculator"],
+      "question": "Get attendance for 'Training Session', calculate percentage from 50 expected, and generate report",
+      "expected_tools": ["collect_attendance", "divide", "write_report"]
+    },
+    {
+      "id": 80,
+      "category": "RPA Included",
+      "agents": ["rpa", "calendar", "mail"],
+      "question": "Search for industry conference news, schedule team discussion, and send details to team",
+      "expected_tools": ["search_latest_news", "create_event", "send_email"]
+    },
+    {
+      "id": 81,
+      "category": "RPA Included",
+      "agents": ["rpa", "mail"],
+      "question": "Generate a customer feedback summary report and email it to support@example.com",
+      "expected_tools": ["write_report", "send_email"]
+    },
+    {
+      "id": 82,
+      "category": "RPA Included",
+      "agents": ["rpa", "jira", "calendar"],
+      "question": "Write incident post-mortem report, create follow-up Jira tasks, and schedule review meeting",
+      "expected_tools": ["write_report", "create_issue", "create_event"]
+    },
+    {
+      "id": 83,
+      "category": "RPA Included",
+      "agents": ["rpa"],
+      "question": "Search for news about machine learning and deep learning",
+      "expected_tools": ["search_latest_news"]
+    },
+    {
+      "id": 84,
+      "category": "RPA Included",
+      "agents": ["rpa", "mail"],
+      "question": "Record attendance for sarah@example.com as 'maybe' for Leadership Summit and email confirmation",
+      "expected_tools": ["collect_attendance", "send_email"]
+    },
+    {
+      "id": 85,
+      "category": "RPA Included",
+      "agents": ["rpa", "jira"],
+      "question": "Search for DevOps news and create Jira improvement suggestions based on findings",
+      "expected_tools": ["search_latest_news", "create_issue"]
+    },
+    {
+      "id": 86,
+      "category": "RPA Included",
+      "agents": ["rpa", "calendar", "mail"],
+      "question": "Write quarterly business review report, schedule presentation meeting, and send invites to executives",
+      "expected_tools": ["write_report", "create_event", "send_email"]
+    },
+    {
+      "id": 87,
+      "category": "RPA Included",
+      "agents": ["rpa", "calculator", "jira"],
+      "question": "Get attendance summary, calculate no-show rate, and create a Jira task to address the issue",
+      "expected_tools": ["collect_attendance", "divide", "create_issue"]
+    },
+    {
+      "id": 88,
+      "category": "RPA Included",
+      "agents": ["rpa", "mail", "calendar"],
+      "question": "Search for upcoming tech conferences, write summary report, and email to learning@example.com",
+      "expected_tools": ["search_latest_news", "write_report", "send_email"]
+    },
+    {
+      "id": 89,
+      "category": "RPA Included",
+      "agents": ["rpa", "jira"],
+      "question": "Write a security audit report and create high-priority Jira issues for vulnerabilities",
+      "expected_tools": ["write_report", "create_issue"]
+    },
+    {
+      "id": 90,
+      "category": "RPA Included",
+      "agents": ["rpa"],
+      "question": "Generate a markdown report about project milestones with timeline and deliverables sections",
+      "expected_tools": ["write_report"]
+    },
+    {
+      "id": 91,
+      "category": "RPA Included",
+      "agents": ["rpa", "mail", "jira"],
+      "question": "Search for open source trends, write analysis report, create research tasks, and email to innovation@example.com",
+      "expected_tools": ["search_latest_news", "write_report", "create_issue", "send_email"]
+    },
+    {
+      "id": 92,
+      "category": "RPA Included",
+      "agents": ["rpa", "calendar"],
+      "question": "Collect attendance for 'Product Demo' and schedule a follow-up for those who couldn't attend",
+      "expected_tools": ["collect_attendance", "create_event"]
+    },
+    {
+      "id": 93,
+      "category": "RPA Included",
+      "agents": ["rpa", "calculator", "mail"],
+      "question": "Search for market growth news, calculate ROI projections, and email investment report to finance team",
+      "expected_tools": ["search_latest_news", "multiply", "send_email"]
+    },
+    {
+      "id": 94,
+      "category": "RPA Included",
+      "agents": ["rpa", "jira", "calendar"],
+      "question": "Write risk assessment report, create mitigation Jira issues, and schedule risk review meeting",
+      "expected_tools": ["write_report", "create_issue", "create_event"]
+    },
+    {
+      "id": 95,
+      "category": "RPA Included",
+      "agents": ["rpa", "mail"],
+      "question": "Search for cloud computing news and send a technology update to engineering@example.com",
+      "expected_tools": ["search_latest_news", "send_email"]
+    },
+    {
+      "id": 96,
+      "category": "RPA Included",
+      "agents": ["rpa", "calendar", "mail"],
+      "question": "Get attendance for Strategy Planning, create makeup session for absent members, and send invites",
+      "expected_tools": ["collect_attendance", "create_event", "send_email"]
+    },
+    {
+      "id": 97,
+      "category": "RPA Included",
+      "agents": ["rpa", "jira"],
+      "question": "Write performance optimization report and create Jira tasks for each improvement area",
+      "expected_tools": ["write_report", "create_issue"]
+    },
+    {
+      "id": 98,
+      "category": "RPA Included",
+      "agents": ["rpa", "calculator", "mail"],
+      "question": "Collect workshop attendance, calculate cost per attendee from $5000 budget, and email metrics to hr@example.com",
+      "expected_tools": ["collect_attendance", "divide", "send_email"]
+    },
+    {
+      "id": 99,
+      "category": "RPA Included",
+      "agents": ["rpa", "mail", "calendar", "jira"],
+      "question": "Search for agile methodology news, write best practices report, schedule training, create tracking issue, and email invites",
+      "expected_tools": ["search_latest_news", "write_report", "create_event", "create_issue", "send_email"]
+    },
+    {
+      "id": 100,
+      "category": "RPA Included",
+      "agents": ["rpa", "jira", "mail"],
+      "question": "Generate compliance audit report, create remediation Jira tasks, and email findings to compliance@example.com",
+      "expected_tools": ["write_report", "create_issue", "send_email"]
+    }
+  ]
+}

@@ -13,9 +13,9 @@ from .tracker import TaskTracker
 class TaskDispatcher:
     """TaskDispatcher - Executes plan steps using MCP"""
 
-    def __init__(self, tracker: TaskTracker):
+    def __init__(self, tracker: TaskTracker, executor: MCPExecutor):
         self.tracker = tracker
-        self.executor = MCPExecutor()
+        self.executor = executor
 
     async def invoke(self, state: State) -> State:
         """

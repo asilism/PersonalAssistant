@@ -1,38 +1,134 @@
 """
-MCP Executor - Directly executes MCP tools
-Instead of sending messages to TaskService, this executes MCP tools directly
+MCP Executor - Connects to and executes MCP tools via STDIO
 """
 
 import asyncio
 import subprocess
 import json
+import os
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Dict, List
+from contextlib import asynccontextmanager
 
-from .types import Step, StepResult
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
+from .types import Step, StepResult, ToolDefinition
 
 
 class MCPExecutor:
-    """MCPExecutor - Executes MCP tools directly"""
+    """MCPExecutor - Executes MCP tools via real MCP servers"""
 
     def __init__(self):
         self._execution_count = 0
+        self._servers: Dict[str, Dict[str, Any]] = {}
+        self._sessions: Dict[str, ClientSession] = {}
+        self._available_tools: Dict[str, ToolDefinition] = {}
+
+    async def initialize_servers(self):
+        """Initialize connections to all MCP servers"""
+        # Define MCP server configurations
+        server_configs = {
+            "mail-agent": {
+                "command": "python3",
+                "args": [os.path.join(os.path.dirname(__file__), "../../mcp_servers/mail_agent/server.py")],
+                "env": None
+            },
+            "calendar-agent": {
+                "command": "python3",
+                "args": [os.path.join(os.path.dirname(__file__), "../../mcp_servers/calendar_agent/server.py")],
+                "env": None
+            },
+            "jira-agent": {
+                "command": "python3",
+                "args": [os.path.join(os.path.dirname(__file__), "../../mcp_servers/jira_agent/server.py")],
+                "env": None
+            },
+            "calculator-agent": {
+                "command": "python3",
+                "args": [os.path.join(os.path.dirname(__file__), "../../mcp_servers/calculator_agent/server.py")],
+                "env": None
+            },
+            "rpa-agent": {
+                "command": "python3",
+                "args": [os.path.join(os.path.dirname(__file__), "../../mcp_servers/rpa_agent/server.py")],
+                "env": None
+            }
+        }
+
+        print("[MCPExecutor] Initializing MCP servers...")
+
+        for server_name, config in server_configs.items():
+            try:
+                # Store server config
+                self._servers[server_name] = {
+                    "config": config,
+                    "status": "starting"
+                }
+
+                print(f"[MCPExecutor] Configured {server_name}")
+                self._servers[server_name]["status"] = "ready"
+
+            except Exception as e:
+                print(f"[MCPExecutor] Error configuring {server_name}: {e}")
+                self._servers[server_name]["status"] = "error"
+
+        print(f"[MCPExecutor] Initialized {len(self._servers)} MCP servers")
+
+    async def discover_tools(self) -> List[ToolDefinition]:
+        """Discover all available tools from MCP servers"""
+        all_tools = []
+
+        for server_name, server_info in self._servers.items():
+            if server_info["status"] != "ready":
+                continue
+
+            try:
+                config = server_info["config"]
+                server_params = StdioServerParameters(
+                    command=config["command"],
+                    args=config["args"],
+                    env=config.get("env")
+                )
+
+                async with stdio_client(server_params) as (read, write):
+                    async with ClientSession(read, write) as session:
+                        await session.initialize()
+
+                        # List tools
+                        tools_result = await session.list_tools()
+
+                        for tool in tools_result.tools:
+                            tool_def = ToolDefinition(
+                                name=tool.name,
+                                description=tool.description or "",
+                                input_schema=tool.inputSchema
+                            )
+                            all_tools.append(tool_def)
+                            self._available_tools[tool.name] = tool_def
+
+                        print(f"[MCPExecutor] Discovered {len(tools_result.tools)} tools from {server_name}")
+
+            except Exception as e:
+                print(f"[MCPExecutor] Error discovering tools from {server_name}: {e}")
+
+        return all_tools
 
     async def execute_step(self, step: Step) -> StepResult:
         """
         Execute a single step using MCP tools
-        This is a simplified implementation - in production, use the official MCP SDK
         """
         start_time = datetime.now()
 
         try:
-            # Simulate MCP tool execution
-            # In a real implementation, this would:
-            # 1. Connect to MCP server
-            # 2. Call the tool with the input
-            # 3. Return the result
+            # Find which server has this tool
+            server_name = await self._find_server_for_tool(step.tool_name)
 
-            output = await self._execute_mcp_tool(step.tool_name, step.input)
+            if not server_name:
+                raise ValueError(f"No MCP server found for tool: {step.tool_name}")
+
+            # Execute the tool
+            output = await self._execute_mcp_tool(server_name, step.tool_name, step.input)
 
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds() * 1000
@@ -57,73 +153,86 @@ class MCPExecutor:
                 duration=duration
             )
 
-    async def _execute_mcp_tool(self, tool_name: str, tool_input: dict[str, Any]) -> Any:
+    async def _find_server_for_tool(self, tool_name: str) -> Optional[str]:
+        """Find which server provides a specific tool"""
+        # Tool name to server mapping
+        tool_server_map = {
+            # Mail agent
+            "send_email": "mail-agent",
+            "read_emails": "mail-agent",
+            "get_email": "mail-agent",
+            "delete_email": "mail-agent",
+            "search_emails": "mail-agent",
+
+            # Calendar agent
+            "create_event": "calendar-agent",
+            "read_event": "calendar-agent",
+            "update_event": "calendar-agent",
+            "delete_event": "calendar-agent",
+            "list_events": "calendar-agent",
+
+            # Jira agent
+            "create_issue": "jira-agent",
+            "read_issue": "jira-agent",
+            "update_issue": "jira-agent",
+            "delete_issue": "jira-agent",
+            "search_issues": "jira-agent",
+
+            # Calculator agent
+            "add": "calculator-agent",
+            "subtract": "calculator-agent",
+            "multiply": "calculator-agent",
+            "divide": "calculator-agent",
+            "power": "calculator-agent",
+
+            # RPA agent
+            "search_latest_news": "rpa-agent",
+            "write_report": "rpa-agent",
+            "collect_attendance": "rpa-agent",
+        }
+
+        return tool_server_map.get(tool_name)
+
+    async def _execute_mcp_tool(self, server_name: str, tool_name: str, tool_input: dict[str, Any]) -> Any:
         """
-        Execute MCP tool (simplified implementation)
-        In production, use the MCP SDK to connect to MCP servers
+        Execute MCP tool via STDIO connection
         """
-        # Mock implementation for different tools
-        if tool_name == "web_search":
-            return await self._mock_web_search(tool_input.get("query", ""))
+        if server_name not in self._servers:
+            raise ValueError(f"Unknown server: {server_name}")
 
-        elif tool_name == "read_file":
-            return await self._mock_read_file(tool_input.get("path", ""))
+        server_info = self._servers[server_name]
+        if server_info["status"] != "ready":
+            raise ValueError(f"Server {server_name} is not ready")
 
-        elif tool_name == "write_file":
-            return await self._mock_write_file(
-                tool_input.get("path", ""),
-                tool_input.get("content", "")
-            )
+        config = server_info["config"]
 
-        elif tool_name == "execute_command":
-            return await self._mock_execute_command(tool_input.get("command", ""))
+        # Create server parameters
+        server_params = StdioServerParameters(
+            command=config["command"],
+            args=config["args"],
+            env=config.get("env")
+        )
 
-        elif tool_name == "send_email":
-            return await self._mock_send_email(
-                tool_input.get("to", ""),
-                tool_input.get("subject", ""),
-                tool_input.get("body", "")
-            )
+        # Connect and execute
+        async with stdio_client(server_params) as (read, write):
+            async with ClientSession(read, write) as session:
+                # Initialize session
+                await session.initialize()
 
-        else:
-            raise ValueError(f"Unknown tool: {tool_name}")
+                # Call the tool
+                result = await session.call_tool(tool_name, arguments=tool_input)
 
-    async def _mock_web_search(self, query: str) -> dict[str, Any]:
-        """Mock web search"""
-        await asyncio.sleep(0.1)  # Simulate network delay
-        return {
-            "query": query,
-            "results": [
-                {"title": f"Result for: {query}", "url": "https://example.com", "snippet": "..."}
-            ]
-        }
+                # Parse result
+                if result.content:
+                    # Get the first text content
+                    for content in result.content:
+                        if hasattr(content, 'text'):
+                            return json.loads(content.text)
 
-    async def _mock_read_file(self, path: str) -> dict[str, Any]:
-        """Mock file read"""
-        await asyncio.sleep(0.05)
-        return {"path": path, "content": f"[Content of {path}]"}
+                return {"success": True, "result": "completed"}
 
-    async def _mock_write_file(self, path: str, content: str) -> dict[str, Any]:
-        """Mock file write"""
-        await asyncio.sleep(0.05)
-        return {"path": path, "bytes_written": len(content)}
-
-    async def _mock_execute_command(self, command: str) -> dict[str, Any]:
-        """Mock command execution"""
-        await asyncio.sleep(0.1)
-        return {
-            "command": command,
-            "stdout": f"[Output of: {command}]",
-            "stderr": "",
-            "exit_code": 0
-        }
-
-    async def _mock_send_email(self, to: str, subject: str, body: str) -> dict[str, Any]:
-        """Mock email sending"""
-        await asyncio.sleep(0.1)
-        return {
-            "to": to,
-            "subject": subject,
-            "status": "sent",
-            "message_id": f"msg_{self._execution_count}"
-        }
+    async def cleanup(self):
+        """Cleanup connections"""
+        print("[MCPExecutor] Cleaning up connections...")
+        self._sessions.clear()
+        self._servers.clear()
