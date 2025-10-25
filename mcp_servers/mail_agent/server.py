@@ -4,17 +4,15 @@ Mail Agent MCP Server
 Provides email management tools: send, read, delete, search
 """
 
-import json
-import sys
-import asyncio
 from datetime import datetime
-from typing import Any, Dict, List
-from mcp.server import Server
-from mcp.types import Tool, TextContent
-from mcp.server.stdio import stdio_server
+from typing import Optional
+from fastmcp import FastMCP
+
+# Create FastMCP server
+mcp = FastMCP("mail-agent")
 
 # Mock email database
-emails_db: List[Dict[str, Any]] = [
+emails_db: list[dict] = [
     {
         "id": "email_1",
         "from": "boss@example.com",
@@ -35,207 +33,142 @@ emails_db: List[Dict[str, Any]] = [
     }
 ]
 
-app = Server("mail-agent")
+
+@mcp.tool()
+def send_email(to: str, subject: str, body: str) -> dict:
+    """Send an email to a recipient
+
+    Args:
+        to: Recipient email address
+        subject: Email subject
+        body: Email body content
+
+    Returns:
+        Result of the send operation
+    """
+    # Create new email
+    email_id = f"email_{len(emails_db) + 1}"
+    new_email = {
+        "id": email_id,
+        "from": "user@example.com",
+        "to": to,
+        "subject": subject,
+        "body": body,
+        "timestamp": datetime.now().isoformat(),
+        "read": True,
+        "sent": True
+    }
+    emails_db.append(new_email)
+
+    return {
+        "success": True,
+        "email_id": email_id,
+        "message": f"Email sent to {to}",
+        "subject": subject
+    }
 
 
-@app.list_tools()
-async def list_tools() -> List[Tool]:
-    """List available email tools"""
-    return [
-        Tool(
-            name="send_email",
-            description="Send an email to a recipient",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "to": {"type": "string", "description": "Recipient email address"},
-                    "subject": {"type": "string", "description": "Email subject"},
-                    "body": {"type": "string", "description": "Email body content"}
-                },
-                "required": ["to", "subject", "body"]
-            }
-        ),
-        Tool(
-            name="read_emails",
-            description="Read emails from inbox with optional filters",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "unread_only": {"type": "boolean", "description": "Only show unread emails"},
-                    "limit": {"type": "number", "description": "Maximum number of emails to return"}
-                }
-            }
-        ),
-        Tool(
-            name="get_email",
-            description="Get a specific email by ID",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "email_id": {"type": "string", "description": "Email ID"}
-                },
-                "required": ["email_id"]
-            }
-        ),
-        Tool(
-            name="delete_email",
-            description="Delete an email by ID",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "email_id": {"type": "string", "description": "Email ID to delete"}
-                },
-                "required": ["email_id"]
-            }
-        ),
-        Tool(
-            name="search_emails",
-            description="Search emails by query string",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "Search query"},
-                    "field": {"type": "string", "description": "Field to search in (subject, body, from)", "enum": ["subject", "body", "from", "all"]}
-                },
-                "required": ["query"]
-            }
-        )
-    ]
+@mcp.tool()
+def read_emails(unread_only: bool = False, limit: int = 10) -> dict:
+    """Read emails from inbox with optional filters
+
+    Args:
+        unread_only: Only show unread emails
+        limit: Maximum number of emails to return
+
+    Returns:
+        List of emails
+    """
+    filtered_emails = emails_db
+    if unread_only:
+        filtered_emails = [e for e in emails_db if not e.get("read", True)]
+
+    result_emails = filtered_emails[:limit]
+
+    return {
+        "success": True,
+        "count": len(result_emails),
+        "emails": result_emails
+    }
 
 
-@app.call_tool()
-async def call_tool(name: str, arguments: Any) -> List[TextContent]:
-    """Handle tool calls"""
-    global emails_db
+@mcp.tool()
+def get_email(email_id: str) -> dict:
+    """Get a specific email by ID
 
-    if name == "send_email":
-        to = arguments["to"]
-        subject = arguments["subject"]
-        body = arguments["body"]
+    Args:
+        email_id: Email ID
 
-        # Create new email
-        email_id = f"email_{len(emails_db) + 1}"
-        new_email = {
-            "id": email_id,
-            "from": "user@example.com",
-            "to": to,
-            "subject": subject,
-            "body": body,
-            "timestamp": datetime.now().isoformat(),
-            "read": True,
-            "sent": True
+    Returns:
+        The email if found
+    """
+    email = next((e for e in emails_db if e["id"] == email_id), None)
+
+    if email:
+        # Mark as read
+        email["read"] = True
+        return {
+            "success": True,
+            "email": email
         }
-        emails_db.append(new_email)
+    else:
+        return {
+            "success": False,
+            "error": f"Email {email_id} not found"
+        }
 
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "success": True,
-                "email_id": email_id,
-                "message": f"Email sent to {to}",
-                "subject": subject
-            }, indent=2)
-        )]
 
-    elif name == "read_emails":
-        unread_only = arguments.get("unread_only", False)
-        limit = arguments.get("limit", 10)
+@mcp.tool()
+def delete_email(email_id: str) -> dict:
+    """Delete an email by ID
 
-        filtered_emails = emails_db
-        if unread_only:
-            filtered_emails = [e for e in emails_db if not e.get("read", True)]
+    Args:
+        email_id: Email ID to delete
 
-        result_emails = filtered_emails[:int(limit)]
+    Returns:
+        Result of the delete operation
+    """
+    global emails_db
+    original_count = len(emails_db)
+    emails_db = [e for e in emails_db if e["id"] != email_id]
 
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "success": True,
-                "count": len(result_emails),
-                "emails": result_emails
-            }, indent=2)
-        )]
+    if len(emails_db) < original_count:
+        return {
+            "success": True,
+            "message": f"Email {email_id} deleted"
+        }
+    else:
+        return {
+            "success": False,
+            "error": f"Email {email_id} not found"
+        }
 
-    elif name == "get_email":
-        email_id = arguments["email_id"]
-        email = next((e for e in emails_db if e["id"] == email_id), None)
 
-        if email:
-            # Mark as read
-            email["read"] = True
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "success": True,
-                    "email": email
-                }, indent=2)
-            )]
-        else:
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "success": False,
-                    "error": f"Email {email_id} not found"
-                }, indent=2)
-            )]
+@mcp.tool()
+def search_emails(query: str, field: str = "all") -> dict:
+    """Search emails by query string
 
-    elif name == "delete_email":
-        email_id = arguments["email_id"]
-        original_count = len(emails_db)
-        emails_db = [e for e in emails_db if e["id"] != email_id]
+    Args:
+        query: Search query
+        field: Field to search in (subject, body, from, all)
 
-        if len(emails_db) < original_count:
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "success": True,
-                    "message": f"Email {email_id} deleted"
-                }, indent=2)
-            )]
-        else:
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "success": False,
-                    "error": f"Email {email_id} not found"
-                }, indent=2)
-            )]
+    Returns:
+        List of matching emails
+    """
+    query_lower = query.lower()
+    results = []
 
-    elif name == "search_emails":
-        query = arguments["query"].lower()
-        field = arguments.get("field", "all")
-
-        results = []
-        for email in emails_db:
-            if field == "all":
-                if (query in email.get("subject", "").lower() or
-                    query in email.get("body", "").lower() or
-                    query in email.get("from", "").lower()):
-                    results.append(email)
-            elif field in email and query in email[field].lower():
+    for email in emails_db:
+        if field == "all":
+            if (query_lower in email.get("subject", "").lower() or
+                query_lower in email.get("body", "").lower() or
+                query_lower in email.get("from", "").lower()):
                 results.append(email)
+        elif field in email and query_lower in email[field].lower():
+            results.append(email)
 
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "success": True,
-                "count": len(results),
-                "results": results
-            }, indent=2)
-        )]
-
-    raise ValueError(f"Unknown tool: {name}")
-
-
-async def main():
-    """Run the MCP server"""
-    async with stdio_server() as (read_stream, write_stream):
-        await app.run(
-            read_stream,
-            write_stream,
-            app.create_initialization_options()
-        )
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    return {
+        "success": True,
+        "count": len(results),
+        "results": results
+    }
