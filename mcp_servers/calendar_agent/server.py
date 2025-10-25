@@ -4,17 +4,15 @@ Calendar Agent MCP Server
 Provides calendar event management tools: create, read, update, delete, list
 """
 
-import json
-import sys
-import asyncio
-from datetime import datetime, timedelta
-from typing import Any, Dict, List
-from mcp.server import Server
-from mcp.types import Tool, TextContent
-from mcp.server.stdio import stdio_server
+from datetime import datetime
+from typing import Optional
+from fastmcp import FastMCP
+
+# Create FastMCP server
+mcp = FastMCP("calendar-agent")
 
 # Mock calendar events database
-events_db: List[Dict[str, Any]] = [
+events_db: list[dict] = [
     {
         "id": "event_1",
         "title": "Team Meeting",
@@ -35,227 +33,181 @@ events_db: List[Dict[str, Any]] = [
     }
 ]
 
-app = Server("calendar-agent")
+
+@mcp.tool()
+def create_event(
+    title: str,
+    start_time: str,
+    end_time: str,
+    description: str = "",
+    attendees: list[str] = None,
+    location: str = ""
+) -> dict:
+    """Create a new calendar event
+
+    Args:
+        title: Event title
+        start_time: Start time (ISO format)
+        end_time: End time (ISO format)
+        description: Event description
+        attendees: List of attendee emails
+        location: Event location
+
+    Returns:
+        The created event
+    """
+    event_id = f"event_{len(events_db) + 1}"
+    new_event = {
+        "id": event_id,
+        "title": title,
+        "description": description,
+        "start_time": start_time,
+        "end_time": end_time,
+        "attendees": attendees or [],
+        "location": location,
+        "created_at": datetime.now().isoformat()
+    }
+    events_db.append(new_event)
+
+    return {
+        "success": True,
+        "event_id": event_id,
+        "event": new_event
+    }
 
 
-@app.list_tools()
-async def list_tools() -> List[Tool]:
-    """List available calendar tools"""
-    return [
-        Tool(
-            name="create_event",
-            description="Create a new calendar event",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string", "description": "Event title"},
-                    "description": {"type": "string", "description": "Event description"},
-                    "start_time": {"type": "string", "description": "Start time (ISO format)"},
-                    "end_time": {"type": "string", "description": "End time (ISO format)"},
-                    "attendees": {"type": "array", "items": {"type": "string"}, "description": "List of attendee emails"},
-                    "location": {"type": "string", "description": "Event location"}
-                },
-                "required": ["title", "start_time", "end_time"]
-            }
-        ),
-        Tool(
-            name="read_event",
-            description="Read a specific event by ID",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "event_id": {"type": "string", "description": "Event ID"}
-                },
-                "required": ["event_id"]
-            }
-        ),
-        Tool(
-            name="update_event",
-            description="Update an existing event",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "event_id": {"type": "string", "description": "Event ID"},
-                    "title": {"type": "string", "description": "New event title"},
-                    "description": {"type": "string", "description": "New event description"},
-                    "start_time": {"type": "string", "description": "New start time"},
-                    "end_time": {"type": "string", "description": "New end time"},
-                    "attendees": {"type": "array", "items": {"type": "string"}, "description": "New attendee list"},
-                    "location": {"type": "string", "description": "New location"}
-                },
-                "required": ["event_id"]
-            }
-        ),
-        Tool(
-            name="delete_event",
-            description="Delete an event by ID",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "event_id": {"type": "string", "description": "Event ID to delete"}
-                },
-                "required": ["event_id"]
-            }
-        ),
-        Tool(
-            name="list_events",
-            description="List calendar events with optional date range filter",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date for filter (ISO format)"},
-                    "end_date": {"type": "string", "description": "End date for filter (ISO format)"},
-                    "limit": {"type": "number", "description": "Maximum number of events"}
-                }
-            }
-        )
-    ]
+@mcp.tool()
+def read_event(event_id: str) -> dict:
+    """Read a specific event by ID
 
+    Args:
+        event_id: Event ID
 
-@app.call_tool()
-async def call_tool(name: str, arguments: Any) -> List[TextContent]:
-    """Handle tool calls"""
-    global events_db
+    Returns:
+        The event if found
+    """
+    event = next((e for e in events_db if e["id"] == event_id), None)
 
-    if name == "create_event":
-        event_id = f"event_{len(events_db) + 1}"
-        new_event = {
-            "id": event_id,
-            "title": arguments["title"],
-            "description": arguments.get("description", ""),
-            "start_time": arguments["start_time"],
-            "end_time": arguments["end_time"],
-            "attendees": arguments.get("attendees", []),
-            "location": arguments.get("location", ""),
-            "created_at": datetime.now().isoformat()
+    if event:
+        return {
+            "success": True,
+            "event": event
         }
-        events_db.append(new_event)
-
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "success": True,
-                "event_id": event_id,
-                "event": new_event
-            }, indent=2)
-        )]
-
-    elif name == "read_event":
-        event_id = arguments["event_id"]
-        event = next((e for e in events_db if e["id"] == event_id), None)
-
-        if event:
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "success": True,
-                    "event": event
-                }, indent=2)
-            )]
-        else:
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "success": False,
-                    "error": f"Event {event_id} not found"
-                }, indent=2)
-            )]
-
-    elif name == "update_event":
-        event_id = arguments["event_id"]
-        event = next((e for e in events_db if e["id"] == event_id), None)
-
-        if event:
-            # Update fields if provided
-            if "title" in arguments:
-                event["title"] = arguments["title"]
-            if "description" in arguments:
-                event["description"] = arguments["description"]
-            if "start_time" in arguments:
-                event["start_time"] = arguments["start_time"]
-            if "end_time" in arguments:
-                event["end_time"] = arguments["end_time"]
-            if "attendees" in arguments:
-                event["attendees"] = arguments["attendees"]
-            if "location" in arguments:
-                event["location"] = arguments["location"]
-
-            event["updated_at"] = datetime.now().isoformat()
-
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "success": True,
-                    "event": event
-                }, indent=2)
-            )]
-        else:
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "success": False,
-                    "error": f"Event {event_id} not found"
-                }, indent=2)
-            )]
-
-    elif name == "delete_event":
-        event_id = arguments["event_id"]
-        original_count = len(events_db)
-        events_db = [e for e in events_db if e["id"] != event_id]
-
-        if len(events_db) < original_count:
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "success": True,
-                    "message": f"Event {event_id} deleted"
-                }, indent=2)
-            )]
-        else:
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "success": False,
-                    "error": f"Event {event_id} not found"
-                }, indent=2)
-            )]
-
-    elif name == "list_events":
-        limit = arguments.get("limit", 100)
-        start_date = arguments.get("start_date")
-        end_date = arguments.get("end_date")
-
-        filtered_events = events_db
-
-        # Apply date filters if provided
-        if start_date:
-            filtered_events = [e for e in filtered_events if e["start_time"] >= start_date]
-        if end_date:
-            filtered_events = [e for e in filtered_events if e["start_time"] <= end_date]
-
-        result_events = filtered_events[:int(limit)]
-
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "success": True,
-                "count": len(result_events),
-                "events": result_events
-            }, indent=2)
-        )]
-
-    raise ValueError(f"Unknown tool: {name}")
+    else:
+        return {
+            "success": False,
+            "error": f"Event {event_id} not found"
+        }
 
 
-async def main():
-    """Run the MCP server"""
-    async with stdio_server() as (read_stream, write_stream):
-        await app.run(
-            read_stream,
-            write_stream,
-            app.create_initialization_options()
-        )
+@mcp.tool()
+def update_event(
+    event_id: str,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    attendees: Optional[list[str]] = None,
+    location: Optional[str] = None
+) -> dict:
+    """Update an existing event
+
+    Args:
+        event_id: Event ID
+        title: New event title
+        description: New event description
+        start_time: New start time
+        end_time: New end time
+        attendees: New attendee list
+        location: New location
+
+    Returns:
+        The updated event
+    """
+    event = next((e for e in events_db if e["id"] == event_id), None)
+
+    if event:
+        # Update fields if provided
+        if title is not None:
+            event["title"] = title
+        if description is not None:
+            event["description"] = description
+        if start_time is not None:
+            event["start_time"] = start_time
+        if end_time is not None:
+            event["end_time"] = end_time
+        if attendees is not None:
+            event["attendees"] = attendees
+        if location is not None:
+            event["location"] = location
+
+        event["updated_at"] = datetime.now().isoformat()
+
+        return {
+            "success": True,
+            "event": event
+        }
+    else:
+        return {
+            "success": False,
+            "error": f"Event {event_id} not found"
+        }
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+@mcp.tool()
+def delete_event(event_id: str) -> dict:
+    """Delete an event by ID
+
+    Args:
+        event_id: Event ID to delete
+
+    Returns:
+        Result of the delete operation
+    """
+    global events_db
+    original_count = len(events_db)
+    events_db = [e for e in events_db if e["id"] != event_id]
+
+    if len(events_db) < original_count:
+        return {
+            "success": True,
+            "message": f"Event {event_id} deleted"
+        }
+    else:
+        return {
+            "success": False,
+            "error": f"Event {event_id} not found"
+        }
+
+
+@mcp.tool()
+def list_events(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 100
+) -> dict:
+    """List calendar events with optional date range filter
+
+    Args:
+        start_date: Start date for filter (ISO format)
+        end_date: End date for filter (ISO format)
+        limit: Maximum number of events
+
+    Returns:
+        List of events
+    """
+    filtered_events = events_db
+
+    # Apply date filters if provided
+    if start_date:
+        filtered_events = [e for e in filtered_events if e["start_time"] >= start_date]
+    if end_date:
+        filtered_events = [e for e in filtered_events if e["start_time"] <= end_date]
+
+    result_events = filtered_events[:limit]
+
+    return {
+        "success": True,
+        "count": len(result_events),
+        "events": result_events
+    }

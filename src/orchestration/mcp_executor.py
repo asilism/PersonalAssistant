@@ -27,31 +27,31 @@ class MCPExecutor:
 
     async def initialize_servers(self):
         """Initialize connections to all MCP servers"""
-        # Define MCP server configurations
+        # Define MCP server configurations (using fastmcp)
         server_configs = {
             "mail-agent": {
-                "command": "python3",
-                "args": [os.path.join(os.path.dirname(__file__), "../../mcp_servers/mail_agent/server.py")],
+                "command": "fastmcp",
+                "args": ["run", os.path.join(os.path.dirname(__file__), "../../mcp_servers/mail_agent/server.py")],
                 "env": None
             },
             "calendar-agent": {
-                "command": "python3",
-                "args": [os.path.join(os.path.dirname(__file__), "../../mcp_servers/calendar_agent/server.py")],
+                "command": "fastmcp",
+                "args": ["run", os.path.join(os.path.dirname(__file__), "../../mcp_servers/calendar_agent/server.py")],
                 "env": None
             },
             "jira-agent": {
-                "command": "python3",
-                "args": [os.path.join(os.path.dirname(__file__), "../../mcp_servers/jira_agent/server.py")],
+                "command": "fastmcp",
+                "args": ["run", os.path.join(os.path.dirname(__file__), "../../mcp_servers/jira_agent/server.py")],
                 "env": None
             },
             "calculator-agent": {
-                "command": "python3",
-                "args": [os.path.join(os.path.dirname(__file__), "../../mcp_servers/calculator_agent/server.py")],
+                "command": "fastmcp",
+                "args": ["run", os.path.join(os.path.dirname(__file__), "../../mcp_servers/calculator_agent/server.py")],
                 "env": None
             },
             "rpa-agent": {
-                "command": "python3",
-                "args": [os.path.join(os.path.dirname(__file__), "../../mcp_servers/rpa_agent/server.py")],
+                "command": "fastmcp",
+                "args": ["run", os.path.join(os.path.dirname(__file__), "../../mcp_servers/rpa_agent/server.py")],
                 "env": None
             }
         }
