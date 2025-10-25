@@ -106,6 +106,7 @@ async def list_tools() -> List[Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: Any) -> List[TextContent]:
     """Handle tool calls"""
+    global emails_db
 
     if name == "send_email":
         to = arguments["to"]
@@ -181,7 +182,6 @@ async def call_tool(name: str, arguments: Any) -> List[TextContent]:
     elif name == "delete_email":
         email_id = arguments["email_id"]
         original_count = len(emails_db)
-        global emails_db
         emails_db = [e for e in emails_db if e["id"] != email_id]
 
         if len(emails_db) < original_count:
