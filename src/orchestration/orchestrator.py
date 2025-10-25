@@ -135,7 +135,11 @@ class Orchestrator:
 
     async def _plan_node(self, state: OrchestrationState) -> OrchestrationState:
         """Planning node"""
-        print(f"[Orchestrator] Planning...")
+        print(f"\n{'='*80}")
+        print(f"[Orchestrator] NODE: Planning")
+        print(f"[Orchestrator] Session ID: {state['session_id']}")
+        print(f"[Orchestrator] User request: {state['request_text']}")
+        print(f"{'='*80}")
 
         # Convert to Pydantic State
         pydantic_state = self._to_pydantic_state(state)
@@ -144,12 +148,22 @@ class Orchestrator:
         # Run planner
         result_state = await self.planner.invoke(pydantic_state)
 
+        print(f"[Orchestrator] Planning complete - next state: {result_state.type.value}")
+
         # Convert back
         return self._from_pydantic_state(result_state)
 
     async def _dispatch_node(self, state: OrchestrationState) -> OrchestrationState:
         """Dispatch node"""
-        print(f"[Orchestrator] Dispatching...")
+        print(f"\n{'='*80}")
+        print(f"[Orchestrator] NODE: Dispatch")
+        print(f"[Orchestrator] Session ID: {state['session_id']}")
+        if state.get('plan'):
+            plan_dict = state['plan']
+            print(f"[Orchestrator] Plan ID: {plan_dict.get('plan_id', 'N/A')}")
+            steps = plan_dict.get('steps', [])
+            print(f"[Orchestrator] Steps to execute: {len(steps)}")
+        print(f"{'='*80}")
 
         # Convert to Pydantic State
         pydantic_state = self._to_pydantic_state(state)
@@ -157,12 +171,23 @@ class Orchestrator:
         # Run dispatcher
         result_state = await self.dispatcher.invoke(pydantic_state)
 
+        print(f"[Orchestrator] Dispatch complete - next state: {result_state.type.value}")
+
         # Convert back
         return self._from_pydantic_state(result_state)
 
     async def _decide_node(self, state: OrchestrationState) -> OrchestrationState:
         """Decision node"""
-        print(f"[Orchestrator] Deciding next action...")
+        print(f"\n{'='*80}")
+        print(f"[Orchestrator] NODE: Decide")
+        print(f"[Orchestrator] Session ID: {state['session_id']}")
+        if state.get('results'):
+            results = state['results']
+            print(f"[Orchestrator] Results available:")
+            print(f"  - Total steps: {results.get('total_steps', 0)}")
+            print(f"  - Completed: {len(results.get('completed_steps', []))}")
+            print(f"  - Failed: {len(results.get('failed_steps', []))}")
+        print(f"{'='*80}")
 
         # Convert to Pydantic State
         pydantic_state = self._to_pydantic_state(state)
@@ -171,19 +196,33 @@ class Orchestrator:
         # Run planner for decision
         result_state = await self.planner.invoke(pydantic_state)
 
+        print(f"[Orchestrator] Decision complete - next state: {result_state.type.value}")
+
         # Convert back
         return self._from_pydantic_state(result_state)
 
     async def _finalize_node(self, state: OrchestrationState) -> OrchestrationState:
         """Finalization node"""
-        print(f"[Orchestrator] Finalizing...")
+        print(f"\n{'='*80}")
+        print(f"[Orchestrator] NODE: Finalize")
+        print(f"[Orchestrator] Session ID: {state['session_id']}")
+        if state.get('final_payload'):
+            payload = state['final_payload']
+            print(f"[Orchestrator] Final message: {payload.get('message', 'N/A')}")
+        print(f"[Orchestrator] ✓ Task completed successfully")
+        print(f"{'='*80}\n")
 
         state["type"] = StateType.FINAL.value
         return state
 
     async def _error_node(self, state: OrchestrationState) -> OrchestrationState:
         """Error node"""
-        print(f"[Orchestrator] Error: {state.get('error', 'Unknown error')}")
+        error_msg = state.get('error', 'Unknown error')
+        print(f"\n{'='*80}")
+        print(f"[Orchestrator] NODE: Error Handler")
+        print(f"[Orchestrator] Session ID: {state['session_id']}")
+        print(f"[Orchestrator] ✗ Error: {error_msg}")
+        print(f"{'='*80}\n")
 
         state["type"] = StateType.ERROR.value
         return state
@@ -193,10 +232,13 @@ class Orchestrator:
         state_type = state.get("type", "")
 
         if state_type == StateType.DISPATCH.value:
+            print(f"[Orchestrator] Routing: planning → dispatch")
             return "dispatch"
         elif state_type == StateType.ERROR.value:
+            print(f"[Orchestrator] Routing: planning → error_handler")
             return "error_handler"
         else:
+            print(f"[Orchestrator] Routing: planning → error_handler (unknown state: {state_type})")
             return "error_handler"
 
     def _route_after_dispatch(self, state: OrchestrationState) -> str:
@@ -204,10 +246,13 @@ class Orchestrator:
         state_type = state.get("type", "")
 
         if state_type == StateType.PLAN_OR_DECIDE.value:
+            print(f"[Orchestrator] Routing: dispatch → decide")
             return "decide"
         elif state_type == StateType.ERROR.value:
+            print(f"[Orchestrator] Routing: dispatch → error_handler")
             return "error_handler"
         else:
+            print(f"[Orchestrator] Routing: dispatch → error_handler (unknown state: {state_type})")
             return "error_handler"
 
     def _route_after_decide(self, state: OrchestrationState) -> str:
@@ -215,15 +260,20 @@ class Orchestrator:
         state_type = state.get("type", "")
 
         if state_type == StateType.DISPATCH.value:
+            print(f"[Orchestrator] Routing: decide → dispatch (more steps needed)")
             return "dispatch"
         elif state_type == StateType.FINAL.value:
+            print(f"[Orchestrator] Routing: decide → finalize (task complete)")
             return "finalize"
         elif state_type == StateType.ERROR.value:
+            print(f"[Orchestrator] Routing: decide → error_handler")
             return "error_handler"
         elif state_type == StateType.HUMAN_IN_THE_LOOP.value:
             # For now, treat as final
+            print(f"[Orchestrator] Routing: decide → end (human intervention needed)")
             return "end"
         else:
+            print(f"[Orchestrator] Routing: decide → error_handler (unknown state: {state_type})")
             return "error_handler"
 
     def _to_pydantic_state(self, state: OrchestrationState) -> State:
@@ -301,6 +351,16 @@ class Orchestrator:
             import uuid
             trace_id = str(uuid.uuid4())
 
+        print(f"\n{'#'*80}")
+        print(f"# ORCHESTRATOR START")
+        print(f"{'#'*80}")
+        print(f"Session ID: {session_id}")
+        print(f"User ID: {self.user_id}")
+        print(f"Tenant: {self.tenant}")
+        print(f"Trace ID: {trace_id}")
+        print(f"Request: {request_text}")
+        print(f"{'#'*80}\n")
+
         # Initial state
         initial_state: OrchestrationState = {
             "type": StateType.INIT.value,
@@ -327,35 +387,65 @@ class Orchestrator:
             end_time = datetime.now()
             execution_time = (end_time - start_time).total_seconds()
 
+            print(f"\n{'#'*80}")
+            print(f"# ORCHESTRATOR END")
+            print(f"{'#'*80}")
+            print(f"Final state: {final_state.get('type', 'UNKNOWN')}")
+            print(f"Execution time: {execution_time:.2f}s")
+
             # Build response
             if final_state.get("type") == StateType.FINAL.value:
                 payload = final_state.get("final_payload", {})
-                return {
+                response = {
                     "success": True,
                     "message": payload.get("message", "Task completed successfully"),
                     "results": payload.get("data"),
                     "execution_time": execution_time,
                     "plan_id": final_state.get("plan", {}).get("plan_id") if final_state.get("plan") else None
                 }
+                print(f"Success: ✓")
+                print(f"Message: {response['message']}")
+                print(f"{'#'*80}\n")
+                return response
             elif final_state.get("type") == StateType.ERROR.value:
-                return {
+                error_msg = final_state.get("error", "Unknown error")
+                response = {
                     "success": False,
-                    "message": final_state.get("error", "Unknown error"),
+                    "message": error_msg,
                     "execution_time": execution_time
                 }
+                print(f"Success: ✗")
+                print(f"Error: {error_msg}")
+                print(f"{'#'*80}\n")
+                return response
             else:
-                return {
+                response = {
                     "success": False,
                     "message": "Execution incomplete",
                     "execution_time": execution_time
                 }
+                print(f"Success: ✗")
+                print(f"Message: Execution incomplete")
+                print(f"{'#'*80}\n")
+                return response
 
         except Exception as e:
             end_time = datetime.now()
             execution_time = (end_time - start_time).total_seconds()
 
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            print(f"\n{'#'*80}")
+            print(f"# ORCHESTRATOR END (EXCEPTION)")
+            print(f"{'#'*80}")
+            print(f"Execution time: {execution_time:.2f}s")
+            print(f"Exception: {error_msg}")
+            import traceback
+            print(f"Traceback:")
+            print(traceback.format_exc())
+            print(f"{'#'*80}\n")
+
             return {
                 "success": False,
-                "message": f"Orchestration failed: {str(e)}",
+                "message": f"Orchestration failed: {error_msg}",
                 "execution_time": execution_time
             }

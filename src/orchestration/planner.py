@@ -90,6 +90,15 @@ Return your plan as a JSON array of steps. Each step should have this format:
 Return ONLY the JSON array, no other text.
 """
 
+        print(f"\n{'='*80}")
+        print(f"[Planner] Creating initial plan")
+        print(f"[Planner] User request: {state.request_text}")
+        print(f"[Planner] Available tools: {len(self.settings.available_tools)}")
+        print(f"\n[Planner] Prompt sent to LLM:")
+        print(f"{'-'*80}")
+        print(prompt)
+        print(f"{'-'*80}\n")
+
         try:
             # Call LLM
             content = await self.llm_client.generate(
@@ -98,6 +107,11 @@ Return ONLY the JSON array, no other text.
             )
             content = content.strip()
 
+            print(f"[Planner] Raw LLM response:")
+            print(f"{'-'*80}")
+            print(content)
+            print(f"{'-'*80}\n")
+
             # Remove markdown code blocks if present
             if content.startswith("```"):
                 content = content.split("```")[1]
@@ -105,7 +119,13 @@ Return ONLY the JSON array, no other text.
                     content = content[4:]
                 content = content.strip()
 
+            print(f"[Planner] Cleaned response (after removing markdown):")
+            print(f"{'-'*80}")
+            print(content)
+            print(f"{'-'*80}\n")
+
             steps_data = json.loads(content)
+            print(f"[Planner] Parsed {len(steps_data)} steps from LLM response")
 
             # Create plan
             plan_id = str(uuid.uuid4())
@@ -114,12 +134,32 @@ Return ONLY the JSON array, no other text.
 
             for i, step_data in enumerate(steps_data):
                 step_id = f"step_{i+1}"
+
+                # Convert dependencies to strings if they are integers
+                raw_dependencies = step_data.get("dependencies", [])
+                str_dependencies = []
+                for dep in raw_dependencies:
+                    if isinstance(dep, int):
+                        # Convert integer index to step_id
+                        str_dependencies.append(f"step_{dep+1}")
+                    elif isinstance(dep, str):
+                        str_dependencies.append(dep)
+                    else:
+                        print(f"[Planner] WARNING: Unknown dependency type {type(dep)}: {dep}")
+
+                print(f"[Planner] Step {i+1}:")
+                print(f"  - Tool: {step_data['tool_name']}")
+                print(f"  - Description: {step_data['description']}")
+                print(f"  - Input: {step_data['input']}")
+                print(f"  - Dependencies (raw): {raw_dependencies}")
+                print(f"  - Dependencies (converted): {str_dependencies}")
+
                 step = Step(
                     step_id=step_id,
                     tool_name=step_data["tool_name"],
                     input=step_data["input"],
                     description=step_data["description"],
-                    dependencies=step_data.get("dependencies", [])
+                    dependencies=str_dependencies
                 )
                 steps.append(step)
                 dependencies[step_id] = step.dependencies
@@ -130,6 +170,11 @@ Return ONLY the JSON array, no other text.
                 dependencies=dependencies
             )
 
+            print(f"\n[Planner] ✓ Plan created successfully:")
+            print(f"  - Plan ID: {plan_id}")
+            print(f"  - Total steps: {len(steps)}")
+            print(f"{'='*80}\n")
+
             # Update state
             state.plan = plan
             state.plan_state = PlanState.PENDING
@@ -137,10 +182,27 @@ Return ONLY the JSON array, no other text.
 
             return state
 
+        except json.JSONDecodeError as e:
+            # JSON parsing failed
+            error_msg = f"Failed to parse LLM response as JSON: {str(e)}"
+            print(f"\n[Planner] ✗ ERROR: {error_msg}")
+            print(f"[Planner] Response that failed to parse:")
+            print(f"{'-'*80}")
+            print(content if 'content' in locals() else 'No content available')
+            print(f"{'-'*80}\n")
+            state.type = StateType.ERROR
+            state.error = f"Planning failed: {error_msg}"
+            return state
         except Exception as e:
             # Planning failed
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            print(f"\n[Planner] ✗ ERROR: {error_msg}")
+            import traceback
+            print(f"[Planner] Traceback:")
+            print(traceback.format_exc())
+            print(f"{'='*80}\n")
             state.type = StateType.ERROR
-            state.error = f"Planning failed: {str(e)}"
+            state.error = f"Planning failed: {error_msg}"
             return state
 
     async def _decide_next(self, state: State) -> State:
@@ -149,6 +211,7 @@ Return ONLY the JSON array, no other text.
         results = state.results
         if not results:
             # No results yet, shouldn't happen
+            print(f"\n[Planner] ✗ ERROR: No results available for decision")
             state.type = StateType.ERROR
             state.error = "No results available for decision"
             return state
@@ -184,12 +247,30 @@ Return your decision as JSON:
 Return ONLY the JSON, no other text.
 """
 
+        print(f"\n{'='*80}")
+        print(f"[Planner] Deciding next action")
+        print(f"[Planner] Original request: {state.request_text}")
+        print(f"[Planner] Execution results:")
+        print(f"  - Total steps: {results.total_steps}")
+        print(f"  - Completed: {len(results.completed_steps)}")
+        print(f"  - Failed: {len(results.failed_steps)}")
+        print(f"  - Success rate: {results.success_rate:.1%}")
+        print(f"\n[Planner] Prompt sent to LLM:")
+        print(f"{'-'*80}")
+        print(prompt)
+        print(f"{'-'*80}\n")
+
         try:
             content = await self.llm_client.generate(
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=4096
             )
             content = content.strip()
+
+            print(f"[Planner] Raw LLM response:")
+            print(f"{'-'*80}")
+            print(content)
+            print(f"{'-'*80}\n")
 
             # Remove markdown code blocks if present
             if content.startswith("```"):
@@ -198,11 +279,23 @@ Return ONLY the JSON, no other text.
                     content = content[4:]
                 content = content.strip()
 
+            print(f"[Planner] Cleaned response (after removing markdown):")
+            print(f"{'-'*80}")
+            print(content)
+            print(f"{'-'*80}\n")
+
             decision_data = json.loads(content)
             decision_type = decision_data["type"]
+            decision_reason = decision_data.get("reason", "No reason provided")
+
+            print(f"[Planner] Decision made:")
+            print(f"  - Type: {decision_type}")
+            print(f"  - Reason: {decision_reason}")
 
             if decision_type == "final":
                 # Task complete
+                print(f"[Planner] ✓ Task complete - transitioning to FINAL state")
+                print(f"{'='*80}\n")
                 state.type = StateType.FINAL
                 state.final_payload = decision_data["payload"]
                 return state
@@ -211,29 +304,57 @@ Return ONLY the JSON, no other text.
                 # Add more steps to plan
                 # For simplicity, we'll transition to HUMAN_IN_THE_LOOP
                 # In production, you'd add steps to the existing plan
+                print(f"[Planner] → More steps needed - transitioning to DISPATCH state")
+                print(f"{'='*80}\n")
                 state.type = StateType.DISPATCH
                 return state
 
             elif decision_type == "needsHuman":
                 # Needs human input
+                print(f"[Planner] ⚠ Human intervention required - transitioning to HUMAN_IN_THE_LOOP state")
+                print(f"{'='*80}\n")
                 state.type = StateType.HUMAN_IN_THE_LOOP
                 state.final_payload = decision_data["payload"]
                 return state
 
             elif decision_type == "failed":
                 # Failed
+                error_msg = decision_data["payload"].get("error", "Task failed")
+                print(f"[Planner] ✗ Task failed - transitioning to ERROR state")
+                print(f"[Planner] Error: {error_msg}")
+                print(f"{'='*80}\n")
                 state.type = StateType.ERROR
-                state.error = decision_data["payload"].get("error", "Task failed")
+                state.error = error_msg
                 return state
 
             else:
+                print(f"[Planner] ✗ Unknown decision type: {decision_type}")
+                print(f"{'='*80}\n")
                 state.type = StateType.ERROR
                 state.error = f"Unknown decision type: {decision_type}"
                 return state
 
-        except Exception as e:
+        except json.JSONDecodeError as e:
+            # JSON parsing failed
+            error_msg = f"Failed to parse LLM response as JSON: {str(e)}"
+            print(f"\n[Planner] ✗ ERROR: {error_msg}")
+            print(f"[Planner] Response that failed to parse:")
+            print(f"{'-'*80}")
+            print(content if 'content' in locals() else 'No content available')
+            print(f"{'-'*80}")
+            print(f"{'='*80}\n")
             state.type = StateType.ERROR
-            state.error = f"Decision making failed: {str(e)}"
+            state.error = f"Decision making failed: {error_msg}"
+            return state
+        except Exception as e:
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            print(f"\n[Planner] ✗ ERROR: {error_msg}")
+            import traceback
+            print(f"[Planner] Traceback:")
+            print(traceback.format_exc())
+            print(f"{'='*80}\n")
+            state.type = StateType.ERROR
+            state.error = f"Decision making failed: {error_msg}"
             return state
 
     def _format_tools_for_prompt(self) -> str:
