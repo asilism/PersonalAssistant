@@ -307,9 +307,39 @@ Available models:
 - `google/gemini-pro`
 - And many more...
 
+## Testing
+
+The project includes a comprehensive test suite with **100 test questions** covering all agent combinations.
+
+### Quick Test (15 questions)
+
+```bash
+python run_sample_test.py
+```
+
+### Full Test Suite (100 questions)
+
+```bash
+python run_tests.py
+```
+
+### Test Categories
+
+- **Single Agent (25 questions)** - Tests individual tools
+- **Multi-Agent (25 questions)** - Tests tool combinations without RPA
+- **RPA Included (50 questions)** - Tests scenarios with RPA agent
+
+### Test Output
+
+Both test runners generate:
+- `test_results.csv` - Spreadsheet-friendly format
+- `test_results.json` - Structured format with summary statistics
+
+For detailed testing documentation, see [TESTING.md](TESTING.md).
+
 ## Development
 
-### Running Tests
+### Running Unit Tests
 
 ```bash
 pytest
