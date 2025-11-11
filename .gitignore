@@ -56,3 +56,5 @@ node_modules/
 .pytest_cache/
 .coverage
 htmlcov/
+test_results*.csv
+test_results*.json
