@@ -92,13 +92,11 @@ class TestRunner:
                 # Extract tools used from the plan
                 if "plan" in response and response["plan"]:
                     plan = response["plan"]
-                    if isinstance(plan, dict) and "task_groups" in plan:
+                    if isinstance(plan, dict) and "steps" in plan:
                         tools_used = []
-                        for task_group in plan["task_groups"]:
-                            if "tasks" in task_group:
-                                for task in task_group["tasks"]:
-                                    if "tool" in task:
-                                        tools_used.append(task["tool"])
+                        for step in plan["steps"]:
+                            if "tool_name" in step:
+                                tools_used.append(step["tool_name"])
                         result["actual_tools_used"] = tools_used
 
                 # Determine success based on status and expected tools
