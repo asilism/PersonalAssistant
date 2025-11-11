@@ -385,7 +385,8 @@ class Orchestrator:
                     "message": payload.get("message", "Task completed successfully"),
                     "results": payload.get("data"),
                     "execution_time": execution_time,
-                    "plan_id": final_state.get("plan", {}).get("plan_id") if final_state.get("plan") else None
+                    "plan_id": final_state.get("plan", {}).get("plan_id") if final_state.get("plan") else None,
+                    "plan": final_state.get("plan")  # Include full plan for analysis
                 }
             elif final_state.get("type") == StateType.ERROR.value:
                 return {
