@@ -45,7 +45,7 @@ class ConfigLoader:
             # Get API keys based on provider
             if llm_provider == "anthropic":
                 llm_api_key = os.getenv("ANTHROPIC_API_KEY", "")
-                llm_model = os.getenv("LLM_MODEL", "claude-3-5-sonnet-20241022")
+                llm_model = os.getenv("LLM_MODEL", "claude-sonnet-4-5-20250929")
             elif llm_provider == "openai":
                 llm_api_key = os.getenv("OPENAI_API_KEY", "")
                 llm_model = os.getenv("LLM_MODEL", "gpt-4-turbo-preview")
@@ -54,7 +54,7 @@ class ConfigLoader:
                 llm_model = os.getenv("LLM_MODEL", "anthropic/claude-3.5-sonnet")
             else:
                 llm_api_key = os.getenv("ANTHROPIC_API_KEY", "")
-                llm_model = os.getenv("LLM_MODEL", "claude-3-5-sonnet-20241022")
+                llm_model = os.getenv("LLM_MODEL", "claude-sonnet-4-5-20250929")
 
             print(f"[ConfigLoader] Using environment variable settings")
 

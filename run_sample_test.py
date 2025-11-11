@@ -14,6 +14,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from run_tests import TestRunner
 
+if not os.getenv("ANTHROPIC_API_KEY"):
+    os.environ["ANTHROPIC_API_KEY"] = "dummy-key-for-testing-purposes-only"
+    print("⚠️  Warning: No ANTHROPIC_API_KEY set. Using dummy key - tests will fail at execution.")
+    print("   Set a valid API key: export ANTHROPIC_API_KEY=your-key-here\n")
+
 
 async def main():
     """Run a sample of test questions"""

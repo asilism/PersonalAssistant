@@ -16,6 +16,11 @@ import time
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
+if not os.getenv("ANTHROPIC_API_KEY"):
+    os.environ["ANTHROPIC_API_KEY"] = "dummy-key-for-testing-purposes-only"
+    print("⚠️  Warning: No ANTHROPIC_API_KEY set. Using dummy key - tests will fail at execution.")
+    print("   Set a valid API key: export ANTHROPIC_API_KEY=your-key-here\n")
+
 from orchestration.orchestrator import Orchestrator
 
 
@@ -26,9 +31,17 @@ class TestRunner:
         self.user_id = user_id
         self.tenant = tenant
         self.results = []
-        self.orchestrator = None  # Will be initialized once before running tests
+        # Initialize orchestrator once for all tests
+        print("Initializing orchestrator and loading MCP servers...")
+        self.orchestrator = Orchestrator(self.user_id, self.tenant)
+
+        # Trigger initialization by calling _initialize directly
+        self.orchestrator._initialize()
+        print(f"✓ Orchestrator initialized\n")
 
     async def run_single_question(self, question_data: Dict[str, Any]) -> Dict[str, Any]:
+
+        
         """Run a single test question"""
         question_id = question_data.get("id")
         category = question_data.get("category")
@@ -124,13 +137,6 @@ class TestRunner:
         print(f"\n{'='*80}")
         print("PersonalAssistant Test Runner")
         print(f"{'='*80}\n")
-
-        # Initialize orchestrator once for all tests
-        print("Initializing orchestrator and loading MCP servers...")
-        self.orchestrator = Orchestrator(self.user_id, self.tenant)
-        # Trigger initialization by calling _initialize directly
-        await self.orchestrator._initialize()
-        print(f"✓ Orchestrator initialized\n")
 
         # Load questions
         with open(questions_file, 'r') as f:
