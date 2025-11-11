@@ -135,55 +135,101 @@ class Orchestrator:
 
     async def _plan_node(self, state: OrchestrationState) -> OrchestrationState:
         """Planning node"""
-        print(f"[Orchestrator] Planning...")
+        print(f"[Orchestrator] === Planning Node ===")
+        print(f"[Orchestrator] Session: {state.get('session_id')}")
+        print(f"[Orchestrator] Request: {state.get('request_text', '')[:100]}...")
 
-        # Convert to Pydantic State
-        pydantic_state = self._to_pydantic_state(state)
-        pydantic_state.type = StateType.PLAN_OR_DECIDE
+        try:
+            # Convert to Pydantic State
+            pydantic_state = self._to_pydantic_state(state)
+            pydantic_state.type = StateType.PLAN_OR_DECIDE
 
-        # Run planner
-        result_state = await self.planner.invoke(pydantic_state)
+            # Run planner
+            result_state = await self.planner.invoke(pydantic_state)
 
-        # Convert back
-        return self._from_pydantic_state(result_state)
+            print(f"[Orchestrator] Planning completed, next state: {result_state.type}")
+
+            # Convert back
+            return self._from_pydantic_state(result_state)
+        except Exception as e:
+            print(f"[Orchestrator] ERROR in planning node: {str(e)}")
+            import traceback
+            print(f"[Orchestrator] Traceback:\n{traceback.format_exc()}")
+            state["type"] = StateType.ERROR.value
+            state["error"] = f"Planning node failed: {str(e)}"
+            return state
 
     async def _dispatch_node(self, state: OrchestrationState) -> OrchestrationState:
         """Dispatch node"""
-        print(f"[Orchestrator] Dispatching...")
+        print(f"[Orchestrator] === Dispatch Node ===")
+        plan_id = state.get("plan", {}).get("plan_id") if state.get("plan") else "N/A"
+        print(f"[Orchestrator] Plan ID: {plan_id}")
 
-        # Convert to Pydantic State
-        pydantic_state = self._to_pydantic_state(state)
+        try:
+            # Convert to Pydantic State
+            pydantic_state = self._to_pydantic_state(state)
 
-        # Run dispatcher
-        result_state = await self.dispatcher.invoke(pydantic_state)
+            # Run dispatcher
+            result_state = await self.dispatcher.invoke(pydantic_state)
 
-        # Convert back
-        return self._from_pydantic_state(result_state)
+            print(f"[Orchestrator] Dispatch completed, next state: {result_state.type}")
+
+            # Convert back
+            return self._from_pydantic_state(result_state)
+        except Exception as e:
+            print(f"[Orchestrator] ERROR in dispatch node: {str(e)}")
+            import traceback
+            print(f"[Orchestrator] Traceback:\n{traceback.format_exc()}")
+            state["type"] = StateType.ERROR.value
+            state["error"] = f"Dispatch node failed: {str(e)}"
+            return state
 
     async def _decide_node(self, state: OrchestrationState) -> OrchestrationState:
         """Decision node"""
-        print(f"[Orchestrator] Deciding next action...")
+        print(f"[Orchestrator] === Decide Node ===")
+        results = state.get("results", {})
+        if results:
+            print(f"[Orchestrator] Completed steps: {results.get('completed_steps', [])}")
+            print(f"[Orchestrator] Failed steps: {results.get('failed_steps', [])}")
 
-        # Convert to Pydantic State
-        pydantic_state = self._to_pydantic_state(state)
-        pydantic_state.type = StateType.PLAN_OR_DECIDE
+        try:
+            # Convert to Pydantic State
+            pydantic_state = self._to_pydantic_state(state)
+            pydantic_state.type = StateType.PLAN_OR_DECIDE
 
-        # Run planner for decision
-        result_state = await self.planner.invoke(pydantic_state)
+            # Run planner for decision
+            result_state = await self.planner.invoke(pydantic_state)
 
-        # Convert back
-        return self._from_pydantic_state(result_state)
+            print(f"[Orchestrator] Decision completed, next state: {result_state.type}")
+
+            # Convert back
+            return self._from_pydantic_state(result_state)
+        except Exception as e:
+            print(f"[Orchestrator] ERROR in decide node: {str(e)}")
+            import traceback
+            print(f"[Orchestrator] Traceback:\n{traceback.format_exc()}")
+            state["type"] = StateType.ERROR.value
+            state["error"] = f"Decide node failed: {str(e)}"
+            return state
 
     async def _finalize_node(self, state: OrchestrationState) -> OrchestrationState:
         """Finalization node"""
-        print(f"[Orchestrator] Finalizing...")
+        print(f"[Orchestrator] === Finalize Node ===")
+        payload = state.get("final_payload", {})
+        print(f"[Orchestrator] Final payload: {payload}")
 
         state["type"] = StateType.FINAL.value
         return state
 
     async def _error_node(self, state: OrchestrationState) -> OrchestrationState:
         """Error node"""
-        print(f"[Orchestrator] Error: {state.get('error', 'Unknown error')}")
+        error_msg = state.get('error', 'Unknown error')
+        print(f"[Orchestrator] === Error Node ===")
+        print(f"[Orchestrator] ERROR: {error_msg}")
+        print(f"[Orchestrator] State at error:")
+        print(f"[Orchestrator]   - Session: {state.get('session_id')}")
+        print(f"[Orchestrator]   - Request: {state.get('request_text', '')[:100]}")
+        print(f"[Orchestrator]   - Plan ID: {state.get('plan', {}).get('plan_id') if state.get('plan') else 'N/A'}")
 
         state["type"] = StateType.ERROR.value
         return state
@@ -353,6 +399,12 @@ class Orchestrator:
         except Exception as e:
             end_time = datetime.now()
             execution_time = (end_time - start_time).total_seconds()
+
+            print(f"[Orchestrator] CRITICAL ERROR: Orchestration failed")
+            print(f"[Orchestrator] Exception type: {type(e).__name__}")
+            print(f"[Orchestrator] Exception message: {str(e)}")
+            import traceback
+            print(f"[Orchestrator] Traceback:\n{traceback.format_exc()}")
 
             return {
                 "success": False,

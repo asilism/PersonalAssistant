@@ -92,11 +92,14 @@ Return ONLY the JSON array, no other text.
 
         try:
             # Call LLM
+            print(f"[Planner] Generating initial plan for request: {state.request_text[:100]}...")
             content = await self.llm_client.generate(
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=4096
             )
             content = content.strip()
+
+            print(f"[Planner] LLM response received, length: {len(content)} chars")
 
             # Remove markdown code blocks if present
             if content.startswith("```"):
@@ -105,7 +108,10 @@ Return ONLY the JSON array, no other text.
                     content = content[4:]
                 content = content.strip()
 
+            print(f"[Planner] Parsing JSON response...")
+            print(f"[Planner] Raw JSON content: {content[:500]}...")  # Log first 500 chars
             steps_data = json.loads(content)
+            print(f"[Planner] Successfully parsed {len(steps_data)} steps")
 
             # Create plan
             plan_id = str(uuid.uuid4())
@@ -114,21 +120,39 @@ Return ONLY the JSON array, no other text.
 
             for i, step_data in enumerate(steps_data):
                 step_id = f"step_{i+1}"
-                step = Step(
-                    step_id=step_id,
-                    tool_name=step_data["tool_name"],
-                    input=step_data["input"],
-                    description=step_data["description"],
-                    dependencies=step_data.get("dependencies", [])
-                )
-                steps.append(step)
-                dependencies[step_id] = step.dependencies
+                print(f"[Planner] Processing step {i+1}/{len(steps_data)}: {step_data.get('description', 'N/A')}")
+
+                # Normalize dependencies - handle various input types
+                raw_deps = step_data.get("dependencies", [])
+                print(f"[Planner]   Raw dependencies: {raw_deps} (type: {type(raw_deps)})")
+
+                normalized_deps = self._normalize_dependencies(raw_deps)
+                print(f"[Planner]   Normalized dependencies: {normalized_deps}")
+
+                try:
+                    step = Step(
+                        step_id=step_id,
+                        tool_name=step_data["tool_name"],
+                        input=step_data["input"],
+                        description=step_data["description"],
+                        dependencies=normalized_deps
+                    )
+                    steps.append(step)
+                    dependencies[step_id] = step.dependencies
+                    print(f"[Planner]   ✓ Step created successfully")
+                except Exception as step_error:
+                    print(f"[Planner]   ✗ Failed to create step {step_id}")
+                    print(f"[Planner]   Error: {str(step_error)}")
+                    print(f"[Planner]   Step data: {json.dumps(step_data, indent=2)}")
+                    raise
 
             plan = Plan(
                 plan_id=plan_id,
                 steps=steps,
                 dependencies=dependencies
             )
+
+            print(f"[Planner] Plan created successfully with {len(steps)} steps")
 
             # Update state
             state.plan = plan
@@ -137,8 +161,21 @@ Return ONLY the JSON array, no other text.
 
             return state
 
+        except json.JSONDecodeError as e:
+            # JSON parsing failed
+            print(f"[Planner] ERROR: JSON parsing failed")
+            print(f"[Planner] JSONDecodeError: {str(e)}")
+            print(f"[Planner] Failed content: {content}")
+            state.type = StateType.ERROR
+            state.error = f"Planning failed: Invalid JSON response from LLM - {str(e)}"
+            return state
         except Exception as e:
             # Planning failed
+            print(f"[Planner] ERROR: Planning failed with exception")
+            print(f"[Planner] Exception type: {type(e).__name__}")
+            print(f"[Planner] Exception message: {str(e)}")
+            import traceback
+            print(f"[Planner] Traceback:\n{traceback.format_exc()}")
             state.type = StateType.ERROR
             state.error = f"Planning failed: {str(e)}"
             return state
@@ -149,6 +186,7 @@ Return ONLY the JSON array, no other text.
         results = state.results
         if not results:
             # No results yet, shouldn't happen
+            print(f"[Planner] ERROR: No results available for decision")
             state.type = StateType.ERROR
             state.error = "No results available for decision"
             return state
@@ -185,11 +223,14 @@ Return ONLY the JSON, no other text.
 """
 
         try:
+            print(f"[Planner] Making decision for plan: {state.plan.plan_id if state.plan else 'N/A'}")
             content = await self.llm_client.generate(
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=4096
             )
             content = content.strip()
+
+            print(f"[Planner] Decision response received, length: {len(content)} chars")
 
             # Remove markdown code blocks if present
             if content.startswith("```"):
@@ -198,43 +239,116 @@ Return ONLY the JSON, no other text.
                     content = content[4:]
                 content = content.strip()
 
+            print(f"[Planner] Parsing decision JSON...")
+            print(f"[Planner] Raw decision content: {content[:500]}...")
             decision_data = json.loads(content)
             decision_type = decision_data["type"]
+            print(f"[Planner] Decision type: {decision_type}")
 
             if decision_type == "final":
                 # Task complete
+                print(f"[Planner] Decision: Task completed")
                 state.type = StateType.FINAL
                 state.final_payload = decision_data["payload"]
                 return state
 
             elif decision_type == "nextSteps":
                 # Add more steps to plan
-                # For simplicity, we'll transition to HUMAN_IN_THE_LOOP
+                print(f"[Planner] Decision: Next steps required")
+                next_steps_data = decision_data["payload"].get("steps", [])
+                print(f"[Planner] Processing {len(next_steps_data)} next steps...")
+
+                # Validate and normalize next steps
+                for i, step_data in enumerate(next_steps_data):
+                    print(f"[Planner]   Validating next step {i+1}: {step_data.get('description', 'N/A')}")
+                    raw_deps = step_data.get("dependencies", [])
+                    normalized_deps = self._normalize_dependencies(raw_deps)
+                    step_data["dependencies"] = normalized_deps
+                    print(f"[Planner]   Dependencies normalized: {raw_deps} -> {normalized_deps}")
+
+                # For simplicity, we'll transition to DISPATCH
                 # In production, you'd add steps to the existing plan
                 state.type = StateType.DISPATCH
                 return state
 
             elif decision_type == "needsHuman":
                 # Needs human input
+                print(f"[Planner] Decision: Human intervention required")
                 state.type = StateType.HUMAN_IN_THE_LOOP
                 state.final_payload = decision_data["payload"]
                 return state
 
             elif decision_type == "failed":
                 # Failed
+                print(f"[Planner] Decision: Task failed")
+                error_msg = decision_data["payload"].get("error", "Task failed")
+                print(f"[Planner] Error: {error_msg}")
                 state.type = StateType.ERROR
-                state.error = decision_data["payload"].get("error", "Task failed")
+                state.error = error_msg
                 return state
 
             else:
+                print(f"[Planner] ERROR: Unknown decision type: {decision_type}")
                 state.type = StateType.ERROR
                 state.error = f"Unknown decision type: {decision_type}"
                 return state
 
+        except json.JSONDecodeError as e:
+            print(f"[Planner] ERROR: Decision JSON parsing failed")
+            print(f"[Planner] JSONDecodeError: {str(e)}")
+            print(f"[Planner] Failed content: {content}")
+            state.type = StateType.ERROR
+            state.error = f"Decision making failed: Invalid JSON response - {str(e)}"
+            return state
         except Exception as e:
+            print(f"[Planner] ERROR: Decision making failed with exception")
+            print(f"[Planner] Exception type: {type(e).__name__}")
+            print(f"[Planner] Exception message: {str(e)}")
+            import traceback
+            print(f"[Planner] Traceback:\n{traceback.format_exc()}")
             state.type = StateType.ERROR
             state.error = f"Decision making failed: {str(e)}"
             return state
+
+    def _normalize_dependencies(self, deps: Any) -> list[str]:
+        """
+        Normalize dependencies to list of strings.
+        Handles various input types from LLM:
+        - None or empty -> []
+        - Integer -> [] (treat as "no dependencies")
+        - String -> [string]
+        - List of integers -> convert to list of strings
+        - List of strings -> return as-is
+        """
+        if deps is None or deps == [] or deps == "":
+            return []
+
+        # Single integer (e.g., 0) - treat as no dependencies
+        if isinstance(deps, int):
+            print(f"[Planner]   Warning: Got integer dependency {deps}, treating as no dependencies")
+            return []
+
+        # Single string - wrap in list
+        if isinstance(deps, str):
+            return [deps]
+
+        # List - normalize each element
+        if isinstance(deps, list):
+            normalized = []
+            for dep in deps:
+                if isinstance(dep, str):
+                    normalized.append(dep)
+                elif isinstance(dep, int):
+                    # Convert integer to step_id format
+                    normalized.append(f"step_{dep}")
+                    print(f"[Planner]   Warning: Converted integer dependency {dep} to 'step_{dep}'")
+                else:
+                    print(f"[Planner]   Warning: Unknown dependency type {type(dep)}: {dep}")
+            return normalized
+
+        # Unknown type - return empty
+        print(f"[Planner]   Warning: Unknown dependencies type {type(deps)}: {deps}, treating as no dependencies")
+        return []
 
     def _format_tools_for_prompt(self) -> str:
         """Format available tools for prompt"""
