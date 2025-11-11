@@ -4,6 +4,8 @@ Main entry point for the Orchestration Service
 
 import asyncio
 import sys
+import json
+import os
 from orchestration.orchestrator import Orchestrator
 
 
@@ -20,17 +22,33 @@ async def main():
 
     orchestrator = Orchestrator(user_id=user_id, tenant=tenant)
 
-    # Example requests
-    test_requests = [
-        "Search the web for recent AI news and summarize the top 3 articles",
-        "Read the file README.md and create a summary",
-        "Send an email to john@example.com with subject 'Meeting Update' and body 'The meeting is rescheduled to 3 PM'"
-    ]
+    # Load test requests from file
+    test_requests_file = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "test_requests.json"
+    )
+
+    try:
+        with open(test_requests_file, 'r', encoding='utf-8') as f:
+            test_data = json.load(f)
+        print(f"Loaded {len(test_data)} test cases from {test_requests_file}\n")
+    except FileNotFoundError:
+        print(f"Error: Test requests file not found at {test_requests_file}")
+        print("Please create the test_requests.json file in the project root.")
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON in test requests file: {e}")
+        sys.exit(1)
 
     # Process requests
-    for i, request in enumerate(test_requests, 1):
+    for test_case in test_data:
+        test_id = test_case.get('id', 'N/A')
+        description = test_case.get('description', 'No description')
+        request = test_case.get('request', '')
+
         print(f"\n{'='*80}")
-        print(f"Request #{i}: {request}")
+        print(f"Test Case #{test_id}: {description}")
+        print(f"Request: {request}")
         print(f"{'='*80}\n")
 
         try:
@@ -55,7 +73,7 @@ async def main():
             import traceback
             traceback.print_exc()
 
-    print("\n=== All requests processed ===\n")
+    print("\n=== All test cases processed ===\n")
 
 
 if __name__ == "__main__":
