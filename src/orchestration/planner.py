@@ -191,6 +191,34 @@ Return ONLY the JSON array, no other text.
             state.error = "No results available for decision"
             return state
 
+        # Check if any steps have exceeded max retries
+        max_retries = self.settings.max_retries  # Default is 3 from types.py
+        steps_exceeded_retries = []
+
+        for failed_step in results.failed_steps:
+            step_id = failed_step.step_id
+            retry_count = state.retry_counts.get(step_id, 0)
+
+            print(f"[Planner] Step {step_id} failure count: {retry_count + 1}/{max_retries}")
+
+            if retry_count >= max_retries:
+                steps_exceeded_retries.append(step_id)
+                print(f"[Planner] Step {step_id} has exceeded max retries ({max_retries})")
+
+        # If any steps exceeded retries, fail the task
+        if steps_exceeded_retries:
+            error_msg = f"Task failed: The following steps exceeded maximum retry limit ({max_retries}): {', '.join(steps_exceeded_retries)}"
+            print(f"[Planner] {error_msg}")
+            state.type = StateType.ERROR
+            state.error = error_msg
+            return state
+
+        # Increment retry counts for failed steps
+        for failed_step in results.failed_steps:
+            step_id = failed_step.step_id
+            state.retry_counts[step_id] = state.retry_counts.get(step_id, 0) + 1
+            print(f"[Planner] Incremented retry count for {step_id}: {state.retry_counts[step_id]}")
+
         # Build prompt for decision
         results_summary = self._format_results(results)
 

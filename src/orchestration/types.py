@@ -129,6 +129,7 @@ class State(BaseModel):
     results: Optional[AggregatedGroupResults] = None
     error: Optional[str] = None
     final_payload: Optional[Any] = None
+    retry_counts: dict[str, int] = Field(default_factory=dict)  # Track retry attempts per step
 
     class Config:
         arbitrary_types_allowed = True

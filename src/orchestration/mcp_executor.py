@@ -145,13 +145,44 @@ class MCPExecutor:
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds() * 1000
 
+            # Extract meaningful error message from exception
+            error_msg = self._extract_error_message(e)
+            print(f"[MCPExecutor] Step {step.step_id} failed: {error_msg}")
+
             return StepResult(
                 step_id=step.step_id,
                 status="failure",
-                error=str(e),
+                error=error_msg,
                 executed_at=start_time,
                 duration=duration
             )
+
+    def _extract_error_message(self, exception: Exception) -> str:
+        """
+        Extract meaningful error message from exception.
+        Handles TaskGroup exceptions and other complex exception types.
+        """
+        # Check if it's an ExceptionGroup (Python 3.11+)
+        if hasattr(exception, '__class__') and 'ExceptionGroup' in exception.__class__.__name__:
+            errors = []
+            if hasattr(exception, 'exceptions'):
+                for sub_exc in exception.exceptions:
+                    errors.append(str(sub_exc))
+                return f"Multiple errors occurred: {'; '.join(errors)}"
+
+        # Check for TaskGroup-related error messages
+        error_str = str(exception)
+        if "TaskGroup" in error_str or "unhandled errors" in error_str:
+            # Try to extract the actual error from the message
+            import traceback
+            tb = traceback.format_exception(type(exception), exception, exception.__traceback__)
+            # Look for the root cause in the traceback
+            for line in tb:
+                if "Error:" in line or "Exception:" in line:
+                    return line.strip()
+
+        # Default: return the exception string
+        return str(exception)
 
     async def _find_server_for_tool(self, tool_name: str) -> Optional[str]:
         """Find which server provides a specific tool"""

@@ -38,6 +38,7 @@ class OrchestrationState(TypedDict):
     results: Optional[dict]
     error: Optional[str]
     final_payload: Optional[dict]
+    retry_counts: dict
 
 
 class Orchestrator:
@@ -311,7 +312,8 @@ class Orchestrator:
             plan_state=plan_state,
             results=results,
             error=state.get("error"),
-            final_payload=state.get("final_payload")
+            final_payload=state.get("final_payload"),
+            retry_counts=state.get("retry_counts", {})
         )
 
     def _from_pydantic_state(self, state: State) -> OrchestrationState:
@@ -328,7 +330,8 @@ class Orchestrator:
             "plan_state": state.plan_state.value if state.plan_state else None,
             "results": state.results.model_dump() if state.results else None,
             "error": state.error,
-            "final_payload": state.final_payload
+            "final_payload": state.final_payload,
+            "retry_counts": state.retry_counts
         }
 
     async def run(self, session_id: str, request_text: str, trace_id: Optional[str] = None) -> dict:
@@ -360,7 +363,8 @@ class Orchestrator:
             "plan_state": None,
             "results": None,
             "error": None,
-            "final_payload": None
+            "final_payload": None,
+            "retry_counts": {}  # Initialize retry tracking
         }
 
         # Run the graph
