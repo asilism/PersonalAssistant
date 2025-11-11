@@ -26,6 +26,7 @@ class TestRunner:
         self.user_id = user_id
         self.tenant = tenant
         self.results = []
+        self.orchestrator = None  # Will be initialized once before running tests
 
     async def run_single_question(self, question_data: Dict[str, Any]) -> Dict[str, Any]:
         """Run a single test question"""
@@ -57,14 +58,11 @@ class TestRunner:
         start_time = time.time()
 
         try:
-            # Create a new orchestrator for each question
-            orchestrator = Orchestrator(self.user_id, self.tenant)
-
             # Generate a unique session ID for this test
             session_id = f"test_{question_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-            # Run the orchestration
-            response = await orchestrator.run(
+            # Run the orchestration using the shared orchestrator instance
+            response = await self.orchestrator.run(
                 session_id=session_id,
                 request_text=question
             )
@@ -126,6 +124,13 @@ class TestRunner:
         print(f"\n{'='*80}")
         print("PersonalAssistant Test Runner")
         print(f"{'='*80}\n")
+
+        # Initialize orchestrator once for all tests
+        print("Initializing orchestrator and loading MCP servers...")
+        self.orchestrator = Orchestrator(self.user_id, self.tenant)
+        # Trigger initialization by calling _initialize directly
+        await self.orchestrator._initialize()
+        print(f"✓ Orchestrator initialized\n")
 
         # Load questions
         with open(questions_file, 'r') as f:
