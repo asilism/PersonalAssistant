@@ -13,6 +13,14 @@ from datetime import datetime
 from typing import Dict, List, Any
 import time
 
+# Set dummy API key for testing if not already set
+# NOTE: A valid API key is required for tests to actually execute.
+# Set ANTHROPIC_API_KEY environment variable with a valid key before running tests.
+if not os.getenv("ANTHROPIC_API_KEY"):
+    os.environ["ANTHROPIC_API_KEY"] = "test-api-key-for-unit-tests"
+    print("⚠️  Warning: No ANTHROPIC_API_KEY set. Using dummy key - tests will fail at execution.")
+    print("   Set a valid API key: export ANTHROPIC_API_KEY=your-key-here\n")
+
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
