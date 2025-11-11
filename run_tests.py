@@ -60,13 +60,23 @@ class TestRunner:
             # Create a new orchestrator for each question
             orchestrator = Orchestrator(self.user_id, self.tenant)
 
+            # Generate a unique session ID for this test
+            session_id = f"test_{question_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
             # Run the orchestration
-            response = await orchestrator.run(question)
+            response = await orchestrator.run(
+                session_id=session_id,
+                request_text=question
+            )
 
             # Extract results
             if response:
-                result["output"] = str(response.get("summary", ""))
-                result["status"] = response.get("status", "unknown")
+                # Map orchestrator response to test result format
+                result["output"] = str(response.get("message", ""))
+                if response.get("success"):
+                    result["status"] = "completed"
+                else:
+                    result["status"] = "failed"
 
                 # Extract tools used from the plan
                 if "plan" in response and response["plan"]:
