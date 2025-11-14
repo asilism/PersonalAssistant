@@ -155,12 +155,27 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="mcpTransport">Transport Type</label>
+                        <select id="mcpTransport" onchange="updateMCPTransportFields()">
+                            <option value="http">HTTP (URL-based)</option>
+                            <option value="stdio">STDIO (Command-based)</option>
+                        </select>
+                        <small style="color: #666;">Choose how to connect to the MCP server</small>
+                    </div>
+
+                    <div class="form-group" id="mcpUrlGroup">
+                        <label for="mcpUrl">Server URL</label>
+                        <input type="text" id="mcpUrl" placeholder="http://localhost:8001">
+                        <small style="color: #666;">URL endpoint for the MCP server</small>
+                    </div>
+
+                    <div class="form-group" id="mcpCommandGroup" style="display: none;">
                         <label for="mcpCommand">Command</label>
                         <input type="text" id="mcpCommand" value="fastmcp" placeholder="fastmcp">
                         <small style="color: #666;">Command to execute (usually 'fastmcp')</small>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" id="mcpArgsGroup" style="display: none;">
                         <label for="mcpArgs">Arguments (JSON Array)</label>
                         <textarea id="mcpArgs" placeholder='["run", "path/to/server.py"]' rows="3"></textarea>
                         <small style="color: #666;">Arguments as JSON array</small>

@@ -246,6 +246,8 @@ async def get_mcp_servers(user_id: str = "test_user", tenant: str = "test_tenant
                 {
                     "server_name": s.server_name,
                     "enabled": s.enabled,
+                    "transport": s.transport if hasattr(s, 'transport') else "stdio",
+                    "url": s.url if hasattr(s, 'url') else None,
                     "command": s.command,
                     "args": s.args,
                     "env_vars": s.env_vars
