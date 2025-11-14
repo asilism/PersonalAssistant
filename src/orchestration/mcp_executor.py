@@ -1,5 +1,5 @@
 """
-MCP Executor - Connects to and executes MCP tools via STDIO
+MCP Executor - Connects to and executes MCP tools via HTTP (SSE)
 """
 
 import asyncio
@@ -10,14 +10,14 @@ from datetime import datetime
 from typing import Any, Optional, Dict, List
 from contextlib import asynccontextmanager
 
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp import ClientSession
+from mcp.client.sse import sse_client
 
 from .types import Step, StepResult, ToolDefinition
 
 
 class MCPExecutor:
-    """MCPExecutor - Executes MCP tools via real MCP servers"""
+    """MCPExecutor - Executes MCP tools via HTTP/SSE MCP servers"""
 
     def __init__(self):
         self._execution_count = 0
@@ -27,32 +27,27 @@ class MCPExecutor:
 
     async def initialize_servers(self):
         """Initialize connections to all MCP servers"""
-        # Define MCP server configurations (using fastmcp)
+        # Define MCP server configurations (HTTP-based)
         server_configs = {
             "mail-agent": {
-                "command": "fastmcp",
-                "args": ["run", os.path.join(os.path.dirname(__file__), "../../mcp_servers/mail_agent/server.py")],
-                "env": None
+                "url": "http://localhost:8001/sse",
+                "transport": "http"
             },
             "calendar-agent": {
-                "command": "fastmcp",
-                "args": ["run", os.path.join(os.path.dirname(__file__), "../../mcp_servers/calendar_agent/server.py")],
-                "env": None
+                "url": "http://localhost:8002/sse",
+                "transport": "http"
             },
             "jira-agent": {
-                "command": "fastmcp",
-                "args": ["run", os.path.join(os.path.dirname(__file__), "../../mcp_servers/jira_agent/server.py")],
-                "env": None
+                "url": "http://localhost:8004/sse",
+                "transport": "http"
             },
             "calculator-agent": {
-                "command": "fastmcp",
-                "args": ["run", os.path.join(os.path.dirname(__file__), "../../mcp_servers/calculator_agent/server.py")],
-                "env": None
+                "url": "http://localhost:8003/sse",
+                "transport": "http"
             },
             "rpa-agent": {
-                "command": "fastmcp",
-                "args": ["run", os.path.join(os.path.dirname(__file__), "../../mcp_servers/rpa_agent/server.py")],
-                "env": None
+                "url": "http://localhost:8005/sse",
+                "transport": "http"
             }
         }
 
@@ -66,7 +61,7 @@ class MCPExecutor:
                     "status": "starting"
                 }
 
-                print(f"[MCPExecutor] Configured {server_name}")
+                print(f"[MCPExecutor] Configured {server_name} at {config['url']}")
                 self._servers[server_name]["status"] = "ready"
 
             except Exception as e:
@@ -85,13 +80,8 @@ class MCPExecutor:
 
             try:
                 config = server_info["config"]
-                server_params = StdioServerParameters(
-                    command=config["command"],
-                    args=config["args"],
-                    env=config.get("env")
-                )
 
-                async with stdio_client(server_params) as (read, write):
+                async with sse_client(config["url"]) as (read, write):
                     async with ClientSession(read, write) as session:
                         await session.initialize()
 
@@ -226,7 +216,7 @@ class MCPExecutor:
 
     async def _execute_mcp_tool(self, server_name: str, tool_name: str, tool_input: dict[str, Any]) -> Any:
         """
-        Execute MCP tool via STDIO connection
+        Execute MCP tool via HTTP/SSE connection
         """
         if server_name not in self._servers:
             raise ValueError(f"Unknown server: {server_name}")
@@ -237,15 +227,8 @@ class MCPExecutor:
 
         config = server_info["config"]
 
-        # Create server parameters
-        server_params = StdioServerParameters(
-            command=config["command"],
-            args=config["args"],
-            env=config.get("env")
-        )
-
-        # Connect and execute
-        async with stdio_client(server_params) as (read, write):
+        # Connect and execute via SSE
+        async with sse_client(config["url"]) as (read, write):
             async with ClientSession(read, write) as session:
                 # Initialize session
                 await session.initialize()

@@ -7,6 +7,7 @@ Provides calendar event management tools: create, read, update, delete, list
 from datetime import datetime
 from typing import Optional
 from fastmcp import FastMCP
+import uvicorn
 
 # Create FastMCP server
 mcp = FastMCP("calendar-agent")
@@ -211,3 +212,8 @@ def list_events(
         "count": len(result_events),
         "events": result_events
     }
+
+
+if __name__ == "__main__":
+    # Run as HTTP server on port 8002
+    uvicorn.run(mcp.get_asgi_app(), host="0.0.0.0", port=8002)

@@ -60,8 +60,10 @@ class SettingsRequest(BaseModel):
 class MCPServerRequest(BaseModel):
     server_name: str
     enabled: bool = True
-    command: str = "fastmcp"
-    args: Optional[list] = None
+    transport: str = "http"  # "stdio" or "http"
+    url: Optional[str] = None  # URL for HTTP transport
+    command: Optional[str] = None  # Command for STDIO transport
+    args: Optional[list] = None  # Args for STDIO transport
     env_vars: Optional[dict] = None
     user_id: Optional[str] = "test_user"
     tenant: Optional[str] = "test_tenant"
@@ -264,6 +266,8 @@ async def save_mcp_server(request: MCPServerRequest):
             tenant=request.tenant,
             server_name=request.server_name,
             enabled=request.enabled,
+            transport=request.transport,
+            url=request.url,
             command=request.command,
             args=request.args,
             env_vars=request.env_vars

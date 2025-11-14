@@ -26,8 +26,10 @@ class MCPServerSettings(BaseModel):
     """MCP Server Settings model"""
     server_name: str
     enabled: bool = True
-    command: str = "fastmcp"
-    args: list = []
+    transport: str = "http"  # "stdio" or "http"
+    url: Optional[str] = None  # URL for HTTP transport
+    command: Optional[str] = None  # Command for STDIO transport
+    args: Optional[list] = None  # Args for STDIO transport
     env_vars: Optional[Dict[str, str]] = None
 
 
@@ -127,7 +129,9 @@ class SettingsManager:
                     tenant TEXT NOT NULL,
                     server_name TEXT NOT NULL,
                     enabled INTEGER DEFAULT 1,
-                    command TEXT DEFAULT 'fastmcp',
+                    transport TEXT DEFAULT 'http',
+                    url TEXT,
+                    command TEXT,
                     args TEXT,
                     env_vars TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -135,6 +139,20 @@ class SettingsManager:
                     UNIQUE(user_id, tenant, server_name)
                 )
             """)
+
+            # Check if transport and url columns exist and add if missing
+            cursor.execute("PRAGMA table_info(mcp_server_settings)")
+            mcp_columns = [row[1] for row in cursor.fetchall()]
+
+            if "transport" not in mcp_columns:
+                print("⚠️  Migrating database: Adding transport column to mcp_server_settings table")
+                cursor.execute("ALTER TABLE mcp_server_settings ADD COLUMN transport TEXT DEFAULT 'http'")
+                migrations_performed.append("transport")
+
+            if "url" not in mcp_columns:
+                print("⚠️  Migrating database: Adding url column to mcp_server_settings table")
+                cursor.execute("ALTER TABLE mcp_server_settings ADD COLUMN url TEXT")
+                migrations_performed.append("url")
 
             # Create index for MCP server settings
             cursor.execute("""
@@ -325,7 +343,9 @@ class SettingsManager:
         tenant: str,
         server_name: str,
         enabled: bool = True,
-        command: str = "fastmcp",
+        transport: str = "http",
+        url: Optional[str] = None,
+        command: Optional[str] = None,
         args: Optional[list] = None,
         env_vars: Optional[Dict[str, str]] = None
     ) -> bool:
@@ -337,15 +357,17 @@ class SettingsManager:
             cursor = conn.cursor()
 
             cursor.execute("""
-                INSERT INTO mcp_server_settings (user_id, tenant, server_name, enabled, command, args, env_vars)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO mcp_server_settings (user_id, tenant, server_name, enabled, transport, url, command, args, env_vars)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_id, tenant, server_name) DO UPDATE SET
                     enabled = excluded.enabled,
+                    transport = excluded.transport,
+                    url = excluded.url,
                     command = excluded.command,
                     args = excluded.args,
                     env_vars = excluded.env_vars,
                     updated_at = CURRENT_TIMESTAMP
-            """, (user_id, tenant, server_name, int(enabled), command, args_json, env_vars_json))
+            """, (user_id, tenant, server_name, int(enabled), transport, url, command, args_json, env_vars_json))
 
             conn.commit()
 
@@ -362,7 +384,7 @@ class SettingsManager:
             cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT server_name, enabled, command, args, env_vars
+                SELECT server_name, enabled, transport, url, command, args, env_vars
                 FROM mcp_server_settings
                 WHERE user_id = ? AND tenant = ? AND server_name = ?
             """, (user_id, tenant, server_name))
@@ -370,12 +392,14 @@ class SettingsManager:
             row = cursor.fetchone()
 
             if row:
-                server_name, enabled, command, args_json, env_vars_json = row
+                server_name, enabled, transport, url, command, args_json, env_vars_json = row
                 return MCPServerSettings(
                     server_name=server_name,
                     enabled=bool(enabled),
+                    transport=transport or "http",
+                    url=url,
                     command=command,
-                    args=json.loads(args_json) if args_json else [],
+                    args=json.loads(args_json) if args_json else None,
                     env_vars=json.loads(env_vars_json) if env_vars_json else None
                 )
 
@@ -387,19 +411,21 @@ class SettingsManager:
             cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT server_name, enabled, command, args, env_vars
+                SELECT server_name, enabled, transport, url, command, args, env_vars
                 FROM mcp_server_settings
                 WHERE user_id = ? AND tenant = ?
             """, (user_id, tenant))
 
             servers = []
             for row in cursor.fetchall():
-                server_name, enabled, command, args_json, env_vars_json = row
+                server_name, enabled, transport, url, command, args_json, env_vars_json = row
                 servers.append(MCPServerSettings(
                     server_name=server_name,
                     enabled=bool(enabled),
+                    transport=transport or "http",
+                    url=url,
                     command=command,
-                    args=json.loads(args_json) if args_json else [],
+                    args=json.loads(args_json) if args_json else None,
                     env_vars=json.loads(env_vars_json) if env_vars_json else None
                 ))
 
