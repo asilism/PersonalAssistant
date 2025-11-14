@@ -91,11 +91,27 @@ class SettingsManager:
             # Check if base_url column exists and add if missing (migration for existing DBs)
             cursor.execute("PRAGMA table_info(llm_settings)")
             columns = [row[1] for row in cursor.fetchall()]
+
+            migrations_performed = []
+
             if "base_url" not in columns:
                 print("⚠️  Migrating database: Adding base_url column to llm_settings table")
                 cursor.execute("ALTER TABLE llm_settings ADD COLUMN base_url TEXT")
+                migrations_performed.append("base_url")
+
+            if "max_retries" not in columns:
+                print("⚠️  Migrating database: Adding max_retries column to llm_settings table")
+                cursor.execute("ALTER TABLE llm_settings ADD COLUMN max_retries INTEGER DEFAULT 3")
+                migrations_performed.append("max_retries")
+
+            if "timeout" not in columns:
+                print("⚠️  Migrating database: Adding timeout column to llm_settings table")
+                cursor.execute("ALTER TABLE llm_settings ADD COLUMN timeout INTEGER DEFAULT 30000")
+                migrations_performed.append("timeout")
+
+            if migrations_performed:
                 conn.commit()
-                print("✅ Database migration complete")
+                print(f"✅ Database migration complete: Added columns {', '.join(migrations_performed)}")
 
             # Create index for faster lookups
             cursor.execute("""
