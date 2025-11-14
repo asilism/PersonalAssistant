@@ -487,6 +487,24 @@ async function saveSettings() {
     }
 }
 
+// Update MCP transport fields visibility
+function updateMCPTransportFields() {
+    const transport = document.getElementById('mcpTransport').value;
+    const urlGroup = document.getElementById('mcpUrlGroup');
+    const commandGroup = document.getElementById('mcpCommandGroup');
+    const argsGroup = document.getElementById('mcpArgsGroup');
+
+    if (transport === 'http') {
+        urlGroup.style.display = 'block';
+        commandGroup.style.display = 'none';
+        argsGroup.style.display = 'none';
+    } else {
+        urlGroup.style.display = 'none';
+        commandGroup.style.display = 'block';
+        argsGroup.style.display = 'block';
+    }
+}
+
 // Load MCP servers
 async function loadMCPServers() {
     const container = document.getElementById('currentMCPServers');
@@ -502,6 +520,7 @@ async function loadMCPServers() {
             if (data.servers && data.servers.length > 0) {
                 html = '<div class="mcp-servers-list">';
                 data.servers.forEach(server => {
+                    const transport = server.transport || 'stdio';
                     html += `
                         <div class="mcp-server-item">
                             <div class="mcp-server-header">
@@ -511,8 +530,12 @@ async function loadMCPServers() {
                                 </span>
                             </div>
                             <div class="mcp-server-details">
-                                <div><strong>Command:</strong> ${server.command}</div>
-                                <div><strong>Args:</strong> ${JSON.stringify(server.args)}</div>
+                                <div><strong>Transport:</strong> ${transport.toUpperCase()}</div>
+                                ${transport === 'http'
+                                    ? `<div><strong>URL:</strong> ${server.url || 'N/A'}</div>`
+                                    : `<div><strong>Command:</strong> ${server.command || 'N/A'}</div>
+                                       <div><strong>Args:</strong> ${JSON.stringify(server.args || [])}</div>`
+                                }
                                 ${server.env_vars ? `<div><strong>Env Vars:</strong> ${JSON.stringify(server.env_vars)}</div>` : ''}
                             </div>
                             <button onclick="deleteMCPServer('${server.server_name}')" class="delete-btn">Delete</button>
@@ -537,6 +560,8 @@ async function loadMCPServers() {
 async function saveMCPServer() {
     const serverName = document.getElementById('mcpServerName').value;
     const enabled = document.getElementById('mcpEnabled').value === 'true';
+    const transport = document.getElementById('mcpTransport').value;
+    const url = document.getElementById('mcpUrl').value;
     const command = document.getElementById('mcpCommand').value;
     const argsText = document.getElementById('mcpArgs').value;
     const envVarsText = document.getElementById('mcpEnvVars').value;
@@ -545,6 +570,17 @@ async function saveMCPServer() {
 
     if (!serverName) {
         resultDiv.innerHTML = '<div class="result-error">Please enter a server name</div>';
+        return;
+    }
+
+    // Validate based on transport type
+    if (transport === 'http' && !url) {
+        resultDiv.innerHTML = '<div class="result-error">Please enter a server URL for HTTP transport</div>';
+        return;
+    }
+
+    if (transport === 'stdio' && !command) {
+        resultDiv.innerHTML = '<div class="result-error">Please enter a command for STDIO transport</div>';
         return;
     }
 
@@ -569,20 +605,33 @@ async function saveMCPServer() {
     resultDiv.innerHTML = '<div class="loading">Saving MCP server</div>';
 
     try {
+        const requestBody = {
+            server_name: serverName,
+            enabled: enabled,
+            transport: transport,
+            user_id: 'test_user',
+            tenant: 'test_tenant'
+        };
+
+        // Add transport-specific fields
+        if (transport === 'http') {
+            requestBody.url = url;
+        } else {
+            requestBody.command = command;
+            requestBody.args = args;
+        }
+
+        // Add optional env vars
+        if (envVars) {
+            requestBody.env_vars = envVars;
+        }
+
         const response = await fetch('/api/mcp-servers', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                server_name: serverName,
-                enabled: enabled,
-                command: command,
-                args: args,
-                env_vars: envVars,
-                user_id: 'test_user',
-                tenant: 'test_tenant'
-            })
+            body: JSON.stringify(requestBody)
         });
 
         const data = await response.json();
@@ -597,6 +646,8 @@ async function saveMCPServer() {
 
             // Clear form
             document.getElementById('mcpServerName').value = '';
+            document.getElementById('mcpUrl').value = '';
+            document.getElementById('mcpCommand').value = 'fastmcp';
             document.getElementById('mcpArgs').value = '';
             document.getElementById('mcpEnvVars').value = '';
 
