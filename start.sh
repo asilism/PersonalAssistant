@@ -39,7 +39,16 @@ fi
 
 echo "✅ Dependencies installed"
 echo ""
-echo "🚀 Starting Web UI and API Server..."
+
+# Check if production mode is requested
+if [ "$1" = "--prod" ]; then
+    export DEV_MODE=false
+    echo "🚀 Starting in PRODUCTION mode..."
+else
+    export DEV_MODE=true
+    echo "🚀 Starting in DEVELOPMENT mode (hot reload enabled)..."
+fi
+
 echo ""
 echo "Available at:"
 echo "  - Web UI:       http://localhost:8000"

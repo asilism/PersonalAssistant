@@ -62,11 +62,31 @@ LLM_MODEL=claude-3-5-sonnet-20241022
 # LLM_BASE_URL=https://custom-endpoint.example.com/v1
 ```
 
-### 3. Run the Service
+### 3. Start MCP Servers (Optional but Recommended)
 
-#### Linux/Mac:
+```bash
+# Start all MCP servers
+./start_mcp_servers.sh
+
+# Check server status
+./status_mcp_servers.sh
+
+# Stop all servers
+./stop_mcp_servers.sh
+```
+
+See [README_MCP_SERVERS.md](README_MCP_SERVERS.md) for detailed MCP server management.
+
+### 4. Run the Service
+
+#### Linux/Mac (Development mode with hot reload):
 ```bash
 ./start.sh
+```
+
+#### Linux/Mac (Production mode):
+```bash
+./start.sh --prod
 ```
 
 #### Windows:
@@ -76,10 +96,19 @@ start.bat
 
 #### Manual:
 ```bash
-python src/api_server.py
+# Development mode (hot reload enabled)
+DEV_MODE=true python src/api_server.py
+
+# Production mode
+DEV_MODE=false python src/api_server.py
 ```
 
-### 4. Access the Web UI
+**Development Mode Features:**
+- ⚡ Hot reload: Code changes automatically restart the server
+- 🔄 Frontend changes are instantly reflected (no manual refresh needed)
+- 📝 Watches both `src/` and `frontend/` directories
+
+### 5. Access the Web UI
 
 Open your browser and navigate to:
 - **Web UI**: http://localhost:8000
@@ -125,8 +154,16 @@ PersonalAssistant/
 ├── data/                     # Data directory (auto-created)
 │   ├── settings.db           # User settings database
 │   └── .encryption_key       # Encryption key for API keys
+├── logs/                     # Log directory (auto-created)
+│   ├── mcp/                  # MCP server logs
+│   └── pids/                 # MCP server PID files
 ├── start.sh                  # Linux/Mac startup script
 ├── start.bat                 # Windows startup script
+├── start_mcp_servers.sh      # Start all MCP servers
+├── stop_mcp_servers.sh       # Stop all MCP servers
+├── status_mcp_servers.sh     # Check MCP server status
+├── README_MCP_SERVERS.md     # MCP server management guide
+├── README_DATABASE.md        # Database management guide
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
@@ -163,9 +200,11 @@ PersonalAssistant/
    - Executes MCP tools
 
 6. **Settings Manager** (`src/orchestration/settings_manager.py`)
-   - Encrypted storage for API keys
+   - **SQLite database** for persistent storage (`data/settings.db`)
+   - **Encrypted API key storage** (Fernet encryption)
    - Per-user/tenant configuration
-   - SQLite-based persistence
+   - Stores: provider, API key, model, base URL
+   - See [README_DATABASE.md](README_DATABASE.md) for details
 
 ### State Machine Flow
 
@@ -374,6 +413,24 @@ Or configure it in the Settings tab of the Web UI.
 
 ## Development
 
+### Development Mode
+
+The service supports hot reload for faster development:
+
+```bash
+# Start in development mode (default)
+./start.sh
+
+# Or set explicitly
+DEV_MODE=true python src/api_server.py
+```
+
+**Hot reload watches:**
+- `src/` - Backend code changes
+- `frontend/` - Frontend HTML/CSS/JS changes
+
+Any changes to these directories will automatically restart the server.
+
 ### Code Formatting
 
 ```bash
@@ -386,6 +443,24 @@ ruff check src/
 ```bash
 mypy src/
 ```
+
+### Managing MCP Servers
+
+```bash
+# Start all MCP servers
+./start_mcp_servers.sh
+
+# Check status
+./status_mcp_servers.sh
+
+# Stop all servers
+./stop_mcp_servers.sh
+
+# View logs
+tail -f logs/mcp/calculator_agent.log
+```
+
+See [README_MCP_SERVERS.md](README_MCP_SERVERS.md) for more details.
 
 ### Adding a New MCP Server
 

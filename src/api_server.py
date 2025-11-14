@@ -205,9 +205,30 @@ def main():
     print("- Web UI: http://localhost:8000")
     print("- API Docs: http://localhost:8000/docs")
     print("- Health Check: http://localhost:8000/api/health")
+
+    # Check if running in development mode
+    dev_mode = os.getenv("DEV_MODE", "true").lower() == "true"
+
+    if dev_mode:
+        print("\n⚡ Development mode: Hot reload enabled")
+        print("   - Backend changes will auto-reload")
+        print("   - Frontend changes will auto-reload")
+
     print("\n" + "=" * 80 + "\n")
 
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    if dev_mode:
+        # Development mode with hot reload
+        uvicorn.run(
+            "api_server:app",
+            host="0.0.0.0",
+            port=8000,
+            reload=True,
+            reload_dirs=["src", "frontend"],
+            log_level="info"
+        )
+    else:
+        # Production mode without reload
+        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
 
 
 if __name__ == "__main__":
