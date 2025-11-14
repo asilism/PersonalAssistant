@@ -15,7 +15,8 @@
 
         <div class="tabs">
             <div class="tab active" onclick="switchTab('manual')">📝 Manual Request</div>
-            <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
+            <div class="tab" onclick="switchTab('settings')">⚙️ LLM Settings</div>
+            <div class="tab" onclick="switchTab('mcp')">🔌 MCP Servers</div>
         </div>
 
         <!-- Manual Testing Tab -->
@@ -98,6 +99,18 @@
                         </select>
                     </div>
 
+                    <div class="form-group">
+                        <label for="maxRetries">Max Retries</label>
+                        <input type="number" id="maxRetries" value="3" min="1" max="10">
+                        <small style="color: #666;">Maximum number of retry attempts</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="timeout">Timeout (ms)</label>
+                        <input type="number" id="timeout" value="30000" min="5000" step="1000">
+                        <small style="color: #666;">Request timeout in milliseconds</small>
+                    </div>
+
                     <div class="settings-actions">
                         <button onclick="testConnection()" id="testBtn">🧪 Test Connection</button>
                         <button onclick="saveSettings()" id="saveBtn">💾 Save Settings</button>
@@ -111,6 +124,64 @@
                 <div class="current-settings-card">
                     <h3>Current Settings</h3>
                     <div id="currentSettings">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MCP Servers Tab -->
+        <div id="mcp-tab" class="tab-content">
+            <div class="settings-container">
+                <h2>🔌 MCP Server Settings</h2>
+                <p style="color: #666; margin-bottom: 20px;">Configure your MCP servers</p>
+
+                <div class="settings-card">
+                    <h3>Add/Update MCP Server</h3>
+
+                    <div class="form-group">
+                        <label for="mcpServerName">Server Name</label>
+                        <input type="text" id="mcpServerName" placeholder="e.g., mail_agent">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="mcpEnabled">Enabled</label>
+                        <select id="mcpEnabled">
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="mcpCommand">Command</label>
+                        <input type="text" id="mcpCommand" value="fastmcp" placeholder="fastmcp">
+                        <small style="color: #666;">Command to execute (usually 'fastmcp')</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="mcpArgs">Arguments (JSON Array)</label>
+                        <textarea id="mcpArgs" placeholder='["run", "path/to/server.py"]' rows="3"></textarea>
+                        <small style="color: #666;">Arguments as JSON array</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="mcpEnvVars">Environment Variables (JSON Object)</label>
+                        <textarea id="mcpEnvVars" placeholder='{"KEY": "value"}' rows="3"></textarea>
+                        <small style="color: #666;">Environment variables as JSON object (optional)</small>
+                    </div>
+
+                    <div class="settings-actions">
+                        <button onclick="saveMCPServer()" id="saveMCPBtn">💾 Save MCP Server</button>
+                    </div>
+
+                    <div id="mcpResult" class="settings-result">
+                        <!-- Result messages will appear here -->
+                    </div>
+                </div>
+
+                <div class="current-settings-card">
+                    <h3>Current MCP Servers</h3>
+                    <div id="currentMCPServers">
                         <div class="loading">Loading...</div>
                     </div>
                 </div>

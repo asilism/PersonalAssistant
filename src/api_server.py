@@ -42,6 +42,18 @@ class SettingsRequest(BaseModel):
     api_key: str
     model: str
     base_url: Optional[str] = None
+    max_retries: Optional[int] = 3
+    timeout: Optional[int] = 30000
+    user_id: Optional[str] = "test_user"
+    tenant: Optional[str] = "test_tenant"
+
+
+class MCPServerRequest(BaseModel):
+    server_name: str
+    enabled: bool = True
+    command: str = "fastmcp"
+    args: Optional[list] = None
+    env_vars: Optional[dict] = None
     user_id: Optional[str] = "test_user"
     tenant: Optional[str] = "test_tenant"
 
@@ -140,7 +152,9 @@ async def save_settings(request: SettingsRequest):
             provider=request.provider,
             api_key=request.api_key,
             model=request.model,
-            base_url=request.base_url
+            base_url=request.base_url,
+            max_retries=request.max_retries,
+            timeout=request.timeout
         )
 
         if success:
@@ -191,6 +205,75 @@ async def list_tools():
         ]
 
         return {"tools": tools, "count": len(tools)}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/mcp-servers")
+async def get_mcp_servers(user_id: str = "test_user", tenant: str = "test_tenant"):
+    """Get all MCP server settings"""
+    try:
+        servers = settings_manager.get_all_mcp_servers(user_id, tenant)
+        return {
+            "servers": [
+                {
+                    "server_name": s.server_name,
+                    "enabled": s.enabled,
+                    "command": s.command,
+                    "args": s.args,
+                    "env_vars": s.env_vars
+                }
+                for s in servers
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/mcp-servers")
+async def save_mcp_server(request: MCPServerRequest):
+    """Save MCP server settings"""
+    try:
+        success = settings_manager.save_mcp_server_settings(
+            user_id=request.user_id,
+            tenant=request.tenant,
+            server_name=request.server_name,
+            enabled=request.enabled,
+            command=request.command,
+            args=request.args,
+            env_vars=request.env_vars
+        )
+
+        if success:
+            # Clear orchestrator cache to force reload with new settings
+            key = f"{request.tenant}:{request.user_id}"
+            if key in orchestrators:
+                del orchestrators[key]
+
+            return {"success": True, "message": "MCP server settings saved successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save MCP server settings")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/mcp-servers/{server_name}")
+async def delete_mcp_server(server_name: str, user_id: str = "test_user", tenant: str = "test_tenant"):
+    """Delete MCP server settings"""
+    try:
+        success = settings_manager.delete_mcp_server_settings(user_id, tenant, server_name)
+
+        if success:
+            # Clear orchestrator cache to force reload
+            key = f"{tenant}:{user_id}"
+            if key in orchestrators:
+                del orchestrators[key]
+
+            return {"success": True, "message": "MCP server settings deleted successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="MCP server settings not found")
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

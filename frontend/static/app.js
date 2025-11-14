@@ -15,6 +15,8 @@ function switchTab(tabName) {
     // Load settings if switching to settings tab
     if (tabName === 'settings') {
         loadCurrentSettings();
+    } else if (tabName === 'mcp') {
+        loadMCPServers();
     }
 }
 
@@ -230,6 +232,24 @@ async function loadCurrentSettings() {
                 `;
             }
 
+            if (data.max_retries !== undefined) {
+                html += `
+                    <div class="settings-item">
+                        <strong>Max Retries:</strong>
+                        <span>${data.max_retries}</span>
+                    </div>
+                `;
+            }
+
+            if (data.timeout !== undefined) {
+                html += `
+                    <div class="settings-item">
+                        <strong>Timeout:</strong>
+                        <span>${data.timeout} ms</span>
+                    </div>
+                `;
+            }
+
             if (html === '') {
                 html = '<p style="color: #999;">No settings configured yet</p>';
             }
@@ -311,6 +331,8 @@ async function saveSettings() {
     const apiKey = document.getElementById('apiKey').value;
     const model = document.getElementById('llmModel').value;
     const baseUrl = document.getElementById('baseUrl').value;
+    const maxRetries = parseInt(document.getElementById('maxRetries').value) || 3;
+    const timeout = parseInt(document.getElementById('timeout').value) || 30000;
     const saveBtn = document.getElementById('saveBtn');
     const resultDiv = document.getElementById('settingsResult');
 
@@ -334,6 +356,8 @@ async function saveSettings() {
                 api_key: apiKey,
                 model: model,
                 base_url: baseUrl || null,
+                max_retries: maxRetries,
+                timeout: timeout,
                 user_id: 'test_user',
                 tenant: 'test_tenant'
             })
@@ -371,5 +395,166 @@ async function saveSettings() {
     } finally {
         saveBtn.disabled = false;
         saveBtn.textContent = '💾 Save Settings';
+    }
+}
+
+// Load MCP servers
+async function loadMCPServers() {
+    const container = document.getElementById('currentMCPServers');
+    container.innerHTML = '<div class="loading">Loading MCP servers</div>';
+
+    try {
+        const response = await fetch('/api/mcp-servers?user_id=test_user&tenant=test_tenant');
+        const data = await response.json();
+
+        if (response.ok) {
+            let html = '';
+
+            if (data.servers && data.servers.length > 0) {
+                html = '<div class="mcp-servers-list">';
+                data.servers.forEach(server => {
+                    html += `
+                        <div class="mcp-server-item">
+                            <div class="mcp-server-header">
+                                <strong>${server.server_name}</strong>
+                                <span class="mcp-status ${server.enabled ? 'enabled' : 'disabled'}">
+                                    ${server.enabled ? '✓ Enabled' : '✗ Disabled'}
+                                </span>
+                            </div>
+                            <div class="mcp-server-details">
+                                <div><strong>Command:</strong> ${server.command}</div>
+                                <div><strong>Args:</strong> ${JSON.stringify(server.args)}</div>
+                                ${server.env_vars ? `<div><strong>Env Vars:</strong> ${JSON.stringify(server.env_vars)}</div>` : ''}
+                            </div>
+                            <button onclick="deleteMCPServer('${server.server_name}')" class="delete-btn">Delete</button>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            } else {
+                html = '<p style="color: #999;">No MCP servers configured yet</p>';
+            }
+
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<p style="color: #f44336;">Failed to load MCP servers</p>';
+        }
+    } catch (error) {
+        container.innerHTML = '<p style="color: #f44336;">Network error</p>';
+    }
+}
+
+// Save MCP server
+async function saveMCPServer() {
+    const serverName = document.getElementById('mcpServerName').value;
+    const enabled = document.getElementById('mcpEnabled').value === 'true';
+    const command = document.getElementById('mcpCommand').value;
+    const argsText = document.getElementById('mcpArgs').value;
+    const envVarsText = document.getElementById('mcpEnvVars').value;
+    const saveBtn = document.getElementById('saveMCPBtn');
+    const resultDiv = document.getElementById('mcpResult');
+
+    if (!serverName) {
+        resultDiv.innerHTML = '<div class="result-error">Please enter a server name</div>';
+        return;
+    }
+
+    // Parse JSON
+    let args = [];
+    let envVars = null;
+
+    try {
+        if (argsText) {
+            args = JSON.parse(argsText);
+        }
+        if (envVarsText) {
+            envVars = JSON.parse(envVarsText);
+        }
+    } catch (e) {
+        resultDiv.innerHTML = '<div class="result-error">Invalid JSON in arguments or environment variables</div>';
+        return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = '💾 Saving...';
+    resultDiv.innerHTML = '<div class="loading">Saving MCP server</div>';
+
+    try {
+        const response = await fetch('/api/mcp-servers', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                server_name: serverName,
+                enabled: enabled,
+                command: command,
+                args: args,
+                env_vars: envVars,
+                user_id: 'test_user',
+                tenant: 'test_tenant'
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            resultDiv.innerHTML = `
+                <div class="result-success">
+                    <div class="result-label">✓ MCP server saved successfully!</div>
+                    <div class="result-value">${data.message}</div>
+                </div>
+            `;
+
+            // Clear form
+            document.getElementById('mcpServerName').value = '';
+            document.getElementById('mcpArgs').value = '';
+            document.getElementById('mcpEnvVars').value = '';
+
+            // Reload servers list
+            setTimeout(() => {
+                loadMCPServers();
+            }, 500);
+        } else {
+            resultDiv.innerHTML = `
+                <div class="result-error">
+                    <div class="result-label">✗ Failed to save MCP server</div>
+                    <div class="result-value">${data.message || data.detail || 'Unknown error'}</div>
+                </div>
+            `;
+        }
+    } catch (error) {
+        resultDiv.innerHTML = `
+            <div class="result-error">
+                <div class="result-label">✗ Network error</div>
+                <div class="result-value">${error.message}</div>
+            </div>
+        `;
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = '💾 Save MCP Server';
+    }
+}
+
+// Delete MCP server
+async function deleteMCPServer(serverName) {
+    if (!confirm(`Are you sure you want to delete the MCP server "${serverName}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/mcp-servers/${serverName}?user_id=test_user&tenant=test_tenant`, {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            loadMCPServers();
+        } else {
+            alert(`Failed to delete MCP server: ${data.message || data.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        alert(`Network error: ${error.message}`);
     }
 }

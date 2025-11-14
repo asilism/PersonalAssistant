@@ -305,3 +305,72 @@ button[type="submit"]:disabled,
 .settings-item span {
     color: #333;
 }
+
+/* MCP Server Styles */
+.mcp-servers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.mcp-server-item {
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 15px;
+    position: relative;
+}
+
+.mcp-server-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.mcp-server-header strong {
+    color: #333;
+    font-size: 1.1em;
+}
+
+.mcp-status {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: 600;
+}
+
+.mcp-status.enabled {
+    background: #e8f5e9;
+    color: #4caf50;
+}
+
+.mcp-status.disabled {
+    background: #ffebee;
+    color: #f44336;
+}
+
+.mcp-server-details {
+    margin-bottom: 10px;
+    font-size: 0.9em;
+    color: #666;
+}
+
+.mcp-server-details div {
+    margin: 5px 0;
+}
+
+.delete-btn {
+    background: #f44336;
+    color: white;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.delete-btn:hover {
+    background: #d32f2f;
+}

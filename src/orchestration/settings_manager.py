@@ -4,6 +4,7 @@ Settings Manager - Manages user settings with SQLite storage
 
 import sqlite3
 import os
+import json
 import base64
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -17,6 +18,17 @@ class LLMSettings(BaseModel):
     api_key: str
     model: str
     base_url: Optional[str] = None
+    max_retries: int = 3
+    timeout: int = 30000  # milliseconds
+
+
+class MCPServerSettings(BaseModel):
+    """MCP Server Settings model"""
+    server_name: str
+    enabled: bool = True
+    command: str = "fastmcp"
+    args: list = []
+    env_vars: Optional[Dict[str, str]] = None
 
 
 class SettingsManager:
@@ -58,7 +70,7 @@ class SettingsManager:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
-            # Create settings table
+            # Create LLM settings table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS llm_settings (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,6 +80,8 @@ class SettingsManager:
                     api_key_encrypted TEXT NOT NULL,
                     model TEXT NOT NULL,
                     base_url TEXT,
+                    max_retries INTEGER DEFAULT 3,
+                    timeout INTEGER DEFAULT 30000,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(user_id, tenant)
@@ -78,6 +92,29 @@ class SettingsManager:
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_user_tenant
                 ON llm_settings(user_id, tenant)
+            """)
+
+            # Create MCP server settings table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS mcp_server_settings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    tenant TEXT NOT NULL,
+                    server_name TEXT NOT NULL,
+                    enabled INTEGER DEFAULT 1,
+                    command TEXT DEFAULT 'fastmcp',
+                    args TEXT,
+                    env_vars TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, tenant, server_name)
+                )
+            """)
+
+            # Create index for MCP server settings
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_mcp_user_tenant
+                ON mcp_server_settings(user_id, tenant)
             """)
 
             conn.commit()
@@ -100,7 +137,9 @@ class SettingsManager:
         provider: str,
         api_key: str,
         model: str,
-        base_url: Optional[str] = None
+        base_url: Optional[str] = None,
+        max_retries: int = 3,
+        timeout: int = 30000
     ) -> bool:
         """Save LLM settings for a user"""
         encrypted_key = self._encrypt_api_key(api_key)
@@ -110,15 +149,17 @@ class SettingsManager:
 
             # Upsert (insert or update)
             cursor.execute("""
-                INSERT INTO llm_settings (user_id, tenant, provider, api_key_encrypted, model, base_url)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO llm_settings (user_id, tenant, provider, api_key_encrypted, model, base_url, max_retries, timeout)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_id, tenant) DO UPDATE SET
                     provider = excluded.provider,
                     api_key_encrypted = excluded.api_key_encrypted,
                     model = excluded.model,
                     base_url = excluded.base_url,
+                    max_retries = excluded.max_retries,
+                    timeout = excluded.timeout,
                     updated_at = CURRENT_TIMESTAMP
-            """, (user_id, tenant, provider, encrypted_key, model, base_url))
+            """, (user_id, tenant, provider, encrypted_key, model, base_url, max_retries, timeout))
 
             conn.commit()
 
@@ -130,7 +171,7 @@ class SettingsManager:
             cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT provider, api_key_encrypted, model, base_url
+                SELECT provider, api_key_encrypted, model, base_url, max_retries, timeout
                 FROM llm_settings
                 WHERE user_id = ? AND tenant = ?
             """, (user_id, tenant))
@@ -138,14 +179,16 @@ class SettingsManager:
             row = cursor.fetchone()
 
             if row:
-                provider, encrypted_key, model, base_url = row
+                provider, encrypted_key, model, base_url, max_retries, timeout = row
                 api_key = self._decrypt_api_key(encrypted_key)
 
                 return LLMSettings(
                     provider=provider,
                     api_key=api_key,
                     model=model,
-                    base_url=base_url
+                    base_url=base_url,
+                    max_retries=max_retries or 3,
+                    timeout=timeout or 30000
                 )
 
         return None
@@ -179,6 +222,8 @@ class SettingsManager:
                 "api_key_set": True,
                 "model": settings.model,
                 "base_url": settings.base_url,
+                "max_retries": settings.max_retries,
+                "timeout": settings.timeout,
                 "has_settings": True
             }
 
@@ -188,6 +233,8 @@ class SettingsManager:
             "api_key_set": False,
             "model": "claude-3-5-sonnet-20241022",
             "base_url": None,
+            "max_retries": 3,
+            "timeout": 30000,
             "has_settings": False
         }
 
@@ -245,3 +292,110 @@ class SettingsManager:
 
         except Exception as e:
             return {"success": False, "message": f"Connection failed: {str(e)}"}
+
+    # MCP Server Settings Methods
+    def save_mcp_server_settings(
+        self,
+        user_id: str,
+        tenant: str,
+        server_name: str,
+        enabled: bool = True,
+        command: str = "fastmcp",
+        args: Optional[list] = None,
+        env_vars: Optional[Dict[str, str]] = None
+    ) -> bool:
+        """Save MCP server settings"""
+        args_json = json.dumps(args or [])
+        env_vars_json = json.dumps(env_vars or {})
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO mcp_server_settings (user_id, tenant, server_name, enabled, command, args, env_vars)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, tenant, server_name) DO UPDATE SET
+                    enabled = excluded.enabled,
+                    command = excluded.command,
+                    args = excluded.args,
+                    env_vars = excluded.env_vars,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (user_id, tenant, server_name, int(enabled), command, args_json, env_vars_json))
+
+            conn.commit()
+
+        return True
+
+    def get_mcp_server_settings(
+        self,
+        user_id: str,
+        tenant: str,
+        server_name: str
+    ) -> Optional[MCPServerSettings]:
+        """Get MCP server settings"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT server_name, enabled, command, args, env_vars
+                FROM mcp_server_settings
+                WHERE user_id = ? AND tenant = ? AND server_name = ?
+            """, (user_id, tenant, server_name))
+
+            row = cursor.fetchone()
+
+            if row:
+                server_name, enabled, command, args_json, env_vars_json = row
+                return MCPServerSettings(
+                    server_name=server_name,
+                    enabled=bool(enabled),
+                    command=command,
+                    args=json.loads(args_json) if args_json else [],
+                    env_vars=json.loads(env_vars_json) if env_vars_json else None
+                )
+
+        return None
+
+    def get_all_mcp_servers(self, user_id: str, tenant: str) -> list[MCPServerSettings]:
+        """Get all MCP server settings for a user"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT server_name, enabled, command, args, env_vars
+                FROM mcp_server_settings
+                WHERE user_id = ? AND tenant = ?
+            """, (user_id, tenant))
+
+            servers = []
+            for row in cursor.fetchall():
+                server_name, enabled, command, args_json, env_vars_json = row
+                servers.append(MCPServerSettings(
+                    server_name=server_name,
+                    enabled=bool(enabled),
+                    command=command,
+                    args=json.loads(args_json) if args_json else [],
+                    env_vars=json.loads(env_vars_json) if env_vars_json else None
+                ))
+
+            return servers
+
+    def delete_mcp_server_settings(
+        self,
+        user_id: str,
+        tenant: str,
+        server_name: str
+    ) -> bool:
+        """Delete MCP server settings"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                DELETE FROM mcp_server_settings
+                WHERE user_id = ? AND tenant = ? AND server_name = ?
+            """, (user_id, tenant, server_name))
+
+            deleted = cursor.rowcount > 0
+            conn.commit()
+
+        return deleted
