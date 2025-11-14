@@ -66,8 +66,14 @@ class ConfigLoader:
                 f"{llm_provider.upper()}_API_KEY environment variable"
             )
 
-        max_retries = int(os.getenv("MAX_RETRIES", "3"))
-        timeout = int(os.getenv("TIMEOUT", "30000"))
+        # Get max_retries and timeout from DB settings if available, otherwise use defaults
+        if db_settings:
+            max_retries = db_settings.max_retries
+            timeout = db_settings.timeout
+        else:
+            # Fall back to environment variables or defaults
+            max_retries = int(os.getenv("MAX_RETRIES", "3"))
+            timeout = int(os.getenv("TIMEOUT", "30000"))
 
         # Use MCP tools if provided, otherwise use defaults
         available_tools = mcp_tools if mcp_tools else self._get_default_tools()
