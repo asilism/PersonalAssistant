@@ -7,8 +7,9 @@ LangGraph-based orchestration service with real MCP agent integration and multi-
 ✨ **5 MCP Agent Servers** - Mail, Calendar, Jira, Calculator, and RPA agents
 🤖 **Multi-LLM Support** - Works with Anthropic Claude, OpenAI GPT, and OpenRouter
 🎯 **LangGraph Orchestration** - Robust state machine for task execution
-🌐 **Web UI** - Beautiful interface for testing and interaction
+🌐 **Modern Web UI** - Beautiful interface with configurable LLM settings
 📡 **REST API** - FastAPI-based API for programmatic access
+🔧 **Flexible Configuration** - Configure LLM provider, model, and base URL through UI
 
 ## Quick Start
 
@@ -25,6 +26,16 @@ pip install -r requirements.txt
 
 ### 2. Configuration
 
+You can configure the LLM provider in two ways:
+
+#### Option 1: Using the Web UI (Recommended)
+1. Start the server (see step 3 below)
+2. Open http://localhost:8000
+3. Go to the "Settings" tab
+4. Configure your LLM provider, API key, model, and optionally base URL
+5. Click "Test Connection" to verify, then "Save Settings"
+
+#### Option 2: Using Environment Variables
 Create a `.env` file:
 
 ```bash
@@ -46,6 +57,9 @@ ANTHROPIC_API_KEY=your_api_key_here
 LLM_MODEL=claude-3-5-sonnet-20241022
 # For OpenAI: gpt-4-turbo-preview, gpt-4, gpt-3.5-turbo
 # For OpenRouter: anthropic/claude-3.5-sonnet, openai/gpt-4-turbo
+
+# Optional: Override the default API endpoint URL
+# LLM_BASE_URL=https://custom-endpoint.example.com/v1
 ```
 
 ### 3. Run the Service
@@ -71,6 +85,103 @@ Open your browser and navigate to:
 - **Web UI**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
 - **Health Check**: http://localhost:8000/api/health
+
+## Architecture
+
+### Project Structure
+
+```
+PersonalAssistant/
+├── frontend/                  # Frontend files (HTML, CSS, JS)
+│   ├── index.html            # Main web UI
+│   └── static/
+│       ├── styles.css        # Styles
+│       └── app.js            # Frontend logic
+├── src/                      # Backend source code
+│   ├── orchestration/
+│   │   ├── __init__.py
+│   │   ├── types.py          # Type definitions
+│   │   ├── config.py         # ConfigLoader
+│   │   ├── tracker.py        # TaskTracker
+│   │   ├── planner.py        # Planner (Multi-LLM)
+│   │   ├── llm_client.py     # LLM client abstraction
+│   │   ├── dispatcher.py     # TaskDispatcher
+│   │   ├── mcp_executor.py   # MCP Executor (STDIO)
+│   │   ├── listener.py       # ResultListener
+│   │   ├── settings_manager.py # Settings manager with encryption
+│   │   └── orchestrator.py   # Main Orchestrator
+│   └── api_server.py         # FastAPI server
+├── mcp_servers/              # MCP agent servers
+│   ├── mail_agent/
+│   │   └── server.py         # Mail MCP server
+│   ├── calendar_agent/
+│   │   └── server.py         # Calendar MCP server
+│   ├── jira_agent/
+│   │   └── server.py         # Jira MCP server
+│   ├── calculator_agent/
+│   │   └── server.py         # Calculator MCP server
+│   └── rpa_agent/
+│       └── server.py         # RPA MCP server
+├── data/                     # Data directory (auto-created)
+│   ├── settings.db           # User settings database
+│   └── .encryption_key       # Encryption key for API keys
+├── start.sh                  # Linux/Mac startup script
+├── start.bat                 # Windows startup script
+├── requirements.txt
+├── .env.example
+├── .gitignore
+└── README.md
+```
+
+### Core Components
+
+1. **Frontend** (`frontend/`)
+   - Modern, responsive web UI
+   - LLM settings configuration
+   - Real-time request execution
+   - Example requests for quick testing
+
+2. **API Server** (`src/api_server.py`)
+   - FastAPI-based REST API
+   - Serves frontend static files
+   - Handles orchestration requests
+   - Manages user settings
+
+3. **Orchestrator** (`src/orchestration/orchestrator.py`)
+   - LangGraph-based state machine
+   - Coordinates all components
+   - Manages execution flow
+
+4. **Planner** (`src/orchestration/planner.py`)
+   - Multi-LLM support (Claude, GPT, OpenRouter)
+   - Creates execution plans
+   - Makes decisions based on results
+
+5. **MCPExecutor** (`src/orchestration/mcp_executor.py`)
+   - Connects to real MCP servers via STDIO
+   - Dynamically discovers available tools
+   - Executes MCP tools
+
+6. **Settings Manager** (`src/orchestration/settings_manager.py`)
+   - Encrypted storage for API keys
+   - Per-user/tenant configuration
+   - SQLite-based persistence
+
+### State Machine Flow
+
+```
+INIT → PLAN_OR_DECIDE → DISPATCH → PLAN_OR_DECIDE → ... → FINAL
+                ↓                      ↓
+              ERROR                  ERROR
+```
+
+### States
+- **INIT**: Initial state
+- **PLAN_OR_DECIDE**: Planning or decision making
+- **DISPATCH**: Executing plan steps
+- **HUMAN_IN_THE_LOOP**: Requires human intervention
+- **FINAL**: Task completed
+- **ERROR**: Error occurred
 
 ## MCP Agent Servers
 
@@ -114,96 +225,23 @@ Automation tasks (3 specialized tools):
 - `write_report` - Generate formatted reports
 - `collect_attendance` - Collect and aggregate attendance
 
-## Architecture
-
-### Core Components
-
-1. **Orchestrator** (`src/orchestration/orchestrator.py`)
-   - LangGraph-based state machine
-   - Coordinates all components
-   - Manages execution flow
-
-2. **Planner** (`src/orchestration/planner.py`)
-   - Multi-LLM support (Claude, GPT, OpenRouter)
-   - Creates execution plans
-   - Makes decisions based on results
-
-3. **MCPExecutor** (`src/orchestration/mcp_executor.py`)
-   - Connects to real MCP servers via STDIO
-   - Dynamically discovers available tools
-   - Executes MCP tools
-
-4. **TaskDispatcher** (`src/orchestration/dispatcher.py`)
-   - Executes plan steps
-   - Tracks execution state
-
-5. **ConfigLoader** (`src/orchestration/config.py`)
-   - Loads settings and configuration
-   - Manages LLM provider selection
-
-6. **API Server** (`src/api_server.py`)
-   - FastAPI-based REST API
-   - Web UI for testing
-   - Tool discovery endpoint
-
-### State Machine Flow
-
-```
-INIT → PLAN_OR_DECIDE → DISPATCH → PLAN_OR_DECIDE → ... → FINAL
-                ↓                      ↓
-              ERROR                  ERROR
-```
-
-### States
-- **INIT**: Initial state
-- **PLAN_OR_DECIDE**: Planning or decision making
-- **DISPATCH**: Executing plan steps
-- **HUMAN_IN_THE_LOOP**: Requires human intervention
-- **FINAL**: Task completed
-- **ERROR**: Error occurred
-
-## Project Structure
-
-```
-PersonalAssistant/
-├── src/
-│   ├── orchestration/
-│   │   ├── __init__.py
-│   │   ├── types.py           # Type definitions
-│   │   ├── config.py          # ConfigLoader
-│   │   ├── tracker.py         # TaskTracker
-│   │   ├── planner.py         # Planner (Multi-LLM)
-│   │   ├── llm_client.py      # LLM client abstraction
-│   │   ├── dispatcher.py      # TaskDispatcher
-│   │   ├── mcp_executor.py    # MCP Executor (STDIO)
-│   │   ├── listener.py        # ResultListener
-│   │   └── orchestrator.py    # Main Orchestrator
-│   ├── api_server.py          # FastAPI server + Web UI
-│   └── main.py                # CLI entry point
-├── mcp_servers/
-│   ├── mail_agent/
-│   │   └── server.py          # Mail MCP server
-│   ├── calendar_agent/
-│   │   └── server.py          # Calendar MCP server
-│   ├── jira_agent/
-│   │   └── server.py          # Jira MCP server
-│   ├── calculator_agent/
-│   │   └── server.py          # Calculator MCP server
-│   └── rpa_agent/
-│       └── server.py          # RPA MCP server
-├── start.sh                   # Linux/Mac startup script
-├── start.bat                  # Windows startup script
-├── requirements.txt
-├── .env.example
-├── .gitignore
-└── README.md
-```
-
 ## Usage Examples
 
 ### Web UI
 
-The easiest way to test the service is through the Web UI at http://localhost:8000.
+The easiest way to use the service is through the Web UI at http://localhost:8000.
+
+**Manual Request Tab:**
+- Enter your request in natural language
+- Click "Execute Request" to run
+- View results in real-time
+
+**Settings Tab:**
+- Configure LLM provider (Anthropic, OpenAI, OpenRouter)
+- Set API key (encrypted and stored securely)
+- Choose model
+- Optionally set custom base URL
+- Test connection before saving
 
 Example requests:
 - "Send an email to john@example.com about the meeting tomorrow"
@@ -222,6 +260,30 @@ curl -X POST http://localhost:8000/api/orchestrate \
     "request_text": "Send an email to john@example.com with subject Hello",
     "user_id": "test_user",
     "tenant": "test_tenant"
+  }'
+
+# Get current settings
+curl http://localhost:8000/api/settings?user_id=test_user&tenant=test_tenant
+
+# Save settings
+curl -X POST http://localhost:8000/api/settings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "anthropic",
+    "api_key": "your-api-key",
+    "model": "claude-3-5-sonnet-20241022",
+    "base_url": null,
+    "user_id": "test_user",
+    "tenant": "test_tenant"
+  }'
+
+# Test connection
+curl -X POST http://localhost:8000/api/settings/test \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "anthropic",
+    "api_key": "your-api-key",
+    "model": "claude-3-5-sonnet-20241022"
   }'
 
 # List available tools
@@ -256,13 +318,6 @@ async def main():
         print(f"Results: {result['results']}")
 
 asyncio.run(main())
-```
-
-### CLI Usage
-
-```bash
-# Run example requests
-python src/main.py
 ```
 
 ## LLM Provider Configuration
@@ -307,43 +362,17 @@ Available models:
 - `google/gemini-pro`
 - And many more...
 
-## Testing
+### Custom Base URL
 
-The project includes a comprehensive test suite with **100 test questions** covering all agent combinations.
+For custom API endpoints or proxies:
 
-### Quick Test (15 questions)
-
-```bash
-python run_sample_test.py
+```env
+LLM_BASE_URL=https://custom-endpoint.example.com/v1
 ```
 
-### Full Test Suite (100 questions)
-
-```bash
-python run_tests.py
-```
-
-### Test Categories
-
-- **Single Agent (25 questions)** - Tests individual tools
-- **Multi-Agent (25 questions)** - Tests tool combinations without RPA
-- **RPA Included (50 questions)** - Tests scenarios with RPA agent
-
-### Test Output
-
-Both test runners generate:
-- `test_results.csv` - Spreadsheet-friendly format
-- `test_results.json` - Structured format with summary statistics
-
-For detailed testing documentation, see [TESTING.md](TESTING.md).
+Or configure it in the Settings tab of the Web UI.
 
 ## Development
-
-### Running Unit Tests
-
-```bash
-pytest
-```
 
 ### Code Formatting
 
@@ -396,16 +425,17 @@ async def call_tool(name: str, arguments: Any):
 ### MCP Server Connection Issues
 
 If you see connection errors:
-1. Ensure Python 3.9+ is installed
+1. Ensure Python 3.11+ is installed
 2. Check that all dependencies are installed: `pip install -r requirements.txt`
 3. Verify the MCP server paths in `src/orchestration/mcp_executor.py`
 
 ### LLM API Errors
 
 If you get API errors:
-1. Check your API key is correctly set in `.env`
+1. Check your API key is correctly set in Settings or `.env`
 2. Verify you have sufficient API credits
 3. Check the model name is correct for your provider
+4. If using a custom base URL, verify it's accessible
 
 ### Port Already in Use
 
@@ -419,6 +449,13 @@ netstat -ano | findstr :8000
 taskkill /PID <PID> /F
 ```
 
+### Settings Not Persisting
+
+Settings are stored in `data/settings.db`. If settings aren't persisting:
+1. Check that the `data/` directory exists and is writable
+2. Verify file permissions
+3. Check the application logs for database errors
+
 ## Key Features
 
 ### 1. Real MCP Integration
@@ -431,9 +468,10 @@ Uses actual MCP STDIO protocol to communicate with agent servers, providing:
 ### 2. Multi-LLM Support
 
 Works with multiple LLM providers:
-- Easy provider switching via environment variables
+- Easy provider switching via UI or environment variables
 - Unified interface across providers
 - Support for latest models
+- Custom base URL support for proxies and custom endpoints
 
 ### 3. LangGraph State Machine
 
@@ -442,12 +480,20 @@ Robust orchestration with:
 - Error handling
 - Decision making
 
-### 4. Beautiful Web UI
+### 4. Modern Web UI
 
-Modern, responsive interface with:
+Beautiful, responsive interface with:
 - Real-time feedback
+- LLM configuration
 - Example requests
 - Result visualization
+
+### 5. Secure Settings Management
+
+- Encrypted API key storage
+- Per-user/tenant isolation
+- SQLite-based persistence
+- Environment variable fallback
 
 ## Contributing
 

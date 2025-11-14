@@ -1,6 +1,6 @@
 """
 FastAPI server for the Orchestration Service
-Provides REST API and web UI for testing
+Provides REST API and serves web UI
 """
 
 import asyncio
@@ -8,11 +8,11 @@ import json
 import uuid
 import os
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
 import uvicorn
 
@@ -37,16 +37,11 @@ class OrchestrationResponse(BaseModel):
     trace_id: str
 
 
-class BatchTestRequest(BaseModel):
-    question_ids: List[int]
-    user_id: Optional[str] = "test_user"
-    tenant: Optional[str] = "test_tenant"
-
-
 class SettingsRequest(BaseModel):
     provider: str
     api_key: str
     model: str
+    base_url: Optional[str] = None
     user_id: Optional[str] = "test_user"
     tenant: Optional[str] = "test_tenant"
 
@@ -55,6 +50,7 @@ class TestConnectionRequest(BaseModel):
     provider: str
     api_key: str
     model: str
+    base_url: Optional[str] = None
 
 
 # Create FastAPI app
@@ -64,21 +60,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Mount static files
+frontend_path = Path(__file__).parent.parent / "frontend"
+app.mount("/static", StaticFiles(directory=str(frontend_path / "static")), name="static")
+
 # Store orchestrator instances per user
 orchestrators = {}
 
 # Settings manager
 settings_manager = SettingsManager()
-
-# Load test questions
-TEST_QUESTIONS_FILE = Path(__file__).parent.parent / "test_questions.json"
-test_questions_data = {}
-
-try:
-    with open(TEST_QUESTIONS_FILE, 'r') as f:
-        test_questions_data = json.load(f)
-except Exception as e:
-    print(f"Warning: Could not load test questions: {e}")
 
 
 def get_orchestrator(user_id: str, tenant: str) -> Orchestrator:
@@ -91,193 +81,10 @@ def get_orchestrator(user_id: str, tenant: str) -> Orchestrator:
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    """Serve the web UI with settings tab"""
-    # Return embedded HTML - moved to separate file for brevity
-    # In production, this would be served as static files
-    html_content = """<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Personal Assistant - Orchestration Service</title>
-    <link rel="stylesheet" href="/static/styles.css">
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🤖 Personal Assistant - Orchestration Service</h1>
-            <p class="subtitle">LangGraph-based orchestration with MCP agent integration • 100 Test Questions</p>
-        </div>
-
-        <div class="tabs">
-            <div class="tab active" onclick="switchTab('manual')">📝 Manual Testing</div>
-            <div class="tab" onclick="switchTab('browser')">🔍 Test Browser</div>
-            <div class="tab" onclick="switchTab('batch')">⚡ Batch Testing</div>
-            <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
-        </div>
-
-        <!-- Manual Testing Tab -->
-        <div id="manual-tab" class="tab-content active">
-            <div class="main-content">
-                <div class="card">
-                    <h2>📝 Make a Request</h2>
-                    <form id="requestForm">
-                        <div class="form-group">
-                            <label for="requestText">Request</label>
-                            <textarea id="requestText" placeholder="Enter your request here..." required></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="userId">User ID</label>
-                            <input type="text" id="userId" value="test_user" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="tenant">Tenant</label>
-                            <input type="text" id="tenant" value="test_tenant" required>
-                        </div>
-
-                        <button type="submit" id="submitBtn">Execute Request</button>
-                    </form>
-
-                    <div class="examples">
-                        <h3>💡 Quick Examples:</h3>
-                        <button class="example-btn" onclick="setExample('Send an email to john@example.com about the meeting tomorrow')">📧 Send Email</button>
-                        <button class="example-btn" onclick="setExample('Create a calendar event for team meeting on Friday at 2 PM')">📅 Create Event</button>
-                        <button class="example-btn" onclick="setExample('Search for issues assigned to me in Jira')">🎫 Search Jira</button>
-                        <button class="example-btn" onclick="setExample('Calculate 25 * 8 + 150')">🔢 Calculate</button>
-                        <button class="example-btn" onclick="setExample('Search for latest AI news and write a brief report')">📰 RPA: News Report</button>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <h2>📊 Response</h2>
-                    <div id="resultContainer">
-                        <p style="color: #999; text-align: center; padding: 40px;">
-                            Results will appear here after executing a request
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Test Browser Tab -->
-        <div id="browser-tab" class="tab-content">
-            <div class="test-browser">
-                <h2>🔍 Browse Test Questions (100 Total)</h2>
-
-                <div class="stats">
-                    <div class="stat-item">
-                        <div class="stat-number" id="statTotal">0</div>
-                        <div class="stat-label">Total Questions</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number" id="statSingle">0</div>
-                        <div class="stat-label">Single Agent</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number" id="statMulti">0</div>
-                        <div class="stat-label">Multi Agent</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number" id="statRPA">0</div>
-                        <div class="stat-label">RPA Included</div>
-                    </div>
-                </div>
-
-                <div class="category-filter">
-                    <button class="filter-btn active" data-filter="all">All (100)</button>
-                    <button class="filter-btn" data-filter="Mail - Single">📧 Mail Only</button>
-                    <button class="filter-btn" data-filter="Calendar - Single">📅 Calendar Only</button>
-                    <button class="filter-btn" data-filter="Jira - Single">🎫 Jira Only</button>
-                    <button class="filter-btn" data-filter="Calculator - Single">🔢 Calculator Only</button>
-                    <button class="filter-btn" data-filter="Multi-Agent">🔀 Multi-Agent</button>
-                    <button class="filter-btn" data-filter="RPA Included">🤖 RPA Included</button>
-                </div>
-
-                <div class="question-list" id="questionList">
-                    <!-- Questions will be loaded here -->
-                </div>
-            </div>
-        </div>
-
-        <!-- Batch Testing Tab -->
-        <div id="batch-tab" class="tab-content">
-            <div class="test-browser">
-                <h2>⚡ Batch Testing</h2>
-                <p style="color: #666; margin-bottom: 20px;">Select multiple questions and run them in sequence</p>
-
-                <div class="batch-actions">
-                    <button onclick="selectAllQuestions()">Select All</button>
-                    <button onclick="clearSelection()">Clear Selection</button>
-                    <button onclick="runBatchTests()" id="batchRunBtn">Run Selected Tests</button>
-                    <span id="selectionCount" style="margin-left: 10px; align-self: center; color: #666;">0 selected</span>
-                </div>
-
-                <div class="question-list" id="batchQuestionList">
-                    <!-- Questions will be loaded here -->
-                </div>
-
-                <div class="test-results" id="testResults">
-                    <!-- Results will appear here -->
-                </div>
-            </div>
-        </div>
-
-        <!-- Settings Tab -->
-        <div id="settings-tab" class="tab-content">
-            <div class="settings-container">
-                <h2>⚙️ LLM Settings</h2>
-                <p style="color: #666; margin-bottom: 20px;">Configure your LLM provider and API credentials</p>
-
-                <div class="settings-card">
-                    <div class="form-group">
-                        <label for="llmProvider">LLM Provider</label>
-                        <select id="llmProvider" onchange="updateModelOptions()">
-                            <option value="anthropic">Anthropic Claude</option>
-                            <option value="openai">OpenAI GPT</option>
-                            <option value="openrouter">OpenRouter</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="apiKey">API Key</label>
-                        <input type="password" id="apiKey" placeholder="Enter your API key">
-                        <small style="color: #666;">Your API key is encrypted and stored securely</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="llmModel">Model</label>
-                        <select id="llmModel">
-                            <!-- Options will be populated based on provider -->
-                        </select>
-                    </div>
-
-                    <div class="settings-actions">
-                        <button onclick="testConnection()" id="testBtn">🧪 Test Connection</button>
-                        <button onclick="saveSettings()" id="saveBtn">💾 Save Settings</button>
-                    </div>
-
-                    <div id="settingsResult" class="settings-result">
-                        <!-- Result messages will appear here -->
-                    </div>
-                </div>
-
-                <div class="current-settings-card">
-                    <h3>Current Settings</h3>
-                    <div id="currentSettings">
-                        <div class="loading">Loading...</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="/static/app.js"></script>
-</body>
-</html>
-"""
-    return html_content
+    """Serve the web UI"""
+    index_file = frontend_path / "index.html"
+    with open(index_file, 'r', encoding='utf-8') as f:
+        return f.read()
 
 
 @app.post("/api/orchestrate", response_model=OrchestrationResponse)
@@ -313,30 +120,6 @@ async def health():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 
-@app.get("/api/test-questions")
-async def get_test_questions():
-    """Get all test questions with statistics"""
-    if not test_questions_data.get("single_agent_questions"):
-        raise HTTPException(status_code=404, detail="Test questions not found")
-
-    questions = test_questions_data["single_agent_questions"]
-
-    # Calculate statistics
-    single_count = sum(1 for q in questions if "Single" in q.get("category", ""))
-    multi_count = sum(1 for q in questions if q.get("category") == "Multi-Agent")
-    rpa_count = sum(1 for q in questions if q.get("category") == "RPA Included")
-
-    return {
-        "questions": questions,
-        "statistics": {
-            "total": len(questions),
-            "single_agent": single_count,
-            "multi_agent": multi_count,
-            "rpa_included": rpa_count
-        }
-    }
-
-
 @app.get("/api/settings")
 async def get_settings(user_id: str = "test_user", tenant: str = "test_tenant"):
     """Get current settings for user"""
@@ -356,7 +139,8 @@ async def save_settings(request: SettingsRequest):
             tenant=request.tenant,
             provider=request.provider,
             api_key=request.api_key,
-            model=request.model
+            model=request.model,
+            base_url=request.base_url
         )
 
         if success:
@@ -380,7 +164,8 @@ async def test_connection(request: TestConnectionRequest):
         result = settings_manager.test_connection(
             provider=request.provider,
             api_key=request.api_key,
-            model=request.model
+            model=request.model,
+            base_url=request.base_url
         )
         return result
     except Exception as e:
@@ -420,7 +205,6 @@ def main():
     print("- Web UI: http://localhost:8000")
     print("- API Docs: http://localhost:8000/docs")
     print("- Health Check: http://localhost:8000/api/health")
-    print("- Test Questions: 100 questions loaded")
     print("\n" + "=" * 80 + "\n")
 
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
