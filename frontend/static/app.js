@@ -23,7 +23,27 @@ function switchTab(tabName) {
 // Set example text
 function setExample(text) {
     document.getElementById('requestText').value = text;
+    document.getElementById('requestText').focus();
 }
+
+// Auto-resize textarea
+document.addEventListener('DOMContentLoaded', () => {
+    const textarea = document.getElementById('requestText');
+    if (textarea) {
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+
+        // Submit on Enter (without Shift)
+        textarea.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                document.getElementById('requestForm').dispatchEvent(new Event('submit'));
+            }
+        });
+    }
+});
 
 // Model options for each provider
 const modelOptions = {
@@ -78,12 +98,22 @@ async function executeRequest() {
     const userId = document.getElementById('userId').value;
     const tenant = document.getElementById('tenant').value;
     const submitBtn = document.getElementById('submitBtn');
-    const resultContainer = document.getElementById('resultContainer');
+    const chatMessages = document.getElementById('chatMessages');
+
+    if (!requestText.trim()) return;
+
+    // Add user message bubble
+    addMessageBubble('user', requestText);
+
+    // Clear input
+    document.getElementById('requestText').value = '';
+    document.getElementById('requestText').style.height = 'auto';
 
     // Disable button and show loading
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Executing...';
-    resultContainer.innerHTML = '<div class="loading">Processing your request</div>';
+
+    // Add loading bubble
+    const loadingId = addMessageBubble('assistant', '', true);
 
     try {
         const response = await fetch('/api/orchestrate', {
@@ -100,81 +130,143 @@ async function executeRequest() {
 
         const data = await response.json();
 
+        // Remove loading bubble
+        removeMessageBubble(loadingId);
+
         if (response.ok) {
-            displayResult(data);
+            // Add assistant response bubble
+            addMessageBubble('assistant', data.message);
+
+            // Add results if available
+            if (data.results) {
+                addMessageBubble('assistant', formatResults(data.results));
+            }
+
+            // Add log information
+            addLogEntry(data);
         } else {
-            displayError(data.detail || 'An error occurred');
+            addMessageBubble('error', data.detail || 'An error occurred');
+            addLogEntry({ error: data.detail, success: false });
         }
     } catch (error) {
-        displayError(`Network error: ${error.message}`);
+        removeMessageBubble(loadingId);
+        addMessageBubble('error', `Network error: ${error.message}`);
+        addLogEntry({ error: error.message, success: false });
     } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Execute Request';
     }
 }
 
-// Display result
-function displayResult(data) {
-    const resultContainer = document.getElementById('resultContainer');
+// Add message bubble
+function addMessageBubble(type, content, isLoading = false) {
+    const chatMessages = document.getElementById('chatMessages');
+    const messageId = 'msg-' + Date.now();
 
-    const statusClass = data.success ? 'result-success' : 'result-error';
+    const messageDiv = document.createElement('div');
+    messageDiv.id = messageId;
+    messageDiv.className = `message-bubble ${type}-message`;
 
+    if (isLoading) {
+        messageDiv.innerHTML = `
+            <div class="loading-dots">
+                <span></span><span></span><span></span>
+            </div>
+        `;
+    } else {
+        if (type === 'user') {
+            messageDiv.innerHTML = `<div class="message-content">${escapeHtml(content)}</div>`;
+        } else if (type === 'error') {
+            messageDiv.innerHTML = `
+                <div class="message-icon">⚠️</div>
+                <div class="message-content">${escapeHtml(content)}</div>
+            `;
+        } else {
+            messageDiv.innerHTML = `
+                <div class="message-icon">🤖</div>
+                <div class="message-content">${content}</div>
+            `;
+        }
+
+        const timestamp = document.createElement('div');
+        timestamp.className = 'message-timestamp';
+        timestamp.textContent = new Date().toLocaleTimeString();
+        messageDiv.appendChild(timestamp);
+    }
+
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    return messageId;
+}
+
+// Remove message bubble
+function removeMessageBubble(messageId) {
+    const element = document.getElementById(messageId);
+    if (element) {
+        element.remove();
+    }
+}
+
+// Format results for display
+function formatResults(results) {
+    if (typeof results === 'object') {
+        return `<pre style="margin: 0; white-space: pre-wrap;">${JSON.stringify(results, null, 2)}</pre>`;
+    }
+    return escapeHtml(String(results));
+}
+
+// Add log entry
+function addLogEntry(data) {
+    const logsContent = document.getElementById('logsContent');
+
+    // Clear placeholder text if this is the first log
+    if (logsContent.querySelector('p')) {
+        logsContent.innerHTML = '';
+    }
+
+    const logEntry = document.createElement('div');
+    logEntry.className = `log-entry ${data.success ? 'log-success' : 'log-error'}`;
+
+    const timestamp = new Date().toLocaleTimeString();
     let html = `
-        <div class="${statusClass}">
-            <div class="result-label">Status:</div>
-            <div class="result-value">${data.success ? '✓ Success' : '✗ Failed'}</div>
-        </div>
-
-        <div class="result-info">
-            <div class="result-label">Message:</div>
-            <div class="result-value">${escapeHtml(data.message)}</div>
-        </div>
-
-        <div class="result-info">
-            <div class="result-label">Execution Time:</div>
-            <div class="result-value">${data.execution_time.toFixed(2)}s</div>
+        <div class="log-header">
+            <span class="log-status">${data.success ? '✓ Success' : '✗ Error'}</span>
+            <span class="log-time">${timestamp}</span>
         </div>
     `;
 
+    if (data.execution_time) {
+        html += `<div class="log-detail"><strong>Execution Time:</strong> ${data.execution_time.toFixed(2)}s</div>`;
+    }
+
     if (data.trace_id) {
-        html += `
-            <div class="result-info">
-                <div class="result-label">Trace ID:</div>
-                <div class="result-value">${data.trace_id}</div>
-            </div>
-        `;
+        html += `<div class="log-detail"><strong>Trace ID:</strong> ${data.trace_id}</div>`;
     }
 
     if (data.plan_id) {
-        html += `
-            <div class="result-info">
-                <div class="result-label">Plan ID:</div>
-                <div class="result-value">${data.plan_id}</div>
-            </div>
-        `;
+        html += `<div class="log-detail"><strong>Plan ID:</strong> ${data.plan_id}</div>`;
     }
 
-    if (data.results) {
-        html += `
-            <div class="result-info">
-                <div class="result-label">Results:</div>
-                <div class="result-value"><pre style="margin-top: 10px; white-space: pre-wrap;">${JSON.stringify(data.results, null, 2)}</pre></div>
-            </div>
-        `;
+    if (data.error) {
+        html += `<div class="log-detail"><strong>Error:</strong> ${escapeHtml(data.error)}</div>`;
     }
 
-    resultContainer.innerHTML = html;
+    logEntry.innerHTML = html;
+    logsContent.appendChild(logEntry);
 }
 
-// Display error
-function displayError(message) {
-    const resultContainer = document.getElementById('resultContainer');
-    resultContainer.innerHTML = `
-        <div class="result-error">
-            <div class="result-label">Error:</div>
-            <div class="result-value">${escapeHtml(message)}</div>
-        </div>
-    `;
+// Toggle logs section
+function toggleLogs() {
+    const logsContent = document.getElementById('logsContent');
+    const logsToggle = document.getElementById('logsToggle');
+
+    if (logsContent.style.display === 'none') {
+        logsContent.style.display = 'block';
+        logsToggle.textContent = '▼';
+    } else {
+        logsContent.style.display = 'none';
+        logsToggle.textContent = '▶';
+    }
 }
 
 // Escape HTML to prevent XSS

@@ -6,6 +6,7 @@ Provides mathematical calculation tools
 
 import math
 from fastmcp import FastMCP
+import uvicorn
 
 # Create FastMCP server
 mcp = FastMCP("calculator-agent")
@@ -145,3 +146,8 @@ def power(base: float, exponent: float) -> dict:
         "exponent": exponent,
         "result": result
     }
+
+
+if __name__ == "__main__":
+    # Run as HTTP server on port 8003
+    uvicorn.run(mcp.get_asgi_app(), host="0.0.0.0", port=8003)
