@@ -88,6 +88,15 @@ class SettingsManager:
                 )
             """)
 
+            # Check if base_url column exists and add if missing (migration for existing DBs)
+            cursor.execute("PRAGMA table_info(llm_settings)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if "base_url" not in columns:
+                print("⚠️  Migrating database: Adding base_url column to llm_settings table")
+                cursor.execute("ALTER TABLE llm_settings ADD COLUMN base_url TEXT")
+                conn.commit()
+                print("✅ Database migration complete")
+
             # Create index for faster lookups
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_user_tenant

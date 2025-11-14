@@ -7,6 +7,8 @@ import asyncio
 import json
 import uuid
 import os
+import logging
+import traceback
 from datetime import datetime
 from typing import Optional
 from pathlib import Path
@@ -18,6 +20,13 @@ import uvicorn
 
 from orchestration.orchestrator import Orchestrator
 from orchestration.settings_manager import SettingsManager
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 # Request/Response models
@@ -136,9 +145,13 @@ async def health():
 async def get_settings(user_id: str = "test_user", tenant: str = "test_tenant"):
     """Get current settings for user"""
     try:
+        logger.info(f"Getting settings for user_id={user_id}, tenant={tenant}")
         settings_data = settings_manager.get_all_settings(user_id, tenant)
+        logger.info(f"Successfully retrieved settings for user_id={user_id}")
         return settings_data
     except Exception as e:
+        logger.error(f"Error getting settings for user_id={user_id}, tenant={tenant}: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -146,6 +159,8 @@ async def get_settings(user_id: str = "test_user", tenant: str = "test_tenant"):
 async def save_settings(request: SettingsRequest):
     """Save LLM settings"""
     try:
+        logger.info(f"Saving settings for user_id={request.user_id}, tenant={request.tenant}, provider={request.provider}, model={request.model}")
+
         success = settings_manager.save_llm_settings(
             user_id=request.user_id,
             tenant=request.tenant,
@@ -162,12 +177,17 @@ async def save_settings(request: SettingsRequest):
             key = f"{request.tenant}:{request.user_id}"
             if key in orchestrators:
                 del orchestrators[key]
+                logger.info(f"Cleared orchestrator cache for {key}")
 
+            logger.info(f"Settings saved successfully for user_id={request.user_id}")
             return {"success": True, "message": "Settings saved successfully"}
         else:
+            logger.error(f"Failed to save settings for user_id={request.user_id}")
             raise HTTPException(status_code=500, detail="Failed to save settings")
 
     except Exception as e:
+        logger.error(f"Error saving settings for user_id={request.user_id}, tenant={request.tenant}: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -175,14 +195,18 @@ async def save_settings(request: SettingsRequest):
 async def test_connection(request: TestConnectionRequest):
     """Test LLM connection"""
     try:
+        logger.info(f"Testing connection for provider={request.provider}, model={request.model}")
         result = settings_manager.test_connection(
             provider=request.provider,
             api_key=request.api_key,
             model=request.model,
             base_url=request.base_url
         )
+        logger.info(f"Connection test result: {result}")
         return result
     except Exception as e:
+        logger.error(f"Error testing connection for provider={request.provider}: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
