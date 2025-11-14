@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Assistant - Orchestration Service</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Personal Assistant - Orchestration Service</h1>
+            <p class="subtitle">LangGraph-based orchestration with MCP agent integration</p>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('manual')">📝 Manual Request</div>
+            <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
+        </div>
+
+        <!-- Manual Testing Tab -->
+        <div id="manual-tab" class="tab-content active">
+            <div class="main-content">
+                <div class="card">
+                    <h2>📝 Make a Request</h2>
+                    <form id="requestForm">
+                        <div class="form-group">
+                            <label for="requestText">Request</label>
+                            <textarea id="requestText" placeholder="Enter your request here..." required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="userId">User ID</label>
+                            <input type="text" id="userId" value="test_user" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="tenant">Tenant</label>
+                            <input type="text" id="tenant" value="test_tenant" required>
+                        </div>
+
+                        <button type="submit" id="submitBtn">Execute Request</button>
+                    </form>
+
+                    <div class="examples">
+                        <h3>💡 Quick Examples:</h3>
+                        <button class="example-btn" onclick="setExample('Send an email to john@example.com about the meeting tomorrow')">📧 Send Email</button>
+                        <button class="example-btn" onclick="setExample('Create a calendar event for team meeting on Friday at 2 PM')">📅 Create Event</button>
+                        <button class="example-btn" onclick="setExample('Search for issues assigned to me in Jira')">🎫 Search Jira</button>
+                        <button class="example-btn" onclick="setExample('Calculate 25 * 8 + 150')">🔢 Calculate</button>
+                        <button class="example-btn" onclick="setExample('Search for latest AI news and write a brief report')">📰 RPA: News Report</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>📊 Response</h2>
+                    <div id="resultContainer">
+                        <p style="color: #999; text-align: center; padding: 40px;">
+                            Results will appear here after executing a request
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-content">
+            <div class="settings-container">
+                <h2>⚙️ LLM Settings</h2>
+                <p style="color: #666; margin-bottom: 20px;">Configure your LLM provider and API credentials</p>
+
+                <div class="settings-card">
+                    <div class="form-group">
+                        <label for="llmProvider">LLM Provider</label>
+                        <select id="llmProvider" onchange="updateModelOptions()">
+                            <option value="anthropic">Anthropic Claude</option>
+                            <option value="openai">OpenAI GPT</option>
+                            <option value="openrouter">OpenRouter</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="apiKey">API Key</label>
+                        <input type="password" id="apiKey" placeholder="Enter your API key">
+                        <small style="color: #666;">Your API key is encrypted and stored securely</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="baseUrl">Base URL (Optional)</label>
+                        <input type="text" id="baseUrl" placeholder="Leave empty for default">
+                        <small style="color: #666;">Override the default API endpoint URL</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="llmModel">Model</label>
+                        <select id="llmModel">
+                            <!-- Options will be populated based on provider -->
+                        </select>
+                    </div>
+
+                    <div class="settings-actions">
+                        <button onclick="testConnection()" id="testBtn">🧪 Test Connection</button>
+                        <button onclick="saveSettings()" id="saveBtn">💾 Save Settings</button>
+                    </div>
+
+                    <div id="settingsResult" class="settings-result">
+                        <!-- Result messages will appear here -->
+                    </div>
+                </div>
+
+                <div class="current-settings-card">
+                    <h3>Current Settings</h3>
+                    <div id="currentSettings">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -35,7 +35,8 @@ class Planner:
         self.llm_client: LLMClient = create_llm_client(
             api_key=settings.llm_api_key,
             model=settings.llm_model,
-            provider=llm_provider
+            provider=llm_provider,
+            base_url=settings.llm_base_url
         )
 
         print(f"[Planner] Using {llm_provider} with model {settings.llm_model}")

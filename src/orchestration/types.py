@@ -45,6 +45,7 @@ class OrchestrationSettings(BaseModel):
     """Orchestration settings"""
     llm_model: str
     llm_api_key: str
+    llm_base_url: Optional[str] = None
     max_retries: int = 3
     timeout: int = 30000
     available_tools: list[ToolDefinition]

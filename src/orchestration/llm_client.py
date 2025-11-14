@@ -4,7 +4,7 @@ LLM Client abstraction - supports multiple LLM providers
 
 import os
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from anthropic import Anthropic
 import openai
 
@@ -21,8 +21,11 @@ class LLMClient(ABC):
 class AnthropicClient(LLMClient):
     """Anthropic Claude client"""
 
-    def __init__(self, api_key: str, model: str):
-        self.client = Anthropic(api_key=api_key)
+    def __init__(self, api_key: str, model: str, base_url: Optional[str] = None):
+        kwargs = {"api_key": api_key}
+        if base_url:
+            kwargs["base_url"] = base_url
+        self.client = Anthropic(**kwargs)
         self.model = model
 
     async def generate(self, messages: List[Dict[str, str]], max_tokens: int = 4096) -> str:
@@ -38,13 +41,16 @@ class AnthropicClient(LLMClient):
 class OpenAIClient(LLMClient):
     """OpenAI GPT client"""
 
-    def __init__(self, api_key: str, model: str):
-        openai.api_key = api_key
+    def __init__(self, api_key: str, model: str, base_url: Optional[str] = None):
+        kwargs = {"api_key": api_key}
+        if base_url:
+            kwargs["base_url"] = base_url
+        self.client = openai.OpenAI(**kwargs)
         self.model = model
 
     async def generate(self, messages: List[Dict[str, str]], max_tokens: int = 4096) -> str:
         """Generate response using OpenAI API"""
-        response = openai.chat.completions.create(
+        response = self.client.chat.completions.create(
             model=self.model,
             max_tokens=max_tokens,
             messages=messages
@@ -55,12 +61,12 @@ class OpenAIClient(LLMClient):
 class OpenRouterClient(LLMClient):
     """OpenRouter client (uses OpenAI-compatible API)"""
 
-    def __init__(self, api_key: str, model: str):
+    def __init__(self, api_key: str, model: str, base_url: Optional[str] = None):
         self.api_key = api_key
         self.model = model
         # Configure OpenAI client to use OpenRouter
         self.client = openai.OpenAI(
-            base_url="https://openrouter.ai/api/v1",
+            base_url=base_url or "https://openrouter.ai/api/v1",
             api_key=api_key
         )
 
@@ -74,15 +80,20 @@ class OpenRouterClient(LLMClient):
         return response.choices[0].message.content
 
 
-def create_llm_client(api_key: str, model: str, provider: str = "anthropic") -> LLMClient:
+def create_llm_client(
+    api_key: str,
+    model: str,
+    provider: str = "anthropic",
+    base_url: Optional[str] = None
+) -> LLMClient:
     """
     Factory function to create an LLM client based on provider
     """
     if provider == "anthropic":
-        return AnthropicClient(api_key, model)
+        return AnthropicClient(api_key, model, base_url)
     elif provider == "openai":
-        return OpenAIClient(api_key, model)
+        return OpenAIClient(api_key, model, base_url)
     elif provider == "openrouter":
-        return OpenRouterClient(api_key, model)
+        return OpenRouterClient(api_key, model, base_url)
     else:
         raise ValueError(f"Unknown LLM provider: {provider}")

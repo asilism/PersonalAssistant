@@ -37,10 +37,12 @@ class ConfigLoader:
             llm_provider = db_settings.provider
             llm_api_key = db_settings.api_key
             llm_model = db_settings.model
+            llm_base_url = db_settings.base_url
             print(f"[ConfigLoader] Using database settings for {user_id}@{tenant}")
         else:
             # Fall back to environment variables
             llm_provider = os.getenv("LLM_PROVIDER", "anthropic")
+            llm_base_url = os.getenv("LLM_BASE_URL")
 
             # Get API keys based on provider
             if llm_provider == "anthropic":
@@ -73,6 +75,7 @@ class ConfigLoader:
         return OrchestrationSettings(
             llm_model=llm_model,
             llm_api_key=llm_api_key,
+            llm_base_url=llm_base_url,
             max_retries=max_retries,
             timeout=timeout,
             available_tools=available_tools

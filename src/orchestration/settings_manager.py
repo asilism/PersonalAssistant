@@ -16,6 +16,7 @@ class LLMSettings(BaseModel):
     provider: str  # anthropic, openai, openrouter
     api_key: str
     model: str
+    base_url: Optional[str] = None
 
 
 class SettingsManager:
@@ -66,6 +67,7 @@ class SettingsManager:
                     provider TEXT NOT NULL,
                     api_key_encrypted TEXT NOT NULL,
                     model TEXT NOT NULL,
+                    base_url TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(user_id, tenant)
@@ -97,7 +99,8 @@ class SettingsManager:
         tenant: str,
         provider: str,
         api_key: str,
-        model: str
+        model: str,
+        base_url: Optional[str] = None
     ) -> bool:
         """Save LLM settings for a user"""
         encrypted_key = self._encrypt_api_key(api_key)
@@ -107,14 +110,15 @@ class SettingsManager:
 
             # Upsert (insert or update)
             cursor.execute("""
-                INSERT INTO llm_settings (user_id, tenant, provider, api_key_encrypted, model)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO llm_settings (user_id, tenant, provider, api_key_encrypted, model, base_url)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_id, tenant) DO UPDATE SET
                     provider = excluded.provider,
                     api_key_encrypted = excluded.api_key_encrypted,
                     model = excluded.model,
+                    base_url = excluded.base_url,
                     updated_at = CURRENT_TIMESTAMP
-            """, (user_id, tenant, provider, encrypted_key, model))
+            """, (user_id, tenant, provider, encrypted_key, model, base_url))
 
             conn.commit()
 
@@ -126,7 +130,7 @@ class SettingsManager:
             cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT provider, api_key_encrypted, model
+                SELECT provider, api_key_encrypted, model, base_url
                 FROM llm_settings
                 WHERE user_id = ? AND tenant = ?
             """, (user_id, tenant))
@@ -134,13 +138,14 @@ class SettingsManager:
             row = cursor.fetchone()
 
             if row:
-                provider, encrypted_key, model = row
+                provider, encrypted_key, model, base_url = row
                 api_key = self._decrypt_api_key(encrypted_key)
 
                 return LLMSettings(
                     provider=provider,
                     api_key=api_key,
-                    model=model
+                    model=model,
+                    base_url=base_url
                 )
 
         return None
@@ -171,23 +176,36 @@ class SettingsManager:
             return {
                 "provider": settings.provider,
                 "api_key_masked": masked_key,
+                "api_key_set": True,
                 "model": settings.model,
+                "base_url": settings.base_url,
                 "has_settings": True
             }
 
         return {
             "provider": "anthropic",
             "api_key_masked": "",
+            "api_key_set": False,
             "model": "claude-3-5-sonnet-20241022",
+            "base_url": None,
             "has_settings": False
         }
 
-    def test_connection(self, provider: str, api_key: str, model: str) -> Dict[str, Any]:
+    def test_connection(
+        self,
+        provider: str,
+        api_key: str,
+        model: str,
+        base_url: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Test LLM connection with provided credentials"""
         try:
             if provider == "anthropic":
                 from anthropic import Anthropic
-                client = Anthropic(api_key=api_key)
+                kwargs = {"api_key": api_key}
+                if base_url:
+                    kwargs["base_url"] = base_url
+                client = Anthropic(**kwargs)
                 # Try a simple API call
                 response = client.messages.create(
                     model=model,
@@ -198,8 +216,11 @@ class SettingsManager:
 
             elif provider == "openai":
                 import openai
-                openai.api_key = api_key
-                response = openai.chat.completions.create(
+                kwargs = {"api_key": api_key}
+                if base_url:
+                    kwargs["base_url"] = base_url
+                client = openai.OpenAI(**kwargs)
+                response = client.chat.completions.create(
                     model=model,
                     max_tokens=10,
                     messages=[{"role": "user", "content": "Hello"}]
@@ -209,7 +230,7 @@ class SettingsManager:
             elif provider == "openrouter":
                 import openai
                 client = openai.OpenAI(
-                    base_url="https://openrouter.ai/api/v1",
+                    base_url=base_url or "https://openrouter.ai/api/v1",
                     api_key=api_key
                 )
                 response = client.chat.completions.create(
