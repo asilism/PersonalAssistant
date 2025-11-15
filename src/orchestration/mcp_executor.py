@@ -24,6 +24,7 @@ class MCPExecutor:
         self._servers: Dict[str, Dict[str, Any]] = {}
         self._clients: Dict[str, Client] = {}
         self._available_tools: Dict[str, ToolDefinition] = {}
+        self._tool_to_server: Dict[str, str] = {}  # Maps tool name to server name
 
     async def initialize_servers(self):
         """Initialize connections to all MCP servers"""
@@ -98,6 +99,8 @@ class MCPExecutor:
                         )
                         tools.append(tool_def)
                         self._available_tools[tool.name] = tool_def
+                        # Store tool-to-server mapping
+                        self._tool_to_server[tool.name] = server_name
 
                     print(f"[MCPExecutor] Discovered {len(tools_result)} tools from {server_name}")
                     return tools
@@ -141,7 +144,14 @@ class MCPExecutor:
             server_name = await self._find_server_for_tool(step.tool_name)
 
             if not server_name:
-                raise ValueError(f"No MCP server found for tool: {step.tool_name}")
+                # Provide helpful error message with available tools
+                available_tools = sorted(self._tool_to_server.keys())
+                error_msg = f"No MCP server found for tool: {step.tool_name}"
+                if available_tools:
+                    error_msg += f"\nAvailable tools: {', '.join(available_tools[:10])}"
+                    if len(available_tools) > 10:
+                        error_msg += f" ... and {len(available_tools) - 10} more"
+                raise ValueError(error_msg)
 
             # Execute the tool
             output = await self._execute_mcp_tool(server_name, step.tool_name, step.input)
@@ -238,7 +248,11 @@ class MCPExecutor:
 
     async def _find_server_for_tool(self, tool_name: str) -> Optional[str]:
         """Find which server provides a specific tool"""
-        # Tool name to server mapping
+        # First, try to find from dynamically discovered tools
+        if tool_name in self._tool_to_server:
+            return self._tool_to_server[tool_name]
+
+        # Fallback to static mapping (for backward compatibility)
         tool_server_map = {
             # Mail agent
             "send_email": "mail-agent",
