@@ -13,23 +13,98 @@ mcp = FastMCP("calendar-agent")
 
 # Mock calendar events database
 events_db: list[dict] = [
+    # This week's meetings (2025-11-10 ~ 2025-11-16)
     {
         "id": "event_1",
-        "title": "Team Meeting",
-        "description": "Weekly team sync",
-        "start_time": "2025-10-22T14:00:00Z",
-        "end_time": "2025-10-22T15:00:00Z",
-        "attendees": ["jaehyun.kim@samsung.com", "dev-team@samsung.com"],
+        "title": "Monday Standup",
+        "description": "Weekly standup meeting",
+        "start_time": "2025-11-10T09:00:00Z",
+        "end_time": "2025-11-10T09:30:00Z",
+        "attendees": ["jaehyun.kim@samsung.com", "dev-team@samsung.com", "minho.park@samsung.com"],
         "location": "Conference Room A"
     },
     {
         "id": "event_2",
         "title": "Project Review",
         "description": "Q4 project review",
-        "start_time": "2025-10-23T10:00:00Z",
-        "end_time": "2025-10-23T11:30:00Z",
-        "attendees": ["jaehyun.kim@samsung.com", "sungjun87.lee@samsung.com"],
+        "start_time": "2025-11-11T10:00:00Z",
+        "end_time": "2025-11-11T11:30:00Z",
+        "attendees": ["jaehyun.kim@samsung.com", "sungjun87.lee@samsung.com", "minho.park@samsung.com"],
         "location": "Virtual"
+    },
+    {
+        "id": "event_3",
+        "title": "Sprint Planning",
+        "description": "Plan next sprint tasks - related to PROJ-1, PROJ-4",
+        "start_time": "2025-11-12T14:00:00Z",
+        "end_time": "2025-11-12T16:00:00Z",
+        "attendees": ["jaehyun.kim@samsung.com", "dev-team@samsung.com", "soyeon.choi@samsung.com"],
+        "location": "Conference Room B"
+    },
+    {
+        "id": "event_4",
+        "title": "Design Review",
+        "description": "Review UI/UX designs - related to PROJ-2",
+        "start_time": "2025-11-13T10:00:00Z",
+        "end_time": "2025-11-13T11:00:00Z",
+        "attendees": ["jaehyun.kim@samsung.com", "soyeon.choi@samsung.com"],
+        "location": "Virtual"
+    },
+    {
+        "id": "event_5",
+        "title": "Team Retrospective",
+        "description": "Weekly retrospective - discuss PROJ-5, PROJ-6 completions",
+        "start_time": "2025-11-14T15:00:00Z",
+        "end_time": "2025-11-14T16:00:00Z",
+        "attendees": ["jaehyun.kim@samsung.com", "dev-team@samsung.com", "sungjun87.lee@samsung.com"],
+        "location": "Conference Room A"
+    },
+    # Tomorrow (2025-11-16) - Saturday, some events but 10am is free
+    {
+        "id": "event_6",
+        "title": "Weekend Workshop",
+        "description": "Optional weekend learning session",
+        "start_time": "2025-11-16T14:00:00Z",
+        "end_time": "2025-11-16T16:00:00Z",
+        "attendees": ["jaehyun.kim@samsung.com", "minho.park@samsung.com"],
+        "location": "Virtual"
+    },
+    # Next week (2025-11-17 ~ 2025-11-23) - includes long consecutive meetings
+    {
+        "id": "event_7",
+        "title": "Client Meeting Part 1",
+        "description": "Initial client presentation",
+        "start_time": "2025-11-18T09:00:00Z",
+        "end_time": "2025-11-18T10:30:00Z",
+        "attendees": ["jaehyun.kim@samsung.com", "sungjun87.lee@samsung.com", "client@example.com"],
+        "location": "Virtual"
+    },
+    {
+        "id": "event_8",
+        "title": "Client Meeting Part 2",
+        "description": "Technical deep dive",
+        "start_time": "2025-11-18T10:30:00Z",
+        "end_time": "2025-11-18T12:00:00Z",
+        "attendees": ["jaehyun.kim@samsung.com", "sungjun87.lee@samsung.com", "client@example.com"],
+        "location": "Virtual"
+    },
+    {
+        "id": "event_9",
+        "title": "Client Q&A Session",
+        "description": "Answer client questions",
+        "start_time": "2025-11-18T13:00:00Z",
+        "end_time": "2025-11-18T14:30:00Z",
+        "attendees": ["jaehyun.kim@samsung.com", "dev-team@samsung.com", "client@example.com"],
+        "location": "Virtual"
+    },
+    {
+        "id": "event_10",
+        "title": "Next Week Planning",
+        "description": "Plan for upcoming week",
+        "start_time": "2025-11-19T10:00:00Z",
+        "end_time": "2025-11-19T11:00:00Z",
+        "attendees": ["jaehyun.kim@samsung.com", "dev-team@samsung.com"],
+        "location": "Conference Room A"
     }
 ]
 
