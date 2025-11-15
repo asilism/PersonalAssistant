@@ -335,19 +335,7 @@ function addLogEntry(data) {
     logsContent.appendChild(logEntry);
 }
 
-// Toggle logs section
-function toggleLogs() {
-    const logsContent = document.getElementById('logsContent');
-    const logsToggle = document.getElementById('logsToggle');
-
-    if (logsContent.style.display === 'none') {
-        logsContent.style.display = 'block';
-        logsToggle.textContent = '▼';
-    } else {
-        logsContent.style.display = 'none';
-        logsToggle.textContent = '▶';
-    }
-}
+// Toggle logs section - removed (logs now always visible in right panel)
 
 // Escape HTML to prevent XSS
 function escapeHtml(text) {

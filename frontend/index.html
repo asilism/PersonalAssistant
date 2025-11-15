@@ -16,49 +16,52 @@
         <div class="tabs">
             <div class="tab active" onclick="switchTab('manual')">📝 Manual Request</div>
             <div class="tab" onclick="switchTab('settings')">⚙️ LLM Settings</div>
-            <div class="tab" onclick="switchTab('mcp')">🔌 MCP Servers</div>
+            <!-- MCP Server tab hidden - using predefined servers -->
+            <div class="tab" onclick="switchTab('mcp')" style="display: none;">🔌 MCP Servers</div>
         </div>
 
         <!-- Chat Tab -->
         <div id="manual-tab" class="tab-content active">
-            <div class="chat-container">
-                <!-- Chat Messages Area -->
-                <div class="chat-messages" id="chatMessages">
-                    <div class="welcome-message">
-                        <p>👋 Welcome to Personal Assistant!</p>
-                        <p style="font-size: 14px; color: #666;">Start chatting or try one of the quick examples below</p>
+            <div class="split-container">
+                <!-- Left: Chat Section -->
+                <div class="chat-container">
+                    <!-- Chat Messages Area -->
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="welcome-message">
+                            <p>👋 Welcome to Personal Assistant!</p>
+                            <p style="font-size: 14px; color: #666;">Start chatting or try one of the quick examples below</p>
+                        </div>
+                    </div>
+
+                    <!-- Quick Examples and Actions -->
+                    <div class="chat-examples">
+                        <button class="example-btn" onclick="setExample('Send an email to john@example.com about the meeting tomorrow')">📧 Send Email</button>
+                        <button class="example-btn" onclick="setExample('Create a calendar event for team meeting on Friday at 2 PM')">📅 Create Event</button>
+                        <button class="example-btn" onclick="setExample('Search for issues assigned to me in Jira')">🎫 Search Jira</button>
+                        <button class="example-btn" onclick="setExample('Calculate 25 * 8 + 150')">🔢 Calculate</button>
+                        <button class="example-btn" onclick="setExample('Search for latest AI news and write a brief report')">📰 RPA: News Report</button>
+                        <button class="example-btn clear-btn" onclick="clearChatHistory()" style="background-color: #f44336; color: white;">🗑️ Clear Chat</button>
+                    </div>
+
+                    <!-- Chat Input Area -->
+                    <div class="chat-input-container">
+                        <form id="requestForm" class="chat-input-form">
+                            <input type="hidden" id="userId" value="test_user">
+                            <input type="hidden" id="tenant" value="test_tenant">
+                            <textarea id="requestText" class="chat-input" placeholder="Type your message here..." required rows="1"></textarea>
+                            <button type="submit" id="submitBtn" class="chat-send-btn">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                        </form>
                     </div>
                 </div>
 
-                <!-- Quick Examples and Actions -->
-                <div class="chat-examples">
-                    <button class="example-btn" onclick="setExample('Send an email to john@example.com about the meeting tomorrow')">📧 Send Email</button>
-                    <button class="example-btn" onclick="setExample('Create a calendar event for team meeting on Friday at 2 PM')">📅 Create Event</button>
-                    <button class="example-btn" onclick="setExample('Search for issues assigned to me in Jira')">🎫 Search Jira</button>
-                    <button class="example-btn" onclick="setExample('Calculate 25 * 8 + 150')">🔢 Calculate</button>
-                    <button class="example-btn" onclick="setExample('Search for latest AI news and write a brief report')">📰 RPA: News Report</button>
-                    <button class="example-btn clear-btn" onclick="clearChatHistory()" style="background-color: #f44336; color: white;">🗑️ Clear Chat</button>
-                </div>
-
-                <!-- Chat Input Area -->
-                <div class="chat-input-container">
-                    <form id="requestForm" class="chat-input-form">
-                        <input type="hidden" id="userId" value="test_user">
-                        <input type="hidden" id="tenant" value="test_tenant">
-                        <textarea id="requestText" class="chat-input" placeholder="Type your message here..." required rows="1"></textarea>
-                        <button type="submit" id="submitBtn" class="chat-send-btn">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Logs Section -->
-                <div class="logs-section" id="logsSection">
-                    <div class="logs-header" onclick="toggleLogs()">
+                <!-- Right: Logs Section -->
+                <div class="logs-panel" id="logsPanel">
+                    <div class="logs-header">
                         <span>📋 Execution Logs</span>
-                        <span id="logsToggle">▼</span>
                     </div>
                     <div class="logs-content" id="logsContent">
                         <p style="color: #999; text-align: center; padding: 20px;">No logs yet</p>
