@@ -347,55 +347,288 @@ function formatResults(results) {
     return escapeHtml(String(results));
 }
 
-// Format execution results (e.g., Jira issues)
+// Format execution results (e.g., Jira issues, emails, calendar events, etc.)
 function formatExecutionResults(message, data) {
-    // Check if this is Jira issues data
+    // Jira issues
     if (data.issues && Array.isArray(data.issues)) {
-        let html = `<div class="message-text">${escapeHtml(message)}</div>`;
-        html += `<div class="jira-issues-container" style="margin-top: 15px;">`;
-        html += `<div class="jira-summary" style="margin-bottom: 10px; padding: 8px; background: #e3f2fd; border-radius: 4px;">`;
-        html += `<strong>Found ${data.count || data.issues.length} issue(s)</strong>`;
-        html += `</div>`;
-
-        data.issues.forEach((issue, index) => {
-            html += `
-                <div class="jira-issue" style="margin-bottom: 12px; padding: 12px; border: 1px solid #e0e0e0; border-radius: 4px; background: #fafafa;">
-                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
-                        <div style="flex: 1;">
-                            <strong style="color: #1976D2; font-size: 14px;">${escapeHtml(issue.key || `Issue ${index + 1}`)}</strong>
-                            <span style="margin-left: 10px; padding: 2px 8px; background: ${getPriorityColor(issue.priority)}; color: white; border-radius: 3px; font-size: 11px;">
-                                ${escapeHtml(issue.priority || 'N/A')}
-                            </span>
-                            <span style="margin-left: 5px; padding: 2px 8px; background: ${getStatusColor(issue.status)}; color: white; border-radius: 3px; font-size: 11px;">
-                                ${escapeHtml(issue.status || 'N/A')}
-                            </span>
-                        </div>
-                    </div>
-                    <div style="margin-bottom: 6px; font-size: 13px; font-weight: 500;">
-                        ${escapeHtml(issue.summary || 'No summary')}
-                    </div>
-                    <div style="margin-bottom: 6px; font-size: 12px; color: #666;">
-                        ${escapeHtml(issue.description || 'No description')}
-                    </div>
-                    <div style="font-size: 11px; color: #999;">
-                        ${issue.assignee ? `<span><strong>Assignee:</strong> ${escapeHtml(issue.assignee)}</span>` : ''}
-                        ${issue.reporter ? `<span style="margin-left: 15px;"><strong>Reporter:</strong> ${escapeHtml(issue.reporter)}</span>` : ''}
-                        ${issue.created_at ? `<span style="margin-left: 15px;"><strong>Created:</strong> ${formatDate(issue.created_at)}</span>` : ''}
-                    </div>
-                </div>
-            `;
-        });
-
-        html += `</div>`;
-        return html;
+        return formatJiraIssues(message, data);
     }
 
-    // For other data types, show message with formatted JSON
+    // Email data
+    if (data.emails && Array.isArray(data.emails)) {
+        return formatEmails(message, data);
+    }
+
+    // Email search results
+    if (data.results && Array.isArray(data.results) && data.results.length > 0 && data.results[0].subject) {
+        return formatEmails(message, { emails: data.results, count: data.count });
+    }
+
+    // Calendar events
+    if (data.events && Array.isArray(data.events)) {
+        return formatCalendarEvents(message, data);
+    }
+
+    // Single calendar event
+    if (data.event && data.event.title && data.event.start_time) {
+        return formatCalendarEvents(message, { events: [data.event], count: 1 });
+    }
+
+    // News articles
+    if (data.articles && Array.isArray(data.articles)) {
+        return formatNewsArticles(message, data);
+    }
+
+    // Report content
+    if (data.content && (data.format === 'markdown' || data.format === 'html' || data.format === 'text')) {
+        return formatReport(message, data);
+    }
+
+    // Attendance summary
+    if (data.summary && data.responses && Array.isArray(data.responses)) {
+        return formatAttendanceSummary(message, data);
+    }
+
+    // Calculator result
+    if (data.operation && data.result !== undefined) {
+        return formatCalculatorResult(message, data);
+    }
+
+    // Single email
+    if (data.email && data.email.subject) {
+        return formatEmails(message, { emails: [data.email], count: 1 });
+    }
+
+    // Generic formatter for other data types
+    return formatGenericData(message, data);
+}
+
+// Format Jira issues
+function formatJiraIssues(message, data) {
+    let html = `<div class="message-text">${escapeHtml(message)}</div>`;
+    html += `<div class="data-container" style="margin-top: 15px;">`;
+    html += `<div class="data-summary" style="margin-bottom: 10px; padding: 8px; background: #e3f2fd; border-radius: 4px;">`;
+    html += `<strong>📋 Found ${data.count || data.issues.length} issue(s)</strong>`;
+    html += `</div>`;
+
+    data.issues.forEach((issue, index) => {
+        html += `
+            <div class="data-item" style="margin-bottom: 12px; padding: 12px; border-left: 4px solid #1976D2; border-radius: 4px; background: #fafafa;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                    <div style="flex: 1;">
+                        <strong style="color: #1976D2; font-size: 14px;">${escapeHtml(issue.key || `Issue ${index + 1}`)}</strong>
+                        <span style="margin-left: 10px; padding: 2px 8px; background: ${getPriorityColor(issue.priority)}; color: white; border-radius: 3px; font-size: 11px;">
+                            ${escapeHtml(issue.priority || 'N/A')}
+                        </span>
+                        <span style="margin-left: 5px; padding: 2px 8px; background: ${getStatusColor(issue.status)}; color: white; border-radius: 3px; font-size: 11px;">
+                            ${escapeHtml(issue.status || 'N/A')}
+                        </span>
+                    </div>
+                </div>
+                <div style="margin-bottom: 6px; font-size: 13px; font-weight: 500;">
+                    ${escapeHtml(issue.summary || 'No summary')}
+                </div>
+                <div style="margin-bottom: 6px; font-size: 12px; color: #666;">
+                    ${escapeHtml(issue.description || 'No description')}
+                </div>
+                <div style="font-size: 11px; color: #999;">
+                    ${issue.assignee ? `<span><strong>Assignee:</strong> ${escapeHtml(issue.assignee)}</span>` : ''}
+                    ${issue.reporter ? `<span style="margin-left: 15px;"><strong>Reporter:</strong> ${escapeHtml(issue.reporter)}</span>` : ''}
+                    ${issue.created_at ? `<span style="margin-left: 15px;"><strong>Created:</strong> ${formatDate(issue.created_at)}</span>` : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+    return html;
+}
+
+// Format emails
+function formatEmails(message, data) {
+    let html = `<div class="message-text">${escapeHtml(message)}</div>`;
+    html += `<div class="data-container" style="margin-top: 15px;">`;
+    html += `<div class="data-summary" style="margin-bottom: 10px; padding: 8px; background: #fff3e0; border-radius: 4px;">`;
+    html += `<strong>📧 Found ${data.count || data.emails.length} email(s)</strong>`;
+    html += `</div>`;
+
+    data.emails.forEach((email, index) => {
+        const isUnread = email.read === false;
+        html += `
+            <div class="data-item" style="margin-bottom: 12px; padding: 12px; border-left: 4px solid ${isUnread ? '#f57c00' : '#9e9e9e'}; border-radius: 4px; background: ${isUnread ? '#fff8f0' : '#fafafa'};">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                    <div style="flex: 1;">
+                        <strong style="color: #f57c00; font-size: 14px;">${escapeHtml(email.subject || 'No subject')}</strong>
+                        ${isUnread ? '<span style="margin-left: 10px; padding: 2px 8px; background: #f57c00; color: white; border-radius: 3px; font-size: 11px;">UNREAD</span>' : ''}
+                    </div>
+                </div>
+                <div style="margin-bottom: 6px; font-size: 12px;">
+                    <strong>From:</strong> ${escapeHtml(email.from || 'Unknown')}
+                    ${email.to ? ` <strong>To:</strong> ${escapeHtml(email.to)}` : ''}
+                </div>
+                <div style="margin-bottom: 6px; font-size: 12px; color: #666;">
+                    ${escapeHtml(email.body || 'No content')}
+                </div>
+                <div style="font-size: 11px; color: #999;">
+                    ${email.timestamp ? `<span><strong>Date:</strong> ${formatDate(email.timestamp)}</span>` : ''}
+                    ${email.id ? `<span style="margin-left: 15px;"><strong>ID:</strong> ${escapeHtml(email.id)}</span>` : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+    return html;
+}
+
+// Format calendar events
+function formatCalendarEvents(message, data) {
+    let html = `<div class="message-text">${escapeHtml(message)}</div>`;
+    html += `<div class="data-container" style="margin-top: 15px;">`;
+    html += `<div class="data-summary" style="margin-bottom: 10px; padding: 8px; background: #e8f5e9; border-radius: 4px;">`;
+    html += `<strong>📅 Found ${data.count || data.events.length} event(s)</strong>`;
+    html += `</div>`;
+
+    data.events.forEach((event, index) => {
+        html += `
+            <div class="data-item" style="margin-bottom: 12px; padding: 12px; border-left: 4px solid #4caf50; border-radius: 4px; background: #fafafa;">
+                <div style="margin-bottom: 8px;">
+                    <strong style="color: #4caf50; font-size: 14px;">${escapeHtml(event.title || 'No title')}</strong>
+                </div>
+                <div style="margin-bottom: 6px; font-size: 12px; color: #666;">
+                    ${escapeHtml(event.description || 'No description')}
+                </div>
+                <div style="margin-bottom: 6px; font-size: 12px;">
+                    <strong>📍 Time:</strong> ${formatDate(event.start_time)} - ${formatDate(event.end_time)}
+                </div>
+                ${event.location ? `<div style="margin-bottom: 6px; font-size: 12px;"><strong>📌 Location:</strong> ${escapeHtml(event.location)}</div>` : ''}
+                ${event.attendees && event.attendees.length > 0 ? `<div style="font-size: 11px; color: #999;"><strong>👥 Attendees:</strong> ${event.attendees.map(a => escapeHtml(a)).join(', ')}</div>` : ''}
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+    return html;
+}
+
+// Format news articles
+function formatNewsArticles(message, data) {
+    let html = `<div class="message-text">${escapeHtml(message)}</div>`;
+    html += `<div class="data-container" style="margin-top: 15px;">`;
+    html += `<div class="data-summary" style="margin-bottom: 10px; padding: 8px; background: #f3e5f5; border-radius: 4px;">`;
+    html += `<strong>📰 Found ${data.count || data.articles.length} article(s)</strong>`;
+    if (data.topic) {
+        html += ` about "${escapeHtml(data.topic)}"`;
+    }
+    html += `</div>`;
+
+    data.articles.forEach((article, index) => {
+        html += `
+            <div class="data-item" style="margin-bottom: 12px; padding: 12px; border-left: 4px solid #9c27b0; border-radius: 4px; background: #fafafa;">
+                <div style="margin-bottom: 8px;">
+                    <strong style="color: #9c27b0; font-size: 14px;">${escapeHtml(article.title || 'No title')}</strong>
+                </div>
+                <div style="margin-bottom: 6px; font-size: 12px; color: #666;">
+                    ${escapeHtml(article.summary || 'No summary')}
+                </div>
+                <div style="font-size: 11px; color: #999;">
+                    <strong>Source:</strong> ${escapeHtml(article.source || 'Unknown')}
+                    ${article.date ? ` | <strong>Date:</strong> ${escapeHtml(article.date)}` : ''}
+                    ${article.url ? ` | <a href="${escapeHtml(article.url)}" target="_blank" style="color: #9c27b0;">Read more</a>` : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+    return html;
+}
+
+// Format report
+function formatReport(message, data) {
+    let html = `<div class="message-text">${escapeHtml(message)}</div>`;
+    html += `<div class="data-container" style="margin-top: 15px;">`;
+    html += `<div class="data-summary" style="margin-bottom: 10px; padding: 8px; background: #e0f2f1; border-radius: 4px;">`;
+    html += `<strong>📄 Report Generated</strong>`;
+    html += `</div>`;
+
+    html += `<div class="data-item" style="padding: 12px; border-left: 4px solid #009688; border-radius: 4px; background: #fafafa;">`;
+
+    if (data.format === 'markdown' || data.format === 'text') {
+        html += `<pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px; line-height: 1.6; margin: 0;">${escapeHtml(data.content)}</pre>`;
+    } else if (data.format === 'html') {
+        html += `<div style="font-size: 12px; line-height: 1.6;">${data.content}</div>`;
+    }
+
+    html += `</div></div>`;
+    return html;
+}
+
+// Format attendance summary
+function formatAttendanceSummary(message, data) {
+    let html = `<div class="message-text">${escapeHtml(message)}</div>`;
+    html += `<div class="data-container" style="margin-top: 15px;">`;
+    html += `<div class="data-summary" style="margin-bottom: 10px; padding: 8px; background: #fce4ec; border-radius: 4px;">`;
+    html += `<strong>👥 Attendance Summary for "${escapeHtml(data.event_name || 'Event')}"</strong>`;
+    html += `</div>`;
+
+    // Summary stats
+    const summary = data.summary;
+    html += `
+        <div class="data-item" style="margin-bottom: 12px; padding: 12px; border-left: 4px solid #e91e63; border-radius: 4px; background: #fafafa;">
+            <div style="display: flex; gap: 20px; margin-bottom: 10px;">
+                <div><strong>✅ Attending:</strong> ${summary.attending}</div>
+                <div><strong>❌ Not Attending:</strong> ${summary.not_attending}</div>
+                <div><strong>❓ Maybe:</strong> ${summary.maybe}</div>
+                <div><strong>📊 Total:</strong> ${summary.total_responses}</div>
+            </div>
+        </div>
+    `;
+
+    // Individual responses
+    if (data.responses && data.responses.length > 0) {
+        html += `<div style="margin-top: 10px; font-size: 12px;">`;
+        html += `<strong>Individual Responses:</strong>`;
+        html += `<ul style="margin: 5px 0; padding-left: 20px;">`;
+        data.responses.forEach(response => {
+            const statusIcon = response.status === 'attending' ? '✅' : response.status === 'not_attending' ? '❌' : '❓';
+            html += `<li>${statusIcon} ${escapeHtml(response.attendee)} - ${escapeHtml(response.status)}</li>`;
+        });
+        html += `</ul></div>`;
+    }
+
+    html += `</div>`;
+    return html;
+}
+
+// Format calculator result
+function formatCalculatorResult(message, data) {
+    let html = `<div class="message-text">${escapeHtml(message)}</div>`;
+    html += `<div class="data-container" style="margin-top: 15px;">`;
+    html += `<div class="data-item" style="padding: 12px; border-left: 4px solid #00bcd4; border-radius: 4px; background: #fafafa;">`;
+    html += `<div style="font-size: 14px; margin-bottom: 8px;"><strong>🔢 Calculation Result</strong></div>`;
+    html += `<div style="font-size: 16px; font-weight: 500; color: #00bcd4; margin-bottom: 8px;">`;
+    html += `${escapeHtml(String(data.result))}`;
+    html += `</div>`;
+    html += `<div style="font-size: 12px; color: #666;">`;
+    html += `<strong>Operation:</strong> ${escapeHtml(data.operation)}`;
+    if (data.numbers) {
+        html += ` | <strong>Numbers:</strong> ${data.numbers.join(', ')}`;
+    } else if (data.base !== undefined && data.exponent !== undefined) {
+        html += ` | <strong>Base:</strong> ${data.base} | <strong>Exponent:</strong> ${data.exponent}`;
+    }
+    html += `</div>`;
+    html += `</div></div>`;
+    return html;
+}
+
+// Format generic data
+function formatGenericData(message, data) {
     let html = `<div class="message-text">${escapeHtml(message)}</div>`;
     html += `<div style="margin-top: 10px;">`;
     html += `<details style="cursor: pointer;">`;
-    html += `<summary style="font-weight: 500; color: #1976D2;">View detailed results</summary>`;
-    html += `<pre style="margin: 10px 0 0 0; padding: 10px; background: #f5f5f5; border-radius: 4px; overflow-x: auto; font-size: 12px;">${JSON.stringify(data, null, 2)}</pre>`;
+    html += `<summary style="font-weight: 500; color: #1976D2; padding: 8px; background: #f5f5f5; border-radius: 4px;">📦 View detailed results</summary>`;
+    html += `<pre style="margin: 10px 0 0 0; padding: 10px; background: #f5f5f5; border-radius: 4px; overflow-x: auto; font-size: 12px; line-height: 1.5;">${JSON.stringify(data, null, 2)}</pre>`;
     html += `</details>`;
     html += `</div>`;
     return html;
