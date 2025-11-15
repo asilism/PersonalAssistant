@@ -14,22 +14,153 @@ mcp = FastMCP("mail-agent")
 
 # Mock email database
 emails_db: list[dict] = [
+    # Project Review related emails
     {
         "id": "email_1",
         "from": "sungjun87.lee@samsung.com",
         "to": "jaehyun.kim@samsung.com",
-        "subject": "Weekly Report Required",
-        "body": "Please send me the weekly report by Friday.",
-        "timestamp": "2025-10-20T10:00:00Z",
+        "subject": "Project Review Meeting - November 11th",
+        "body": "Hi Jaehyun,\n\nJust confirming our Project Review meeting scheduled for November 11th at 10:00 AM. Please prepare the Q4 progress report.\n\nBest regards,\nSungjun",
+        "timestamp": "2025-11-08T09:30:00Z",
         "read": True
     },
     {
         "id": "email_2",
+        "from": "minho.park@samsung.com",
+        "to": "jaehyun.kim@samsung.com",
+        "subject": "Re: Project Review Meeting Agenda",
+        "body": "I'll be joining the Project Review meeting. Looking forward to discussing PROJ-1 progress.",
+        "timestamp": "2025-11-09T14:20:00Z",
+        "read": True
+    },
+
+    # Weekly meeting preparation emails
+    {
+        "id": "email_3",
         "from": "dev-team@samsung.com",
         "to": "jaehyun.kim@samsung.com",
-        "subject": "Team Meeting Tomorrow",
-        "body": "Don't forget about the team meeting at 2 PM tomorrow.",
-        "timestamp": "2025-10-20T14:30:00Z",
+        "subject": "Sprint Planning - November 12th",
+        "body": "Sprint Planning meeting is scheduled for November 12th at 2:00 PM. Please review PROJ-1 and PROJ-4 status before the meeting.\n\nTopics:\n- User authentication implementation\n- Database connection pooling refactor",
+        "timestamp": "2025-11-10T10:00:00Z",
+        "read": False
+    },
+    {
+        "id": "email_4",
+        "from": "soyeon.choi@samsung.com",
+        "to": "jaehyun.kim@samsung.com",
+        "subject": "Design Review Materials - PROJ-2",
+        "body": "Hi Jaehyun,\n\nI've prepared the UI/UX designs for the responsive login page (PROJ-2). Let's review them in our meeting on November 13th.\n\nAttached:\n- Mobile mockups\n- Tablet layouts\n- Desktop designs\n\nThanks,\nSoyeon",
+        "timestamp": "2025-11-11T16:45:00Z",
+        "read": False
+    },
+
+    # Team Sync and meeting invitation emails
+    {
+        "id": "email_5",
+        "from": "jaehyun.kim@samsung.com",
+        "to": "dev-team@samsung.com",
+        "subject": "Team Sync - Weekly Standup",
+        "body": "Hi team,\n\nOur weekly standup is scheduled for every Monday at 9:00 AM. Please come prepared with your updates.\n\nAgenda:\n- Last week's accomplishments\n- This week's goals\n- Blockers and concerns",
+        "timestamp": "2025-11-07T08:00:00Z",
+        "read": True,
+        "sent": True
+    },
+
+    # Schedule conflict and meeting coordination
+    {
+        "id": "email_6",
+        "from": "sungjun87.lee@samsung.com",
+        "to": "jaehyun.kim@samsung.com",
+        "subject": "Client Meeting Series - November 18th",
+        "body": "Hi Jaehyun,\n\nWe have a series of client meetings scheduled for November 18th:\n- 9:00 AM - Initial presentation\n- 10:30 AM - Technical deep dive\n- 1:00 PM - Q&A session\n\nThis is almost 5 hours of continuous meetings. Please block your calendar.\n\nRegards,\nSungjun",
+        "timestamp": "2025-11-12T11:30:00Z",
+        "read": False
+    },
+    {
+        "id": "email_7",
+        "from": "client@techcorp.com",
+        "to": "jaehyun.kim@samsung.com",
+        "subject": "Looking forward to next week's meetings",
+        "body": "Hello,\n\nThank you for scheduling the comprehensive meeting series next week. We have many questions about the authentication system and database architecture.\n\nSee you on the 18th!\n\nBest,\nClient Team",
+        "timestamp": "2025-11-13T15:20:00Z",
+        "read": False
+    },
+
+    # Weekly report and Jira completion emails
+    {
+        "id": "email_8",
+        "from": "sungjun87.lee@samsung.com",
+        "to": "jaehyun.kim@samsung.com",
+        "subject": "Weekly Report Due - November 15th",
+        "body": "Hi Jaehyun,\n\nPlease send me the weekly completion report by end of day Friday (Nov 15th). Include:\n- Completed Jira issues\n- Meeting summaries\n- Next week's priorities\n\nThanks,\nSungjun",
+        "timestamp": "2025-11-13T09:00:00Z",
+        "read": False
+    },
+    {
+        "id": "email_9",
+        "from": "jira-notifications@samsung.com",
+        "to": "jaehyun.kim@samsung.com",
+        "subject": "PROJ-7 Completed - Email notification system",
+        "body": "[JIRA] Issue PROJ-7 has been completed by jaehyun.kim@samsung.com\n\nSummary: Implement email notification system\nStatus: Done\nCompleted: 2025-11-08 14:20\n\nGreat work!",
+        "timestamp": "2025-11-08T14:25:00Z",
+        "read": True
+    },
+    {
+        "id": "email_10",
+        "from": "minho.park@samsung.com",
+        "to": "jaehyun.kim@samsung.com",
+        "subject": "PROJ-6 Fixed - Memory leak resolved",
+        "body": "Hi Jaehyun,\n\nI've successfully fixed the memory leak in the background worker (PROJ-6). The issue was with unclosed database connections. Performance is back to normal.\n\nClosed on: November 7th\nPriority: Critical\n\nLet me know if you need more details for the weekly report.\n\nMinho",
+        "timestamp": "2025-11-07T17:30:00Z",
+        "read": True
+    },
+
+    # Team Retrospective and completion discussions
+    {
+        "id": "email_11",
+        "from": "dev-team@samsung.com",
+        "to": "jaehyun.kim@samsung.com",
+        "subject": "Team Retrospective - November 14th",
+        "body": "Team Retrospective is scheduled for November 14th at 3:00 PM.\n\nWe'll discuss:\n- PROJ-5 (User profile page) - completed by Soyeon\n- PROJ-6 (Memory leak fix) - completed by Minho\n- What went well this sprint\n- What can be improved\n\nSee you there!",
+        "timestamp": "2025-11-12T10:15:00Z",
+        "read": False
+    },
+    {
+        "id": "email_12",
+        "from": "soyeon.choi@samsung.com",
+        "to": "jaehyun.kim@samsung.com",
+        "subject": "PROJ-5 Delivered - User Profile Page",
+        "body": "Hi Jaehyun,\n\nHappy to report that PROJ-5 (User profile page with edit functionality) has been completed and deployed!\n\nCompleted: November 6th, 3:30 PM\nTesting: All tests passing\nDeployment: Production\n\nUsers can now edit their profiles with the new interface.\n\nSoyeon",
+        "timestamp": "2025-11-06T15:45:00Z",
+        "read": True
+    },
+
+    # Additional context emails for testing
+    {
+        "id": "email_13",
+        "from": "hr@samsung.com",
+        "to": "jaehyun.kim@samsung.com",
+        "subject": "Reminder: Q4 Performance Review",
+        "body": "This is a reminder that Q4 performance reviews are due by November 30th. Please complete your self-assessment in the HR portal.\n\nDeadline: November 30th, 2025",
+        "timestamp": "2025-11-14T08:00:00Z",
+        "read": False
+    },
+    {
+        "id": "email_14",
+        "from": "sungjun87.lee@samsung.com",
+        "to": "jaehyun.kim@samsung.com",
+        "subject": "Great work on PROJ-3",
+        "body": "Hi Jaehyun,\n\nI noticed you're making good progress on the API documentation (PROJ-3). The updated docs are really helpful.\n\nKeep up the great work!\n\nSungjun",
+        "timestamp": "2025-11-14T16:30:00Z",
+        "read": False
+    },
+    {
+        "id": "email_15",
+        "from": "minho.park@samsung.com",
+        "to": "jaehyun.kim@samsung.com",
+        "subject": "Weekend Workshop - November 16th",
+        "body": "Hey Jaehyun,\n\nAre you joining the weekend workshop on Saturday (Nov 16th) at 2 PM? We're doing a learning session on advanced TypeScript patterns.\n\nIt's optional but should be interesting!\n\nMinho",
+        "timestamp": "2025-11-15T11:00:00Z",
         "read": False
     }
 ]
