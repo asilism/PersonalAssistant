@@ -7,7 +7,6 @@ Provides Jira issue management tools: create, read, update, delete, search
 from datetime import datetime
 from typing import Optional
 from fastmcp import FastMCP
-import uvicorn
 
 # Create FastMCP server
 mcp = FastMCP("jira-agent")
@@ -235,4 +234,4 @@ def search_issues(
 
 if __name__ == "__main__":
     # Run as HTTP server on port 8004
-    uvicorn.run(mcp.get_asgi_app(), host="0.0.0.0", port=8004)
+    mcp.run(transport="http", host="0.0.0.0", port=8004)
