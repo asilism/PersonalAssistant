@@ -878,7 +878,20 @@ Return ONLY the JSON, no other text.
         Returns:
             Resolved input dict or None if resolution failed
         """
+        # Check if there's a HITL response in context
+        hitl_response = None
+        if state.context and state.context.additional_context:
+            hitl_response = state.context.additional_context.get("hitl_response")
+
         # Build prompt for LLM
+        hitl_context = ""
+        if hitl_response:
+            hitl_context = f"""
+HUMAN INPUT (HITL Response):
+The user has provided additional information: "{hitl_response}"
+Use this information to resolve any missing parameters or placeholders.
+"""
+
         prompt = f"""You are helping resolve placeholders in a task execution step.
 
 MOST RECENT STEP EXECUTED:
@@ -888,7 +901,7 @@ MOST RECENT STEP EXECUTED:
 
 ALL COMPLETED STEPS (for reference):
 {self._format_all_step_results(all_results)}
-
+{hitl_context}
 NEXT STEP TO EXECUTE:
 - Step ID: {next_step.step_id}
 - Description: {next_step.description}

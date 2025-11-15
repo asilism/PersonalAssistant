@@ -461,25 +461,89 @@ class Orchestrator:
         for msg in chat_history:
             conversation_history.append(f"{msg.role}: {msg.content}")
 
-        # Initial state - LangGraph checkpointer will handle resume automatically
-        initial_state: OrchestrationState = {
-            "type": StateType.INIT.value,
-            "session_id": session_id,
-            "user_id": self.user_id,
-            "tenant": self.tenant,
-            "request_text": request_text,
-            "trace_id": trace_id,
-            "context": {"session_id": session_id, "conversation_history": conversation_history, "additional_context": {}},
-            "plan": None,  # Will be created by planner or restored from checkpoint
-            "plan_state": None,
-            "results": None,
-            "error": None,
-            "final_payload": None,
-            "retry_counts": {}  # Initialize retry tracking
-        }
-
         # Configure thread_id for checkpointing (use session_id as thread_id)
         thread_config = {"configurable": {"thread_id": session_id}}
+
+        # Check if there's a previous state (HITL scenario)
+        previous_state = None
+        try:
+            # Get the latest state from checkpointer
+            state_snapshot = await self.graph.aget_state(thread_config)
+            if state_snapshot and state_snapshot.values:
+                previous_state = state_snapshot.values
+                print(f"[Orchestrator] Found previous state for session {session_id}")
+                print(f"[Orchestrator] Previous state type: {previous_state.get('type')}")
+                print(f"[Orchestrator] Previous plan: {previous_state.get('plan', {}).get('plan_id') if previous_state.get('plan') else 'None'}")
+        except Exception as e:
+            print(f"[Orchestrator] No previous state found or error retrieving it: {e}")
+
+        # Determine initial state based on whether this is a HITL response
+        if previous_state and previous_state.get("type") == StateType.HUMAN_IN_THE_LOOP.value:
+            # This is a HITL response - resume from previous state
+            print(f"[Orchestrator] HITL response detected - resuming from previous state")
+
+            # Update the previous state with new request text (HITL response)
+            initial_state = previous_state.copy()
+            initial_state["request_text"] = request_text  # Update with HITL response
+            initial_state["trace_id"] = trace_id  # Update trace_id for new execution
+            initial_state["type"] = StateType.PLAN_OR_DECIDE.value  # Resume execution
+
+            # Update context with conversation history
+            if initial_state.get("context"):
+                initial_state["context"]["conversation_history"] = conversation_history
+            else:
+                initial_state["context"] = {
+                    "session_id": session_id,
+                    "conversation_history": conversation_history,
+                    "additional_context": {}
+                }
+
+            # Add HITL response to context for planner to use
+            if "additional_context" not in initial_state["context"]:
+                initial_state["context"]["additional_context"] = {}
+            initial_state["context"]["additional_context"]["hitl_response"] = request_text
+
+            # Check if there's a failed step to retry
+            failed_step_id = previous_state.get("final_payload", {}).get("failed_step_id")
+            if failed_step_id:
+                print(f"[Orchestrator] HITL retry: Removing failed step {failed_step_id} from results to allow retry")
+
+                # Remove the failed step from results to allow it to be retried
+                if initial_state.get("results"):
+                    results = initial_state["results"]
+                    if "failed_steps" in results:
+                        # Filter out the failed step
+                        results["failed_steps"] = [
+                            step for step in results["failed_steps"]
+                            if step.get("step_id") != failed_step_id
+                        ]
+                        print(f"[Orchestrator] Removed {failed_step_id} from failed_steps")
+
+                # Reset retry count for this step
+                if "retry_counts" in initial_state:
+                    if failed_step_id in initial_state["retry_counts"]:
+                        del initial_state["retry_counts"][failed_step_id]
+                        print(f"[Orchestrator] Reset retry count for {failed_step_id}")
+
+            print(f"[Orchestrator] Resuming with plan: {initial_state.get('plan', {}).get('plan_id') if initial_state.get('plan') else 'None'}")
+        else:
+            # New request - create initial state
+            print(f"[Orchestrator] New request - creating initial state")
+            initial_state: OrchestrationState = {
+                "type": StateType.INIT.value,
+                "session_id": session_id,
+                "user_id": self.user_id,
+                "tenant": self.tenant,
+                "request_text": request_text,
+                "trace_id": trace_id,
+                "context": {"session_id": session_id, "conversation_history": conversation_history, "additional_context": {}},
+                "plan": None,  # Will be created by planner or restored from checkpoint
+                "plan_state": None,
+                "results": None,
+                "error": None,
+                "final_payload": None,
+                "retry_counts": {}  # Initialize retry tracking
+            }
 
         # Run the graph
         start_time = datetime.now()
