@@ -33,38 +33,53 @@
                         </div>
                     </div>
 
-                    <!-- Quick Examples and Actions -->
-                    <div class="chat-examples">
-                        <button class="example-btn" onclick="setExample('Send an email to john@example.com about the meeting tomorrow')">📧 Send Email</button>
-                        <button class="example-btn" onclick="setExample('Create a calendar event for team meeting on Friday at 2 PM')">📅 Create Event</button>
-                        <button class="example-btn" onclick="setExample('Search for issues assigned to me in Jira')">🎫 Search Jira</button>
-                        <button class="example-btn" onclick="setExample('Calculate 25 * 8 + 150')">🔢 Calculate</button>
-                        <button class="example-btn" onclick="setExample('Search for latest AI news and write a brief report')">📰 RPA: News Report</button>
-                        <button class="example-btn clear-btn" onclick="clearChatHistory()" style="background-color: #f44336; color: white;">🗑️ Clear Chat</button>
+                    <!-- Simple Query Examples -->
+                    <div class="example-category" style="margin-top: 10px; padding: 10px; background: #f0f7ff; border-radius: 8px; border-left: 4px solid #4CAF50;">
+                        <div class="category-header" onclick="toggleCategory('simple-examples')" style="font-size: 13px; font-weight: 600; color: #2E7D32; margin-bottom: 8px; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;">
+                            <span>✨ 단순 질문 예제</span>
+                            <span class="toggle-icon" id="simple-examples-icon">▼</span>
+                        </div>
+                        <div class="chat-examples" id="simple-examples" style="display: flex;">
+                            <button class="example-btn" onclick="setExample('Send an email to john@example.com about the meeting tomorrow')" title="Send an email to john@example.com about the meeting tomorrow">📧 Send Email</button>
+                            <button class="example-btn" onclick="setExample('Create a calendar event for team meeting on Friday at 2 PM')" title="Create a calendar event for team meeting on Friday at 2 PM">📅 Create Event</button>
+                            <button class="example-btn" onclick="setExample('Search for issues assigned to me in Jira')" title="Search for issues assigned to me in Jira">🎫 Search Jira</button>
+                            <button class="example-btn" onclick="setExample('Calculate 25 * 8 + 150')" title="Calculate 25 * 8 + 150">🔢 Calculate</button>
+                            <button class="example-btn" onclick="setExample('Search for latest AI news and write a brief report')" title="Search for latest AI news and write a brief report">📰 RPA: News Report</button>
+                        </div>
                     </div>
 
                     <!-- Complex Multi-Tool Examples -->
-                    <div style="margin-top: 10px; padding: 10px; background: #f0f7ff; border-radius: 8px; border-left: 4px solid #2196F3;">
-                        <div style="font-size: 13px; font-weight: 600; color: #1976D2; margin-bottom: 8px;">🔧 Complex Multi-Tool Examples</div>
-                        <div class="chat-examples">
-                            <button class="example-btn" onclick="setExample('Project Review의 일정의 end date를 11월 30일로 변경해줘. 그리고 참석자들에게 일정이 변경되었다고 메일로 알려줘')" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">📅✉️ 일정 변경 + 이메일 알림</button>
-                            <button class="example-btn" onclick="setExample('이번 주 월요일부터 금요일까지 모든 회의 일정을 조회하고, 각 회의별로 Jira에서 관련된 이슈들을 찾아서 회의 준비 자료를 이메일로 보내줘')" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">📅🎫✉️ 주간 회의 준비</button>
-                            <button class="example-btn" onclick="setExample('내일 오전 10시에 일정이 비어있는지 확인하고, 비어있으면 Team Sync 미팅을 추가한 다음 팀원들에게 초대 메일을 발송해줘')" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">🔍📅✉️ 일정 확인 + 미팅 생성</button>
-                            <button class="example-btn" onclick="setExample('다음 주 전체 캘린더를 확인해서 3시간 이상 연속된 회의가 있는지 찾고, 있다면 일정 조정이 필요하다고 관련 참석자들에게 이메일을 보내줘')" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white;">📊📅✉️ 일정 충돌 감지</button>
-                            <button class="example-btn" onclick="setExample('지난주에 완료된 Jira 이슈들(status=Done)을 조회하고, 각 이슈의 제목, 담당자, 완료일을 포함한 요약 보고서를 sungjun87.lee@samsung.com에게 이메일로 전송해줘')" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: white;">🎫📄✉️ 주간 보고서 자동화</button>
+                    <div class="example-category" style="margin-top: 10px; padding: 10px; background: #f0f7ff; border-radius: 8px; border-left: 4px solid #2196F3;">
+                        <div class="category-header" onclick="toggleCategory('complex-examples')" style="font-size: 13px; font-weight: 600; color: #1976D2; margin-bottom: 8px; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;">
+                            <span>🔧 복합 질문 예제</span>
+                            <span class="toggle-icon" id="complex-examples-icon">▼</span>
+                        </div>
+                        <div class="chat-examples" id="complex-examples" style="display: flex;">
+                            <button class="example-btn" onclick="setExample('Project Review의 일정의 end date를 11월 30일로 변경해줘. 그리고 참석자들에게 일정이 변경되었다고 메일로 알려줘')" title="Project Review의 일정의 end date를 11월 30일로 변경해줘. 그리고 참석자들에게 일정이 변경되었다고 메일로 알려줘" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">📅✉️ 일정 변경 + 이메일 알림</button>
+                            <button class="example-btn" onclick="setExample('이번 주 월요일부터 금요일까지 모든 회의 일정을 조회하고, 각 회의별로 Jira에서 관련된 이슈들을 찾아서 회의 준비 자료를 이메일로 보내줘')" title="이번 주 월요일부터 금요일까지 모든 회의 일정을 조회하고, 각 회의별로 Jira에서 관련된 이슈들을 찾아서 회의 준비 자료를 이메일로 보내줘" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">📅🎫✉️ 주간 회의 준비</button>
+                            <button class="example-btn" onclick="setExample('내일 오전 10시에 일정이 비어있는지 확인하고, 비어있으면 Team Sync 미팅을 추가한 다음 팀원들에게 초대 메일을 발송해줘')" title="내일 오전 10시에 일정이 비어있는지 확인하고, 비어있으면 Team Sync 미팅을 추가한 다음 팀원들에게 초대 메일을 발송해줘" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">🔍📅✉️ 일정 확인 + 미팅 생성</button>
+                            <button class="example-btn" onclick="setExample('다음 주 전체 캘린더를 확인해서 3시간 이상 연속된 회의가 있는지 찾고, 있다면 일정 조정이 필요하다고 관련 참석자들에게 이메일을 보내줘')" title="다음 주 전체 캘린더를 확인해서 3시간 이상 연속된 회의가 있는지 찾고, 있다면 일정 조정이 필요하다고 관련 참석자들에게 이메일을 보내줘" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white;">📊📅✉️ 일정 충돌 감지</button>
+                            <button class="example-btn" onclick="setExample('지난주에 완료된 Jira 이슈들(status=Done)을 조회하고, 각 이슈의 제목, 담당자, 완료일을 포함한 요약 보고서를 sungjun87.lee@samsung.com에게 이메일로 전송해줘')" title="지난주에 완료된 Jira 이슈들(status=Done)을 조회하고, 각 이슈의 제목, 담당자, 완료일을 포함한 요약 보고서를 sungjun87.lee@samsung.com에게 이메일로 전송해줘" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: white;">🎫📄✉️ 주간 보고서 자동화</button>
                         </div>
                     </div>
 
                     <!-- Chat Input Area -->
                     <div class="chat-input-container">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <div style="font-size: 12px; color: #999;">질문을 입력하거나 위의 예제 버튼을 클릭하세요</div>
+                            <button class="clear-chat-btn" onclick="clearChatHistory()" title="대화 이력을 삭제합니다">
+                                🗑️ Clear Chat
+                            </button>
+                        </div>
                         <form id="requestForm" class="chat-input-form">
                             <input type="hidden" id="userId" value="test_user">
                             <input type="hidden" id="tenant" value="test_tenant">
                             <textarea id="requestText" class="chat-input" placeholder="Type your message here..." required rows="1"></textarea>
                             <button type="submit" id="submitBtn" class="chat-send-btn">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                     <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
+                                <span style="margin-left: 6px;">전송</span>
                             </button>
                         </form>
                     </div>
