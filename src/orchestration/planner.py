@@ -236,6 +236,19 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
     async def _decide_next(self, state: State) -> State:
         """Decide next action based on current results"""
 
+        # Increment total decision count
+        state.total_decision_count += 1
+        print(f"[Planner] Decision count: {state.total_decision_count}")
+
+        # Check if total decision count exceeds maximum (prevent infinite loops)
+        MAX_TOTAL_DECISIONS = 10
+        if state.total_decision_count > MAX_TOTAL_DECISIONS:
+            error_msg = f"Task failed: Exceeded maximum decision limit ({MAX_TOTAL_DECISIONS}). Possible infinite loop detected."
+            print(f"[Planner] {error_msg}")
+            state.type = StateType.ERROR
+            state.error = error_msg
+            return state
+
         results = state.results
         if not results:
             # No results yet, shouldn't happen

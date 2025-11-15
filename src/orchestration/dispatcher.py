@@ -8,6 +8,7 @@ from typing import Optional
 from .types import State, StateType, PlanState, PlanUpdate
 from .mcp_executor import MCPExecutor
 from .tracker import TaskTracker
+from .placeholder_resolver import PlaceholderResolver
 
 
 class TaskDispatcher:
@@ -16,6 +17,7 @@ class TaskDispatcher:
     def __init__(self, tracker: TaskTracker, executor: MCPExecutor):
         self.tracker = tracker
         self.executor = executor
+        self.resolver = PlaceholderResolver()
 
     async def invoke(self, state: State) -> State:
         """
@@ -34,13 +36,23 @@ class TaskDispatcher:
         # Save plan to tracker
         await self.tracker.persist_plan(plan)
 
+        # Clear resolver for new plan execution
+        self.resolver.clear()
+
         # Execute steps
         try:
             # For simplicity, execute steps sequentially
             # In production, respect dependencies and execute in parallel when possible
             for step in plan.steps:
-                # Execute step
-                result = await self.executor.execute_step(step)
+                # Resolve placeholders in step input
+                resolved_step = self.resolver.resolve_step_input(step)
+
+                # Execute step with resolved input
+                result = await self.executor.execute_step(resolved_step)
+
+                # Register successful step outputs for future placeholder resolution
+                if result.status == "success" and result.output is not None:
+                    self.resolver.register_step_result(step.step_id, result.output)
 
                 # Save result
                 await self.tracker.append_step_result(plan.plan_id, result)
