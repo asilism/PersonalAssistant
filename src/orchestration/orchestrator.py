@@ -457,36 +457,68 @@ class Orchestrator:
         for msg in chat_history:
             conversation_history.append(f"{msg.role}: {msg.content}")
 
-        # Load recent execution results for context
-        additional_context = {}
-        try:
-            recent_history = await self.tracker.get_history(session_id, self.user_id)
-            if recent_history.recent_plans:
-                # Get the most recent plan (regardless of status) to reuse successful step results
-                # This is important for HITL scenarios where the plan is not yet completed
-                # but has already executed some steps successfully
-                most_recent = recent_history.recent_plans[-1]
-                recent_results = self.tracker.get_step_results(most_recent.plan_id)
-                if recent_results:
-                    # Filter for successful results only
-                    successful_results = [r for r in recent_results if r.status == "success"]
-                    if successful_results:
-                        # Store recent results in additional context
-                        additional_context["recent_plan_id"] = most_recent.plan_id
-                        additional_context["recent_request"] = most_recent.request_text
-                        additional_context["recent_results"] = [
-                            {
-                                "step_id": r.step_id,
-                                "description": r.description,
-                                "output": r.output,
-                                "status": r.status
-                            }
-                            for r in successful_results
-                        ]
-        except Exception as e:
-            print(f"[Orchestrator] Warning: Could not load recent execution results: {e}")
+        # Check for active plan (HITL resume scenario)
+        active_plan = None
+        active_plan_state = None
+        active_plan_results = None
 
-        # Initial state
+        existing_plan = self.tracker.get_active_plan(session_id)
+        if existing_plan:
+            print(f"[Orchestrator] Found active plan: {existing_plan.plan_id}")
+            plan_state = self.tracker.get_plan_state(existing_plan.plan_id)
+            print(f"[Orchestrator] Active plan state: {plan_state}")
+
+            # Load step results for the active plan
+            step_results = self.tracker.get_step_results(existing_plan.plan_id)
+            if step_results:
+                print(f"[Orchestrator] Active plan has {len(step_results)} step results")
+                # Build aggregated results
+                completed_steps = [r for r in step_results if r.status == "success"]
+                failed_steps = [r for r in step_results if r.status == "failure"]
+
+                from .types import AggregatedGroupResults
+                active_plan_results = AggregatedGroupResults(
+                    plan_id=existing_plan.plan_id,
+                    completed_steps=completed_steps,
+                    failed_steps=failed_steps,
+                    total_steps=len(existing_plan.steps),
+                    success_rate=len(completed_steps) / len(step_results) if step_results else 0.0
+                )
+
+            active_plan = existing_plan
+            active_plan_state = plan_state
+
+        # Load recent execution results for context (fallback if no active plan)
+        additional_context = {}
+        if not active_plan:
+            try:
+                recent_history = await self.tracker.get_history(session_id, self.user_id)
+                if recent_history.recent_plans:
+                    # Get the most recent plan (regardless of status) to reuse successful step results
+                    # This is important for HITL scenarios where the plan is not yet completed
+                    # but has already executed some steps successfully
+                    most_recent = recent_history.recent_plans[-1]
+                    recent_results = self.tracker.get_step_results(most_recent.plan_id)
+                    if recent_results:
+                        # Filter for successful results only
+                        successful_results = [r for r in recent_results if r.status == "success"]
+                        if successful_results:
+                            # Store recent results in additional context
+                            additional_context["recent_plan_id"] = most_recent.plan_id
+                            additional_context["recent_request"] = most_recent.request_text
+                            additional_context["recent_results"] = [
+                                {
+                                    "step_id": r.step_id,
+                                    "description": r.description,
+                                    "output": r.output,
+                                    "status": r.status
+                                }
+                                for r in successful_results
+                            ]
+            except Exception as e:
+                print(f"[Orchestrator] Warning: Could not load recent execution results: {e}")
+
+        # Initial state - include active plan if resuming
         initial_state: OrchestrationState = {
             "type": StateType.INIT.value,
             "session_id": session_id,
@@ -495,9 +527,9 @@ class Orchestrator:
             "request_text": request_text,
             "trace_id": trace_id,
             "context": {"session_id": session_id, "conversation_history": conversation_history, "additional_context": additional_context},
-            "plan": None,
-            "plan_state": None,
-            "results": None,
+            "plan": active_plan.model_dump() if active_plan else None,
+            "plan_state": active_plan_state.value if active_plan_state else None,
+            "results": active_plan_results.model_dump() if active_plan_results else None,
             "error": None,
             "final_payload": None,
             "retry_counts": {}  # Initialize retry tracking
@@ -526,6 +558,9 @@ class Orchestrator:
             if final_state.get("type") == StateType.FINAL.value:
                 payload = final_state.get("final_payload", {})
                 response_message = payload.get("message", "Task completed successfully")
+
+                # Clear active plan (task completed)
+                self.tracker.clear_active_plan(session_id)
 
                 # Save assistant response to chat history
                 await self.tracker.save_assistant_message(
@@ -558,6 +593,18 @@ class Orchestrator:
                 # Support both "message" and "question" keys for backward compatibility
                 message = payload.get("message") or payload.get("question", "추가 정보가 필요합니다.")
 
+                # Update plan state to NEEDS_HUMAN (keep active plan for resume)
+                plan_id = final_state.get("plan", {}).get("plan_id") if final_state.get("plan") else None
+                if plan_id:
+                    from .types import PlanUpdate, PlanState
+                    update = PlanUpdate(
+                        plan_id=plan_id,
+                        status=PlanState.NEEDS_HUMAN,
+                        completed_steps=0,
+                        total_steps=0
+                    )
+                    await self.tracker.persist_plan_update(update)
+
                 # Save assistant response to chat history
                 await self.tracker.save_assistant_message(
                     session_id=session_id,
@@ -581,10 +628,13 @@ class Orchestrator:
                     "missing_param": payload.get("missing_param"),
                     "failed_step_id": payload.get("failed_step_id"),
                     "execution_time": execution_time,
-                    "plan_id": final_state.get("plan", {}).get("plan_id") if final_state.get("plan") else None
+                    "plan_id": plan_id
                 }
             elif final_state.get("type") == StateType.ERROR.value:
                 error_message = final_state.get("error", "Unknown error")
+
+                # Clear active plan (error occurred)
+                self.tracker.clear_active_plan(session_id)
 
                 # Save error message to chat history
                 await self.tracker.save_assistant_message(

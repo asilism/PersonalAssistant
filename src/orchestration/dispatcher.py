@@ -38,6 +38,9 @@ class TaskDispatcher:
         # Save plan to tracker
         await self.tracker.persist_plan(plan)
 
+        # Set as active plan for this session
+        self.tracker.set_active_plan(state.session_id, plan.plan_id)
+
         # Get existing results to preserve successful step outputs
         existing_results = await self.tracker.get_aggregated_results_for_group(plan.plan_id)
 
