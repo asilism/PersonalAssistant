@@ -116,6 +116,16 @@ IMPORTANT: Always use DOUBLE curly braces {{{{ }}}} for placeholders!
   Example: {{"recipient": {{{{step_1.events.0.attendees.0}}}}}}
   NOTE: Array indices use dot notation (events.0.id) NOT bracket notation (events[0].id)
 
+IMPORTANT: FILTERING AND SEARCHING IN ARRAYS
+- When the user asks for a specific item (e.g., "update Project Review event"), DO NOT blindly use index 0
+- Instead, describe what you're looking for using a descriptive placeholder
+- The system will resolve it intelligently based on the actual data
+- Examples:
+  * BAD:  {{"event_id": {{{{step_0.events.0.id}}}}}}  // Always picks first event
+  * GOOD: {{"event_id": "{{{{event_id_where_title_is_Project_Review}}}}"}}  // Describes what to find
+  * GOOD: Use a descriptive placeholder that indicates filtering criteria
+- If you need to find a specific item, create a placeholder that describes the search condition
+
 - Dependencies are specified as integers (0 for first step, 1 for second step, etc.)
   Example: "dependencies": [0] means this step depends on step_0 (the first step)
   Example: "dependencies": [0, 1] means this step depends on step_0 and step_1
@@ -412,6 +422,7 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
         # Build prompt for decision
         results_summary = self._format_results(results, state.plan)
         context_str = self._format_context(state.context)
+        tools_list_detailed = self._format_tools_detailed()
 
         prompt = f"""You are an AI assistant making STEP-BY-STEP decisions about task execution.
 
@@ -421,6 +432,11 @@ Original request: {state.request_text}
 
 Context:
 {context_str}
+
+Available tools (you MUST use these exact tool names):
+{tools_list_detailed}
+
+CRITICAL: You MUST use ONLY the exact tool names listed above. DO NOT create variations or guess tool names.
 
 Execution results (all steps have been executed):
 {results_summary}
@@ -832,11 +848,21 @@ NEXT STEP TO EXECUTE:
 
 YOUR TASK:
 1. Analyze the output from previous steps (especially the most recent one)
-2. Find the values that match the placeholder descriptions
-3. Return the resolved input for {next_step.step_id}
+2. Read the NEXT STEP's description carefully to understand what specific item is needed
+3. Search through arrays intelligently based on the description and user's original intent
+4. Return the resolved input for {next_step.step_id}
+
+CRITICAL INSTRUCTIONS FOR ARRAY PLACEHOLDERS:
+- When you see {{{{step_X.array.0.field}}}}, DO NOT always pick index 0
+- Instead, analyze the step description and previous context to find the RIGHT item
+- Example: If step description is "Update Project Review event" and step_0 returned:
+  * events: [{{"id": "event_1", "title": "Team Meeting"}}, {{"id": "event_2", "title": "Project Review"}}]
+  * The placeholder {{{{step_0.events.0.id}}}} should resolve to "event_2" (not "event_1")
+  * Because the description mentions "Project Review"
 
 IMPORTANT:
 - If a placeholder describes a filter or search (e.g., "event where title='X'"), find the matching item
+- Use the step description as a guide for which item to select from arrays
 - Extract the exact field value requested (e.g., if placeholder asks for "id", return just the id)
 - Preserve all non-placeholder values as-is
 - If you cannot resolve a placeholder, keep it as-is and explain in reasoning
