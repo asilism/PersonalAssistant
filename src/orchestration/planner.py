@@ -213,6 +213,11 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
 
             print(f"[Planner] Parsing JSON response...")
             print(f"[Planner] Raw JSON content: {content[:500]}...")  # Log first 500 chars
+
+            # Fix unquoted placeholders in JSON before parsing
+            content = self._fix_placeholders_in_json(content)
+            print(f"[Planner] After placeholder fix: {content[:500]}...")  # Log first 500 chars after fix
+
             response_data = json.loads(content)
 
             # Check if this is a tool list request
@@ -555,6 +560,11 @@ Return ONLY the JSON, no other text.
 
             print(f"[Planner] Parsing decision JSON...")
             print(f"[Planner] Raw decision content: {content[:500]}...")
+
+            # Fix unquoted placeholders in JSON before parsing
+            content = self._fix_placeholders_in_json(content)
+            print(f"[Planner] After placeholder fix: {content[:500]}...")
+
             decision_data = json.loads(content)
             decision_type = decision_data["type"]
             print(f"[Planner] Decision type: {decision_type}")
@@ -952,6 +962,9 @@ Return ONLY the JSON, no other text."""
             if json_match:
                 content = json_match.group(1)
 
+            # Fix unquoted placeholders in JSON before parsing
+            content = self._fix_placeholders_in_json(content)
+
             data = json.loads(content)
 
             resolved_input = data.get("resolved_input")
@@ -984,6 +997,34 @@ Return ONLY the JSON, no other text."""
             lines.append(f"  Output: {json.dumps(step_result.output, indent=4)}")
 
         return "\n".join(lines) if lines else "No previous steps"
+
+    def _fix_placeholders_in_json(self, content: str) -> str:
+        """
+        Fix unquoted placeholders in JSON content by wrapping them in quotes.
+        Handles patterns like {{step_0.result}} and converts them to "{{step_0.result}}"
+        when they appear unquoted in JSON.
+
+        This prevents JSON parsing errors when LLM generates placeholders without quotes
+        in contexts where strings are expected (e.g., in arrays or as object values).
+
+        Args:
+            content: Raw JSON string that may contain unquoted placeholders
+
+        Returns:
+            Fixed JSON string with all placeholders properly quoted
+        """
+        # Pattern to match unquoted placeholders in JSON
+        # Matches: {{...}} when NOT already inside quotes
+        # Uses negative lookbehind (?<!") and negative lookahead (?!") to ensure
+        # the placeholder is not already quoted
+        pattern = r'(?<!")(\{\{[^}]+\}\})(?!")'
+
+        def replace_match(match):
+            placeholder = match.group(1)
+            return f'"{placeholder}"'
+
+        fixed = re.sub(pattern, replace_match, content)
+        return fixed
 
     def _normalize_dependencies(self, deps: Any) -> list[str]:
         """
