@@ -11,8 +11,10 @@ from .types import Step, StepResult
 class PlaceholderResolver:
     """Resolves placeholders like {{step_id}} or {{step_id.field}} in step inputs"""
 
-    # Support both {{}} and ${} patterns for flexibility
-    PLACEHOLDER_PATTERN = re.compile(r'(\{\{([^}]+)\}\}|\$\{([^}]+)\})')
+    # Support {{...}}, ${...}, and {step_...} patterns for flexibility
+    # The third pattern {step_\w+[^}]*} specifically matches {step_N} or {step_N.field}
+    # to avoid matching regular JSON objects like {"key": "value"}
+    PLACEHOLDER_PATTERN = re.compile(r'(\{\{([^}]+)\}\}|\$\{([^}]+)\}|\{(step_\w+[^}]*)\})')
 
     def __init__(self):
         self._step_outputs: Dict[str, Any] = {}
@@ -72,8 +74,8 @@ class PlaceholderResolver:
         Resolve placeholders in a string
 
         Supports:
-        - {{step_id}} or ${step_id} - replaces with entire output
-        - {{step_id.field}} or ${step_id.field} - replaces with specific field from output
+        - {{step_id}} or ${step_id} or {step_id} - replaces with entire output
+        - {{step_id.field}} or ${step_id.field} or {step_id.field} - replaces with specific field from output
         - {{step_id.field.nested}} - supports nested field access
         """
         # Find all placeholders in the string
@@ -84,8 +86,8 @@ class PlaceholderResolver:
 
         # If the entire string is a single placeholder, return the value directly
         if len(matches) == 1 and matches[0].group(0) == text:
-            # Extract placeholder content (from group 2 for {{}} or group 3 for ${})
-            placeholder = matches[0].group(2) or matches[0].group(3)
+            # Extract placeholder content (from group 2 for {{}}, group 3 for ${}, or group 4 for {step_...})
+            placeholder = matches[0].group(2) or matches[0].group(3) or matches[0].group(4)
             value = self._get_placeholder_value(placeholder)
             if value is not None:
                 print(f"[PlaceholderResolver] Resolved '{text}' -> {value}")
@@ -97,8 +99,8 @@ class PlaceholderResolver:
         # If there are multiple placeholders or mixed text, do string replacement
         resolved_text = text
         for match in reversed(matches):  # Process in reverse to maintain positions
-            # Extract placeholder content (from group 2 for {{}} or group 3 for ${})
-            placeholder = match.group(2) or match.group(3)
+            # Extract placeholder content (from group 2 for {{}}, group 3 for ${}, or group 4 for {step_...})
+            placeholder = match.group(2) or match.group(3) or match.group(4)
             value = self._get_placeholder_value(placeholder)
             if value is not None:
                 # Convert value to string for insertion
