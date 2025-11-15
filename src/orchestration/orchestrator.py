@@ -268,8 +268,9 @@ class Orchestrator:
         elif state_type == StateType.ERROR.value:
             return "error_handler"
         elif state_type == StateType.HUMAN_IN_THE_LOOP.value:
-            # For now, treat as final
-            return "end"
+            # Treat as finalize to return response to user
+            print(f"[Orchestrator] Routing HUMAN_IN_THE_LOOP to finalize")
+            return "finalize"
         else:
             return "error_handler"
 
@@ -387,6 +388,18 @@ class Orchestrator:
                     "execution_time": execution_time,
                     "plan_id": final_state.get("plan", {}).get("plan_id") if final_state.get("plan") else None,
                     "plan": final_state.get("plan")  # Include full plan for analysis
+                }
+            elif final_state.get("type") == StateType.HUMAN_IN_THE_LOOP.value:
+                # Human input required
+                payload = final_state.get("final_payload", {})
+                return {
+                    "success": False,
+                    "message": payload.get("message", "추가 정보가 필요합니다."),
+                    "requires_input": True,
+                    "missing_param": payload.get("missing_param"),
+                    "failed_step_id": payload.get("failed_step_id"),
+                    "execution_time": execution_time,
+                    "plan_id": final_state.get("plan", {}).get("plan_id") if final_state.get("plan") else None
                 }
             elif final_state.get("type") == StateType.ERROR.value:
                 return {
