@@ -1,5 +1,5 @@
 """
-MCP Executor - Connects to and executes MCP tools via HTTP (SSE)
+MCP Executor - Connects to and executes MCP tools via HTTP (Streamable-HTTP)
 """
 
 import asyncio
@@ -10,19 +10,18 @@ from datetime import datetime
 from typing import Any, Optional, Dict, List
 from contextlib import asynccontextmanager
 
-from mcp import ClientSession
-from mcp.client.sse import sse_client
+from fastmcp import Client
 
 from .types import Step, StepResult, ToolDefinition
 
 
 class MCPExecutor:
-    """MCPExecutor - Executes MCP tools via HTTP/SSE MCP servers"""
+    """MCPExecutor - Executes MCP tools via HTTP (Streamable-HTTP) using FastMCP"""
 
     def __init__(self):
         self._execution_count = 0
         self._servers: Dict[str, Dict[str, Any]] = {}
-        self._sessions: Dict[str, ClientSession] = {}
+        self._clients: Dict[str, Client] = {}
         self._available_tools: Dict[str, ToolDefinition] = {}
 
     async def initialize_servers(self):
@@ -81,26 +80,28 @@ class MCPExecutor:
             try:
                 config = server_info["config"]
 
-                async with sse_client(config["url"]) as (read, write):
-                    async with ClientSession(read, write) as session:
-                        await session.initialize()
+                # Create FastMCP client
+                client = Client(config["url"])
 
-                        # List tools
-                        tools_result = await session.list_tools()
+                async with client:
+                    # List tools
+                    tools_result = await client.list_tools()
 
-                        for tool in tools_result.tools:
-                            tool_def = ToolDefinition(
-                                name=tool.name,
-                                description=tool.description or "",
-                                input_schema=tool.inputSchema
-                            )
-                            all_tools.append(tool_def)
-                            self._available_tools[tool.name] = tool_def
+                    for tool in tools_result:
+                        tool_def = ToolDefinition(
+                            name=tool.name,
+                            description=tool.description or "",
+                            input_schema=tool.input_schema
+                        )
+                        all_tools.append(tool_def)
+                        self._available_tools[tool.name] = tool_def
 
-                        print(f"[MCPExecutor] Discovered {len(tools_result.tools)} tools from {server_name}")
+                    print(f"[MCPExecutor] Discovered {len(tools_result)} tools from {server_name}")
 
             except Exception as e:
                 print(f"[MCPExecutor] Error discovering tools from {server_name}: {e}")
+                import traceback
+                traceback.print_exc()
 
         return all_tools
 
@@ -216,7 +217,7 @@ class MCPExecutor:
 
     async def _execute_mcp_tool(self, server_name: str, tool_name: str, tool_input: dict[str, Any]) -> Any:
         """
-        Execute MCP tool via HTTP/SSE connection
+        Execute MCP tool via HTTP (Streamable-HTTP) connection using FastMCP
         """
         if server_name not in self._servers:
             raise ValueError(f"Unknown server: {server_name}")
@@ -227,26 +228,30 @@ class MCPExecutor:
 
         config = server_info["config"]
 
-        # Connect and execute via SSE
-        async with sse_client(config["url"]) as (read, write):
-            async with ClientSession(read, write) as session:
-                # Initialize session
-                await session.initialize()
+        # Connect and execute via FastMCP Client
+        client = Client(config["url"])
 
-                # Call the tool
-                result = await session.call_tool(tool_name, arguments=tool_input)
+        async with client:
+            # Call the tool
+            result = await client.call_tool(tool_name, tool_input)
 
-                # Parse result
-                if result.content:
-                    # Get the first text content
-                    for content in result.content:
-                        if hasattr(content, 'text'):
-                            return json.loads(content.text)
+            # Parse result
+            if isinstance(result, list) and len(result) > 0:
+                # Get the first content item
+                first_content = result[0]
+                if hasattr(first_content, 'text'):
+                    try:
+                        return json.loads(first_content.text)
+                    except json.JSONDecodeError:
+                        return {"success": True, "result": first_content.text}
+                elif isinstance(first_content, dict):
+                    return first_content
 
-                return {"success": True, "result": "completed"}
+            return {"success": True, "result": "completed"}
 
     async def cleanup(self):
         """Cleanup connections"""
         print("[MCPExecutor] Cleaning up connections...")
-        self._sessions.clear()
+        self._clients.clear()
         self._servers.clear()
+        self._available_tools.clear()
