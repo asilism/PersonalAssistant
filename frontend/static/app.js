@@ -248,9 +248,13 @@ async function executeRequest() {
                     // Add execution log entry
                     addExecutionLogEntry(eventData);
 
-                    // Store final message if execution completed
+                    // Store final message and data if execution completed
                     if (eventData.event_type === 'execution_completed') {
                         finalMessage = eventData.message;
+                        // Check if there's structured data to display
+                        if (eventData.data && eventData.data.results) {
+                            finalMessage = formatExecutionResults(eventData.message, eventData.data.results);
+                        }
                     }
                 } catch (e) {
                     console.error('Error parsing SSE data:', e);
@@ -341,6 +345,92 @@ function formatResults(results) {
         return `<pre style="margin: 0; white-space: pre-wrap;">${JSON.stringify(results, null, 2)}</pre>`;
     }
     return escapeHtml(String(results));
+}
+
+// Format execution results (e.g., Jira issues)
+function formatExecutionResults(message, data) {
+    // Check if this is Jira issues data
+    if (data.issues && Array.isArray(data.issues)) {
+        let html = `<div class="message-text">${escapeHtml(message)}</div>`;
+        html += `<div class="jira-issues-container" style="margin-top: 15px;">`;
+        html += `<div class="jira-summary" style="margin-bottom: 10px; padding: 8px; background: #e3f2fd; border-radius: 4px;">`;
+        html += `<strong>Found ${data.count || data.issues.length} issue(s)</strong>`;
+        html += `</div>`;
+
+        data.issues.forEach((issue, index) => {
+            html += `
+                <div class="jira-issue" style="margin-bottom: 12px; padding: 12px; border: 1px solid #e0e0e0; border-radius: 4px; background: #fafafa;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                        <div style="flex: 1;">
+                            <strong style="color: #1976D2; font-size: 14px;">${escapeHtml(issue.key || `Issue ${index + 1}`)}</strong>
+                            <span style="margin-left: 10px; padding: 2px 8px; background: ${getPriorityColor(issue.priority)}; color: white; border-radius: 3px; font-size: 11px;">
+                                ${escapeHtml(issue.priority || 'N/A')}
+                            </span>
+                            <span style="margin-left: 5px; padding: 2px 8px; background: ${getStatusColor(issue.status)}; color: white; border-radius: 3px; font-size: 11px;">
+                                ${escapeHtml(issue.status || 'N/A')}
+                            </span>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 6px; font-size: 13px; font-weight: 500;">
+                        ${escapeHtml(issue.summary || 'No summary')}
+                    </div>
+                    <div style="margin-bottom: 6px; font-size: 12px; color: #666;">
+                        ${escapeHtml(issue.description || 'No description')}
+                    </div>
+                    <div style="font-size: 11px; color: #999;">
+                        ${issue.assignee ? `<span><strong>Assignee:</strong> ${escapeHtml(issue.assignee)}</span>` : ''}
+                        ${issue.reporter ? `<span style="margin-left: 15px;"><strong>Reporter:</strong> ${escapeHtml(issue.reporter)}</span>` : ''}
+                        ${issue.created_at ? `<span style="margin-left: 15px;"><strong>Created:</strong> ${formatDate(issue.created_at)}</span>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+        return html;
+    }
+
+    // For other data types, show message with formatted JSON
+    let html = `<div class="message-text">${escapeHtml(message)}</div>`;
+    html += `<div style="margin-top: 10px;">`;
+    html += `<details style="cursor: pointer;">`;
+    html += `<summary style="font-weight: 500; color: #1976D2;">View detailed results</summary>`;
+    html += `<pre style="margin: 10px 0 0 0; padding: 10px; background: #f5f5f5; border-radius: 4px; overflow-x: auto; font-size: 12px;">${JSON.stringify(data, null, 2)}</pre>`;
+    html += `</details>`;
+    html += `</div>`;
+    return html;
+}
+
+// Get priority color
+function getPriorityColor(priority) {
+    const colors = {
+        'Critical': '#d32f2f',
+        'High': '#f57c00',
+        'Medium': '#fbc02d',
+        'Low': '#388e3c'
+    };
+    return colors[priority] || '#757575';
+}
+
+// Get status color
+function getStatusColor(status) {
+    const colors = {
+        'To Do': '#757575',
+        'In Progress': '#1976D2',
+        'Done': '#388e3c',
+        'Blocked': '#d32f2f'
+    };
+    return colors[status] || '#757575';
+}
+
+// Format date
+function formatDate(dateString) {
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+        return dateString;
+    }
 }
 
 // Add log entry
