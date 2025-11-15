@@ -75,7 +75,7 @@ def start_server(server_name, config):
             if sys.platform == 'win32':
                 # Windows
                 process = subprocess.Popen(
-                    [sys.executable, str(server_path)],
+                    [sys.executable, "server.py"],
                     cwd=server_path.parent,
                     stdout=log,
                     stderr=subprocess.STDOUT,
@@ -85,7 +85,7 @@ def start_server(server_name, config):
             else:
                 # Unix-like
                 process = subprocess.Popen(
-                    [sys.executable, str(server_path)],
+                    [sys.executable, "server.py"],
                     cwd=server_path.parent,
                     stdout=log,
                     stderr=subprocess.STDOUT,
