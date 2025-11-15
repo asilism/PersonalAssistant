@@ -17,8 +17,13 @@ def test_validate_email():
 
     test_cases = [
         # (email, expected_valid, description)
-        ("user@example.com", True, "Valid email"),
-        ("test.user+tag@example.co.kr", True, "Valid email with special chars"),
+        ("user@gmail.com", True, "Valid email"),
+        ("test.user+tag@company.co.kr", True, "Valid email with special chars"),
+        ("user@example.com", False, "Placeholder domain - example.com"),
+        ("asilism@example.com", False, "Placeholder domain - example.com"),
+        ("test@test.com", False, "Placeholder domain - test.com"),
+        ("user@sample.org", False, "Placeholder domain - sample.org"),
+        ("fake@dummy.com", False, "Placeholder domain - dummy.com"),
         ("{{USER_EMAIL}}", False, "Template variable"),
         ("{{RECIPIENT}}", False, "Another template variable"),
         ("", False, "Empty string"),
@@ -66,6 +71,7 @@ def test_extract_missing_params():
         "Email validation failed: Email address contains unresolved template variable: {{USER_EMAIL}}",
         "Email validation failed: Email address is required",
         "Email validation failed: Invalid email address format: invalid-email",
+        "Email validation failed: 'example.com' is a placeholder domain",
     ]
 
     for error_msg in test_cases:

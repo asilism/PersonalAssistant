@@ -37,6 +37,17 @@ def validate_email(email: str) -> Tuple[bool, str]:
     if not re.match(email_pattern, email.strip()):
         return False, f"Invalid email address format: {email}"
 
+    # Block common placeholder/fake domains
+    blocked_domains = [
+        'example.com', 'example.org', 'example.net',
+        'test.com', 'test.org', 'test.net',
+        'sample.com', 'sample.org', 'sample.net',
+        'placeholder.com', 'dummy.com', 'fake.com'
+    ]
+    email_domain = email.strip().split('@')[-1].lower()
+    if email_domain in blocked_domains:
+        return False, f"Email validation failed: '{email_domain}' is a placeholder domain"
+
     return True, ""
 
 
@@ -58,6 +69,13 @@ def extract_missing_params(error_message: str) -> dict:
                 "param_type": "email",
                 "reason": "unresolved_template",
                 "question": "이메일을 보내려면 받는 사람의 이메일 주소가 필요합니다. 누구에게 보낼까요?"
+            }
+        elif "placeholder domain" in error_message.lower():
+            return {
+                "param_name": "to",
+                "param_type": "email",
+                "reason": "placeholder_domain",
+                "question": "정확한 이메일 주소를 알 수 없습니다. 받는 사람의 이메일 주소를 입력해주세요."
             }
         elif "required" in error_message.lower():
             return {
