@@ -13,6 +13,7 @@ mcp = FastMCP("jira-agent")
 
 # Mock Jira issues database
 issues_db: list[dict] = [
+    # In Progress issues
     {
         "id": "PROJ-1",
         "key": "PROJ-1",
@@ -23,7 +24,7 @@ issues_db: list[dict] = [
         "assignee": "minho.park@samsung.com",
         "reporter": "sungjun87.lee@samsung.com",
         "created_at": "2025-10-15T09:00:00Z",
-        "updated_at": "2025-10-20T14:30:00Z"
+        "updated_at": "2025-11-12T14:30:00Z"
     },
     {
         "id": "PROJ-2",
@@ -35,7 +36,84 @@ issues_db: list[dict] = [
         "assignee": "soyeon.choi@samsung.com",
         "reporter": "jaehyun.kim@samsung.com",
         "created_at": "2025-10-18T11:00:00Z",
-        "updated_at": "2025-10-18T11:00:00Z"
+        "updated_at": "2025-11-13T10:00:00Z"
+    },
+    {
+        "id": "PROJ-3",
+        "key": "PROJ-3",
+        "summary": "Update API documentation",
+        "description": "Document all REST API endpoints",
+        "status": "In Progress",
+        "priority": "Medium",
+        "assignee": "jaehyun.kim@samsung.com",
+        "reporter": "sungjun87.lee@samsung.com",
+        "created_at": "2025-11-01T09:00:00Z",
+        "updated_at": "2025-11-14T16:00:00Z"
+    },
+    {
+        "id": "PROJ-4",
+        "key": "PROJ-4",
+        "summary": "Refactor database connection pooling",
+        "description": "Improve database performance with better connection pooling",
+        "status": "To Do",
+        "priority": "High",
+        "assignee": "minho.park@samsung.com",
+        "reporter": "sungjun87.lee@samsung.com",
+        "created_at": "2025-11-05T10:00:00Z",
+        "updated_at": "2025-11-12T14:00:00Z"
+    },
+    # Completed issues from last week (2025-11-03 ~ 2025-11-09)
+    {
+        "id": "PROJ-5",
+        "key": "PROJ-5",
+        "summary": "Add user profile page",
+        "description": "Create user profile page with edit functionality",
+        "status": "Done",
+        "priority": "High",
+        "assignee": "soyeon.choi@samsung.com",
+        "reporter": "jaehyun.kim@samsung.com",
+        "created_at": "2025-10-28T09:00:00Z",
+        "updated_at": "2025-11-06T15:30:00Z",
+        "resolved_at": "2025-11-06T15:30:00Z"
+    },
+    {
+        "id": "PROJ-6",
+        "key": "PROJ-6",
+        "summary": "Fix memory leak in background worker",
+        "description": "Background worker process was consuming excessive memory",
+        "status": "Done",
+        "priority": "Critical",
+        "assignee": "minho.park@samsung.com",
+        "reporter": "sungjun87.lee@samsung.com",
+        "created_at": "2025-10-30T11:00:00Z",
+        "updated_at": "2025-11-07T17:00:00Z",
+        "resolved_at": "2025-11-07T17:00:00Z"
+    },
+    {
+        "id": "PROJ-7",
+        "key": "PROJ-7",
+        "summary": "Implement email notification system",
+        "description": "Send email notifications for important events",
+        "status": "Done",
+        "priority": "Medium",
+        "assignee": "jaehyun.kim@samsung.com",
+        "reporter": "sungjun87.lee@samsung.com",
+        "created_at": "2025-10-25T10:00:00Z",
+        "updated_at": "2025-11-08T14:20:00Z",
+        "resolved_at": "2025-11-08T14:20:00Z"
+    },
+    {
+        "id": "PROJ-8",
+        "key": "PROJ-8",
+        "summary": "Upgrade dependencies to latest versions",
+        "description": "Update all npm packages to latest stable versions",
+        "status": "Done",
+        "priority": "Low",
+        "assignee": "minho.park@samsung.com",
+        "reporter": "jaehyun.kim@samsung.com",
+        "created_at": "2025-11-01T09:00:00Z",
+        "updated_at": "2025-11-09T11:00:00Z",
+        "resolved_at": "2025-11-09T11:00:00Z"
     }
 ]
 

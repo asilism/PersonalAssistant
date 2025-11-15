@@ -6,6 +6,7 @@ import json
 import re
 import uuid
 import os
+from datetime import datetime
 from typing import Optional, Any, List
 from anthropic import Anthropic
 
@@ -69,7 +70,17 @@ class Planner:
         tools_list_detailed = self._format_tools_detailed()
         context_str = self._format_context(state.context)
 
+        # Get current date and time
+        current_datetime = datetime.now()
+        today_str = current_datetime.strftime("%Y-%m-%d (%A)")
+        current_time_str = current_datetime.strftime("%H:%M:%S")
+
         prompt = f"""You are an AI assistant that creates execution plans.
+
+IMPORTANT CONTEXT:
+- Today's date: {today_str}
+- Current time: {current_time_str}
+- When interpreting time references (e.g., "this week", "next week", "tomorrow", "last week"), use today's date as the reference point.
 
 Available tools (you MUST use these exact tool names):
 {tools_list_detailed}
@@ -424,7 +435,17 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
         context_str = self._format_context(state.context)
         tools_list_detailed = self._format_tools_detailed()
 
+        # Get current date and time
+        current_datetime = datetime.now()
+        today_str = current_datetime.strftime("%Y-%m-%d (%A)")
+        current_time_str = current_datetime.strftime("%H:%M:%S")
+
         prompt = f"""You are an AI assistant making STEP-BY-STEP decisions about task execution.
+
+IMPORTANT CONTEXT:
+- Today's date: {today_str}
+- Current time: {current_time_str}
+- When interpreting time references (e.g., "this week", "next week", "tomorrow", "last week"), use today's date as the reference point.
 
 IMPORTANT: All planned steps have been executed. Now you need to decide if the task is complete or if additional steps are needed.
 
