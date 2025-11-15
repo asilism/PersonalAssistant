@@ -61,6 +61,7 @@ class Planner:
 
         # Build prompt for LLM
         tools_description = self._format_tools_for_prompt()
+        tools_list_detailed = self._format_tools_detailed()
         context_str = self._format_context(state.context)
 
         prompt = f"""You are an AI assistant that creates execution plans.
@@ -73,7 +74,17 @@ User request: {state.request_text}
 Context:
 {context_str}
 
-Create a step-by-step execution plan to fulfill the user's request.
+IMPORTANT: If the user is asking about what tools you have, what you can do, or requesting a list of available capabilities, you should provide the list of available tools instead of creating an execution plan.
+
+For tool listing requests, return a JSON response in this format:
+{{
+  "type": "tool_list_request",
+  "tools": [
+{tools_list_detailed}
+  ]
+}}
+
+Otherwise, create a step-by-step execution plan to fulfill the user's request.
 For each step, specify:
 1. tool_name: which tool to use
 2. input: parameters for the tool
@@ -88,7 +99,7 @@ Return your plan as a JSON array of steps. Each step should have this format:
   "dependencies": []
 }}
 
-Return ONLY the JSON array, no other text.
+Return ONLY the JSON (either tool list or execution plan), no other text.
 """
 
         try:
@@ -111,7 +122,47 @@ Return ONLY the JSON array, no other text.
 
             print(f"[Planner] Parsing JSON response...")
             print(f"[Planner] Raw JSON content: {content[:500]}...")  # Log first 500 chars
-            steps_data = json.loads(content)
+            response_data = json.loads(content)
+
+            # Check if this is a tool list request
+            if isinstance(response_data, dict) and response_data.get("type") == "tool_list_request":
+                print(f"[Planner] Detected tool list request")
+                tools_info = response_data.get("tools", [])
+
+                # Format tools information for user
+                tools_message = "Here are the tools I have access to:\n\n"
+                for i, tool in enumerate(self.settings.available_tools, 1):
+                    tools_message += f"{i}. **{tool.name}**: {tool.description}\n"
+                    if tool.input_schema and tool.input_schema.get('properties'):
+                        tools_message += "   Parameters:\n"
+                        properties = tool.input_schema['properties']
+                        required = tool.input_schema.get('required', [])
+                        for prop_name, prop_details in properties.items():
+                            req_marker = " (required)" if prop_name in required else " (optional)"
+                            prop_desc = prop_details.get('description', prop_details.get('type', ''))
+                            tools_message += f"   - {prop_name}{req_marker}: {prop_desc}\n"
+                    tools_message += "\n"
+
+                # Return as final response
+                state.type = StateType.FINAL
+                state.final_payload = {
+                    "message": tools_message,
+                    "data": {
+                        "tool_count": len(self.settings.available_tools),
+                        "tools": [
+                            {
+                                "name": tool.name,
+                                "description": tool.description,
+                                "input_schema": tool.input_schema
+                            }
+                            for tool in self.settings.available_tools
+                        ]
+                    }
+                }
+                return state
+
+            # Otherwise, treat as execution plan
+            steps_data = response_data if isinstance(response_data, list) else response_data.get("steps", [])
             print(f"[Planner] Successfully parsed {len(steps_data)} steps")
 
             # Create plan
@@ -385,6 +436,19 @@ Return ONLY the JSON, no other text.
         for tool in self.settings.available_tools:
             lines.append(f"- {tool.name}: {tool.description}")
         return "\n".join(lines)
+
+    def _format_tools_detailed(self) -> str:
+        """Format available tools in detailed JSON format for prompt"""
+        lines = []
+        for tool in self.settings.available_tools:
+            tool_dict = {
+                "name": tool.name,
+                "description": tool.description
+            }
+            if tool.input_schema:
+                tool_dict["input_schema"] = tool.input_schema
+            lines.append("    " + json.dumps(tool_dict, indent=4).replace("\n", "\n    "))
+        return ",\n".join(lines)
 
     def _format_context(self, context: Optional[ContextBundle]) -> str:
         """Format context for prompt"""
