@@ -207,8 +207,8 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
             dependencies = {}
 
             for i, step_data in enumerate(steps_data):
-                step_id = f"step_{i+1}"
-                print(f"[Planner] Processing step {i+1}/{len(steps_data)}: {step_data.get('description', 'N/A')}")
+                step_id = f"step_{i}"
+                print(f"[Planner] Processing step {i}/{len(steps_data)-1}: {step_data.get('description', 'N/A')}")
 
                 # Normalize dependencies - handle various input types
                 raw_deps = step_data.get("dependencies", [])
