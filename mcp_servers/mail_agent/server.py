@@ -36,74 +36,102 @@ emails_db: list[dict] = [
 
 
 @mcp.tool()
-def send_email(to: str, subject: str, body: str) -> dict:
-    """Send an email to a recipient
+def send_email(to: str | list[str], subject: str, body: str) -> dict:
+    """Send an email to one or more recipients
 
     Args:
-        to: Recipient email address
+        to: Recipient email address (string) or list of email addresses (list)
         subject: Email subject
         body: Email body content
 
     Returns:
         Result of the send operation
     """
-    # Validate email address
-    if not to:
+    # Normalize to list for uniform processing
+    recipients = [to] if isinstance(to, str) else to
+
+    # Validate that we have at least one recipient
+    if not recipients:
         return {
             "success": False,
             "error": "Email validation failed: Email address is required"
         }
 
-    # Check for template variables
-    template_pattern = r'\{\{.*?\}\}'
-    if re.search(template_pattern, to):
+    # Validate and send to each recipient
+    sent_emails = []
+    errors = []
+
+    for recipient in recipients:
+        # Validate email address
+        if not recipient:
+            errors.append("Empty email address in recipient list")
+            continue
+
+        # Check for template variables
+        template_pattern = r'\{\{.*?\}\}'
+        if re.search(template_pattern, recipient):
+            errors.append(f"Email address contains unresolved template variable: {recipient}")
+            continue
+
+        # Check email format
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, recipient.strip()):
+            errors.append(f"Invalid email address format: {recipient}")
+            continue
+
+        # Block common placeholder/fake domains
+        blocked_domains = [
+            'example.com', 'example.org', 'example.net',
+            'test.com', 'test.org', 'test.net',
+            'sample.com', 'sample.org', 'sample.net',
+            'placeholder.com', 'dummy.com', 'fake.com'
+        ]
+        email_domain = recipient.strip().split('@')[-1].lower()
+        if email_domain in blocked_domains:
+            errors.append(f"'{email_domain}' is a placeholder domain. Please provide a valid email address: {recipient}")
+            continue
+
+        # Create new email
+        email_id = f"email_{len(emails_db) + 1}"
+        new_email = {
+            "id": email_id,
+            "from": "jaehyun.kim@samsung.com",
+            "to": recipient,
+            "subject": subject,
+            "body": body,
+            "timestamp": datetime.now().isoformat(),
+            "read": True,
+            "sent": True
+        }
+        emails_db.append(new_email)
+        sent_emails.append({
+            "email_id": email_id,
+            "to": recipient
+        })
+
+    # Return results
+    if not sent_emails and errors:
         return {
             "success": False,
-            "error": f"Email validation failed: Email address contains unresolved template variable: {to}"
+            "error": "Email validation failed: " + "; ".join(errors)
         }
-
-    # Check email format
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    if not re.match(email_pattern, to.strip()):
+    elif sent_emails and not errors:
         return {
-            "success": False,
-            "error": f"Email validation failed: Invalid email address format: {to}"
+            "success": True,
+            "sent_count": len(sent_emails),
+            "emails": sent_emails,
+            "message": f"Email sent to {len(sent_emails)} recipient(s)",
+            "subject": subject
         }
-
-    # Block common placeholder/fake domains
-    blocked_domains = [
-        'example.com', 'example.org', 'example.net',
-        'test.com', 'test.org', 'test.net',
-        'sample.com', 'sample.org', 'sample.net',
-        'placeholder.com', 'dummy.com', 'fake.com'
-    ]
-    email_domain = to.strip().split('@')[-1].lower()
-    if email_domain in blocked_domains:
+    else:  # Partial success
         return {
-            "success": False,
-            "error": f"Email validation failed: '{email_domain}' is a placeholder domain. Please provide a valid email address for the recipient."
+            "success": True,
+            "sent_count": len(sent_emails),
+            "emails": sent_emails,
+            "message": f"Email sent to {len(sent_emails)} recipient(s), {len(errors)} failed",
+            "subject": subject,
+            "errors": errors
         }
-
-    # Create new email
-    email_id = f"email_{len(emails_db) + 1}"
-    new_email = {
-        "id": email_id,
-        "from": "jaehyun.kim@samsung.com",
-        "to": to,
-        "subject": subject,
-        "body": body,
-        "timestamp": datetime.now().isoformat(),
-        "read": True,
-        "sent": True
-    }
-    emails_db.append(new_email)
-
-    return {
-        "success": True,
-        "email_id": email_id,
-        "message": f"Email sent to {to}",
-        "subject": subject
-    }
 
 
 @mcp.tool()
