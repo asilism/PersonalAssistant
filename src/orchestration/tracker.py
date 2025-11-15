@@ -32,7 +32,9 @@ class TaskTracker:
         """Persist a new plan"""
         self._plans[plan.plan_id] = plan
         self._plan_states[plan.plan_id] = PlanState.PENDING
-        self._step_results[plan.plan_id] = []
+        # Only initialize step_results if this is a new plan
+        if plan.plan_id not in self._step_results:
+            self._step_results[plan.plan_id] = []
 
     async def persist_plan_update(self, update: PlanUpdate) -> None:
         """Update plan state"""
