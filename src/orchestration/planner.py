@@ -365,28 +365,60 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
         # Build prompt for decision
         results_summary = self._format_results(results)
 
-        prompt = f"""You are an AI assistant making decisions about task execution.
+        prompt = f"""You are an AI assistant making STEP-BY-STEP decisions about task execution.
+
+IMPORTANT: You analyze the results of each step ONE AT A TIME and decide the next action.
+This means you can:
+1. Examine the output of the most recent step
+2. Use that output to dynamically determine what to do next
+3. Create new steps based on the actual data returned (not just placeholders)
+4. Filter, search, or process results intelligently before proceeding
 
 Original request: {state.request_text}
 
 Execution results so far:
 {results_summary}
 
-Decide what to do next:
-1. "final" - task is complete, return final response
-2. "nextSteps" - more steps needed, provide them
-3. "needsHuman" - requires human intervention
-4. "failed" - task failed and cannot continue
+ANALYZING STEP RESULTS:
+- Look at the actual data returned by each completed step
+- If a step returned a list of items (e.g., calendar events), you can now:
+  * Check if the desired item exists in the list
+  * Create a new step to process specific items based on their properties
+  * Use the actual IDs, titles, or other fields from the results
+- You do NOT need to rely only on placeholder syntax like {{{{step_0.events.0.id}}}}
+- Instead, you can examine the step output and create intelligent next steps
+
+DECISION OPTIONS:
+1. "final" - Task is complete, return final response to user
+2. "nextSteps" - More steps needed based on the results you analyzed
+   - Create new steps dynamically using the actual data from previous steps
+   - You can reference specific values you found in the step outputs
+   - Each new step should have: tool_name, input, description, dependencies
+3. "needsHuman" - Requires human intervention (missing info, ambiguous results, etc.)
+4. "failed" - Task failed and cannot continue
+
+PLACEHOLDER SYNTAX FOR NEXT STEPS (when needed):
+- To reference previous step output: {{{{step_N}}}} or {{{{step_N.field_name}}}}
+- To access array elements: {{{{step_N.array.0.id}}}} (use dot notation)
+- NOTE: Steps are 0-indexed (step_0 is first step, step_1 is second, etc.)
+- But prefer using actual values from the results when possible!
 
 Return your decision as JSON:
 {{
   "type": "final|nextSteps|needsHuman|failed",
-  "reason": "explanation",
+  "reason": "explanation of your analysis and decision",
   "payload": {{
-    // For "final": {{"message": "success message", "data": ...}}
-    // For "nextSteps": {{"steps": [...]}} (same format as initial planning)
-    // For "needsHuman": {{"question": "what to ask user"}}
-    // For "failed": {{"error": "error message"}}
+    // For "final": {{"message": "success message to user", "data": <optional result data>}}
+    // For "nextSteps": {{"steps": [
+    //   {{
+    //     "tool_name": "tool_name",
+    //     "input": {{"param": "value or {{{{placeholder}}}}"}},
+    //     "description": "what this step does",
+    //     "dependencies": [0, 1]  // indices of steps this depends on
+    //   }}
+    // ]}}
+    // For "needsHuman": {{"question": "what to ask the user"}}
+    // For "failed": {{"error": "error description"}}
   }}
 }}
 
