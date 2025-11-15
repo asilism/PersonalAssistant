@@ -91,7 +91,7 @@ class MCPExecutor:
                         tool_def = ToolDefinition(
                             name=tool.name,
                             description=tool.description or "",
-                            input_schema=tool.input_schema
+                            input_schema=tool.inputSchema
                         )
                         all_tools.append(tool_def)
                         self._available_tools[tool.name] = tool_def
