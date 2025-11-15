@@ -171,7 +171,10 @@ def send_email(to: str | list[str], subject: str, body: str) -> dict:
     """Send an email to one or more recipients
 
     Args:
-        to: Recipient email address (string) or list of email addresses (list)
+        to: Recipient email address. Use one of these formats:
+            - Single recipient (str): "user@example.com"
+            - Multiple recipients (list): ["user1@example.com", "user2@example.com", "user3@example.com"]
+            IMPORTANT: For multiple recipients, use a JSON array, NOT a comma-separated string
         subject: Email subject
         body: Email body content
 
