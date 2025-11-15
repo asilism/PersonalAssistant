@@ -511,7 +511,8 @@ class Orchestrator:
                     trace_id=trace_id,
                     success=True,
                     message=response_message,
-                    execution_time=execution_time
+                    execution_time=execution_time,
+                    results=payload.get("data")
                 )
 
                 return {
