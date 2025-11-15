@@ -11,8 +11,9 @@ from .types import Step, StepResult
 class PlaceholderResolver:
     """Resolves placeholders like {{step_id}} or {{step_id.field}} in step inputs"""
 
-    # Support both {{}} and ${} patterns for flexibility
-    PLACEHOLDER_PATTERN = re.compile(r'(\{\{([^}]+)\}\}|\$\{([^}]+)\})')
+    # Support {{}} (double braces), ${} (dollar), and {} (single braces) patterns for flexibility
+    # Pattern matches: {{...}}, ${...}, or {...}
+    PLACEHOLDER_PATTERN = re.compile(r'(\{\{([^}]+)\}\}|\$\{([^}]+)\}|\{([^}]+)\})')
 
     def __init__(self):
         self._step_outputs: Dict[str, Any] = {}
@@ -84,8 +85,8 @@ class PlaceholderResolver:
 
         # If the entire string is a single placeholder, return the value directly
         if len(matches) == 1 and matches[0].group(0) == text:
-            # Extract placeholder content (from group 2 for {{}} or group 3 for ${})
-            placeholder = matches[0].group(2) or matches[0].group(3)
+            # Extract placeholder content (from group 2 for {{}}, group 3 for ${}, or group 4 for {})
+            placeholder = matches[0].group(2) or matches[0].group(3) or matches[0].group(4)
             value = self._get_placeholder_value(placeholder)
             if value is not None:
                 print(f"[PlaceholderResolver] Resolved '{text}' -> {value}")
@@ -97,8 +98,8 @@ class PlaceholderResolver:
         # If there are multiple placeholders or mixed text, do string replacement
         resolved_text = text
         for match in reversed(matches):  # Process in reverse to maintain positions
-            # Extract placeholder content (from group 2 for {{}} or group 3 for ${})
-            placeholder = match.group(2) or match.group(3)
+            # Extract placeholder content (from group 2 for {{}}, group 3 for ${}, or group 4 for {})
+            placeholder = match.group(2) or match.group(3) or match.group(4)
             value = self._get_placeholder_value(placeholder)
             if value is not None:
                 # Convert value to string for insertion
@@ -117,16 +118,22 @@ class PlaceholderResolver:
         Args:
             placeholder: The placeholder content (without {{ }})
                         Examples: "step_1", "step_1.id", "step_1.events.0.id"
+                        Also supports: "step_1.events[0].id" (Python array indexing)
                         Or expressions: "step_1.attendees + ['new@email.com']"
 
         Returns:
             The resolved value or None if not found
         """
-        # Check if this is an expression (contains operators or brackets)
-        if any(op in placeholder for op in ['+', '-', '*', '/', '[', '(', ',']):
-            return self._evaluate_expression(placeholder)
+        # Normalize Python array indexing [N] to dot notation .N
+        # Convert: "step_1.events[0].id" -> "step_1.events.0.id"
+        normalized_placeholder = self._normalize_array_indexing(placeholder)
 
-        parts = placeholder.split('.')
+        # Check if this is an expression (contains operators or brackets)
+        # Note: After normalization, brackets in expressions like [...] will still be present
+        if any(op in normalized_placeholder for op in ['+', '-', '*', '/', '[', '(', ',']):
+            return self._evaluate_expression(normalized_placeholder)
+
+        parts = normalized_placeholder.split('.')
         step_id = parts[0]
 
         # Check if step output exists
@@ -307,6 +314,31 @@ class PlaceholderResolver:
                 i += 1
 
         return ''.join(result)
+
+    def _normalize_array_indexing(self, placeholder: str) -> str:
+        """
+        Normalize Python array indexing to dot notation
+
+        Converts "field[0]" to "field.0", "field[1]" to "field.1", etc.
+        Examples:
+            "step_1.events[0].id" -> "step_1.events.0.id"
+            "step_0.attendees[0]" -> "step_0.attendees.0"
+
+        Args:
+            placeholder: The placeholder string with potential array indexing
+
+        Returns:
+            Normalized placeholder with dot notation
+        """
+        # Replace [N] with .N using regex
+        # Pattern: [\d+] (bracket with digits inside)
+        import re
+        normalized = re.sub(r'\[(\d+)\]', r'.\1', placeholder)
+
+        if normalized != placeholder:
+            print(f"[PlaceholderResolver] Normalized array indexing: '{placeholder}' -> '{normalized}'")
+
+        return normalized
 
     def clear(self) -> None:
         """Clear all registered step outputs"""

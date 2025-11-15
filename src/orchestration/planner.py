@@ -95,10 +95,22 @@ For each step, specify:
 4. dependencies: which previous step IDs this depends on (empty list if none)
 
 PLACEHOLDER SYNTAX FOR REFERENCING PREVIOUS STEPS:
-- To reference a previous step's entire output: use {{step_N}} or {{step_N.result}}
-  Example: {{"numbers": [{{step_1.result}}, 150]}}
-- To reference a specific field: use {{step_N.field_name}}
-  Example: {{"event_id": {{step_1.id}}}}
+IMPORTANT: Always use DOUBLE curly braces {{{{ }}}} for placeholders!
+
+- To reference a previous step's entire output: use {{{{step_N}}}} or {{{{step_N.result}}}}
+  Example: {{"numbers": [{{{{step_1.result}}}}, 150]}}
+
+- To reference a specific field: use {{{{step_N.field_name}}}}
+  Example: {{"event_id": {{{{step_1.id}}}}}}
+
+- To access nested fields: use {{{{step_N.field.nested_field}}}}
+  Example: {{"title": {{{{step_1.event.title}}}}}}
+
+- To access array elements: use {{{{step_N.array_field.INDEX}}}} (dot notation)
+  Example: {{"event_id": {{{{step_0.events.0.id}}}}}}
+  Example: {{"recipient": {{{{step_0.events.0.attendees.0}}}}}}
+  NOTE: Array indices use dot notation (events.0.id) NOT bracket notation (events[0].id)
+
 - Dependencies are specified as integers (0 for first step, 1 for second step, etc.)
   Example: "dependencies": [0] means this step depends on the first step
 
