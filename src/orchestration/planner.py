@@ -71,13 +71,15 @@ class Planner:
 
         prompt = f"""You are an AI assistant that creates execution plans.
 
-Available tools:
-{tools_description}
+Available tools (you MUST use these exact tool names):
+{tools_list_detailed}
 
 User request: {state.request_text}
 
 Context:
 {context_str}
+
+CRITICAL: You MUST use ONLY the exact tool names listed above. DO NOT create variations or guess tool names (e.g., if the tool is "update_event", do NOT use "update_calendar_event").
 
 IMPORTANT: If the user is asking about what tools you have, what you can do, or requesting a list of available capabilities, you should provide the list of available tools instead of creating an execution plan.
 
@@ -336,19 +338,40 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
                 }
                 return state
 
-        # Check if any steps have exceeded max retries
+        # Check if any steps have exceeded max retries or have non-retryable errors
         max_retries = self.settings.max_retries  # Default is 3 from types.py
         steps_exceeded_retries = []
+        steps_with_non_retryable_errors = []
 
         for failed_step in results.failed_steps:
             step_id = failed_step.step_id
-            retry_count = state.retry_counts.get(step_id, 0)
+            error_msg = failed_step.error or ""
 
+            # Check for non-retryable errors (e.g., tool not found)
+            if "No MCP server found for tool" in error_msg:
+                steps_with_non_retryable_errors.append(step_id)
+                print(f"[Planner] Step {step_id} has non-retryable error: {error_msg}")
+                continue
+
+            retry_count = state.retry_counts.get(step_id, 0)
             print(f"[Planner] Step {step_id} failure count: {retry_count + 1}/{max_retries}")
 
             if retry_count >= max_retries:
                 steps_exceeded_retries.append(step_id)
                 print(f"[Planner] Step {step_id} has exceeded max retries ({max_retries})")
+
+        # If any steps have non-retryable errors, fail immediately with detailed message
+        if steps_with_non_retryable_errors:
+            failed_steps_info = []
+            for failed_step in results.failed_steps:
+                if failed_step.step_id in steps_with_non_retryable_errors:
+                    failed_steps_info.append(f"{failed_step.step_id}: {failed_step.error}")
+
+            error_msg = f"Task failed: Steps have non-retryable errors:\n" + "\n".join(failed_steps_info)
+            print(f"[Planner] {error_msg}")
+            state.type = StateType.ERROR
+            state.error = error_msg
+            return state
 
         # If any steps exceeded retries, fail the task
         if steps_exceeded_retries:
@@ -358,11 +381,12 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
             state.error = error_msg
             return state
 
-        # Increment retry counts for failed steps
+        # Increment retry counts for failed steps (excluding non-retryable)
         for failed_step in results.failed_steps:
             step_id = failed_step.step_id
-            state.retry_counts[step_id] = state.retry_counts.get(step_id, 0) + 1
-            print(f"[Planner] Incremented retry count for {step_id}: {state.retry_counts[step_id]}")
+            if step_id not in steps_with_non_retryable_errors:
+                state.retry_counts[step_id] = state.retry_counts.get(step_id, 0) + 1
+                print(f"[Planner] Incremented retry count for {step_id}: {state.retry_counts[step_id]}")
 
         # Check if there are pending steps (not yet executed)
         completed_step_ids = {step.step_id for step in results.completed_steps}
