@@ -130,6 +130,18 @@ class MCPExecutor:
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds() * 1000
 
+            # Check if the tool returned success=False in its output
+            if isinstance(output, dict) and output.get("success") is False:
+                error_msg = output.get("error", "Tool returned success=False")
+                print(f"[MCPExecutor] Step {step.step_id} tool returned failure: {error_msg}")
+                return StepResult(
+                    step_id=step.step_id,
+                    status="failure",
+                    error=error_msg,
+                    executed_at=start_time,
+                    duration=duration
+                )
+
             return StepResult(
                 step_id=step.step_id,
                 status="success",
