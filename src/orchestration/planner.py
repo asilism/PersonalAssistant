@@ -71,13 +71,15 @@ class Planner:
 
         prompt = f"""You are an AI assistant that creates execution plans.
 
-Available tools:
-{tools_description}
+Available tools (you MUST use these exact tool names):
+{tools_list_detailed}
 
 User request: {state.request_text}
 
 Context:
 {context_str}
+
+CRITICAL: You MUST use ONLY the exact tool names listed above. DO NOT create variations or guess tool names (e.g., if the tool is "update_event", do NOT use "update_calendar_event").
 
 IMPORTANT: If the user is asking about what tools you have, what you can do, or requesting a list of available capabilities, you should provide the list of available tools instead of creating an execution plan.
 
