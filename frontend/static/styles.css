@@ -589,9 +589,9 @@ button[type="submit"]:disabled,
 }
 
 .chat-send-btn {
-    width: 44px;
     height: 44px;
-    border-radius: 50%;
+    padding: 0 20px;
+    border-radius: 22px;
     background: #0077c8;
     border: none;
     color: white;
@@ -601,6 +601,9 @@ button[type="submit"]:disabled,
     justify-content: center;
     transition: background 0.2s;
     flex-shrink: 0;
+    font-size: 0.95em;
+    font-weight: 500;
+    white-space: nowrap;
 }
 
 .chat-send-btn:hover:not(:disabled) {
@@ -614,6 +617,47 @@ button[type="submit"]:disabled,
 .chat-send-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+/* Clear Chat Button */
+.clear-chat-btn {
+    background: #f44336;
+    color: white;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.clear-chat-btn:hover {
+    background: #d32f2f;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(244, 67, 54, 0.3);
+}
+
+.clear-chat-btn:active {
+    background: #c62828;
+    transform: translateY(0);
+}
+
+/* Category Styles */
+.example-category {
+    transition: all 0.3s ease;
+}
+
+.category-header:hover {
+    background: rgba(0, 119, 200, 0.05);
+    border-radius: 4px;
+    padding: 4px;
+    margin: -4px;
+}
+
+.toggle-icon {
+    font-size: 12px;
+    transition: transform 0.3s ease;
 }
 
 /* Logs Panel - Right Side */

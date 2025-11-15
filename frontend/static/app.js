@@ -26,6 +26,20 @@ function setExample(text) {
     document.getElementById('requestText').focus();
 }
 
+// Toggle category visibility
+function toggleCategory(categoryId) {
+    const category = document.getElementById(categoryId);
+    const icon = document.getElementById(categoryId + '-icon');
+
+    if (category.style.display === 'none') {
+        category.style.display = 'flex';
+        icon.textContent = '▼';
+    } else {
+        category.style.display = 'none';
+        icon.textContent = '▶';
+    }
+}
+
 // Auto-resize textarea
 document.addEventListener('DOMContentLoaded', () => {
     const textarea = document.getElementById('requestText');
