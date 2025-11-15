@@ -30,23 +30,23 @@ class MCPExecutor:
         # Define MCP server configurations (HTTP-based)
         server_configs = {
             "mail-agent": {
-                "url": "http://localhost:8001/sse",
+                "url": "http://localhost:8001/mcp",
                 "transport": "http"
             },
             "calendar-agent": {
-                "url": "http://localhost:8002/sse",
+                "url": "http://localhost:8002/mcp",
                 "transport": "http"
             },
             "jira-agent": {
-                "url": "http://localhost:8004/sse",
+                "url": "http://localhost:8004/mcp",
                 "transport": "http"
             },
             "calculator-agent": {
-                "url": "http://localhost:8003/sse",
+                "url": "http://localhost:8003/mcp",
                 "transport": "http"
             },
             "rpa-agent": {
-                "url": "http://localhost:8005/sse",
+                "url": "http://localhost:8005/mcp",
                 "transport": "http"
             }
         }
