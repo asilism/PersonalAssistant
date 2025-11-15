@@ -98,21 +98,23 @@ PLACEHOLDER SYNTAX FOR REFERENCING PREVIOUS STEPS:
 IMPORTANT: Always use DOUBLE curly braces {{{{ }}}} for placeholders!
 
 - To reference a previous step's entire output: use {{{{step_N}}}} or {{{{step_N.result}}}}
-  Example: {{"numbers": [{{{{step_1.result}}}}, 150]}}
+  Example: {{"numbers": [{{{{step_0.result}}}}, 150]}}
+  NOTE: Steps are 0-indexed (step_0 is the first step, step_1 is the second, etc.)
 
 - To reference a specific field: use {{{{step_N.field_name}}}}
-  Example: {{"event_id": {{{{step_1.id}}}}}}
+  Example: {{"event_id": {{{{step_0.id}}}}}}
 
 - To access nested fields: use {{{{step_N.field.nested_field}}}}
-  Example: {{"title": {{{{step_1.event.title}}}}}}
+  Example: {{"title": {{{{step_0.event.title}}}}}}
 
 - To access array elements: use {{{{step_N.array_field.INDEX}}}} (dot notation)
   Example: {{"event_id": {{{{step_0.events.0.id}}}}}}
-  Example: {{"recipient": {{{{step_0.events.0.attendees.0}}}}}}
+  Example: {{"recipient": {{{{step_1.events.0.attendees.0}}}}}}
   NOTE: Array indices use dot notation (events.0.id) NOT bracket notation (events[0].id)
 
 - Dependencies are specified as integers (0 for first step, 1 for second step, etc.)
-  Example: "dependencies": [0] means this step depends on the first step
+  Example: "dependencies": [0] means this step depends on step_0 (the first step)
+  Example: "dependencies": [0, 1] means this step depends on step_0 and step_1
 
 CRITICAL RULES FOR EMAIL ADDRESSES AND CONTACT INFORMATION:
 - NEVER fabricate or guess email addresses (e.g., DO NOT create "name@example.com" or "username@domain.com")
@@ -207,8 +209,8 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
             dependencies = {}
 
             for i, step_data in enumerate(steps_data):
-                step_id = f"step_{i+1}"
-                print(f"[Planner] Processing step {i+1}/{len(steps_data)}: {step_data.get('description', 'N/A')}")
+                step_id = f"step_{i}"
+                print(f"[Planner] Processing step {i}/{len(steps_data)-1}: {step_data.get('description', 'N/A')}")
 
                 # Normalize dependencies - handle various input types
                 raw_deps = step_data.get("dependencies", [])
