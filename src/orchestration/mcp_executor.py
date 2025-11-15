@@ -1,5 +1,5 @@
 """
-MCP Executor - Connects to and executes MCP tools via HTTP (Streamable-HTTP)
+MCP Executor - Connects to and executes MCP tools via Streamable-HTTP
 """
 
 import asyncio
@@ -16,7 +16,7 @@ from .types import Step, StepResult, ToolDefinition
 
 
 class MCPExecutor:
-    """MCPExecutor - Executes MCP tools via HTTP (Streamable-HTTP) using FastMCP"""
+    """MCPExecutor - Executes MCP tools via Streamable-HTTP using FastMCP 2.0"""
 
     def __init__(self):
         self._execution_count = 0
@@ -26,27 +26,27 @@ class MCPExecutor:
 
     async def initialize_servers(self):
         """Initialize connections to all MCP servers"""
-        # Define MCP server configurations (HTTP-based)
+        # Define MCP server configurations (Streamable-HTTP based)
         server_configs = {
             "mail-agent": {
                 "url": "http://localhost:8001/mcp",
-                "transport": "http"
+                "transport": "streamable-http"
             },
             "calendar-agent": {
                 "url": "http://localhost:8002/mcp",
-                "transport": "http"
+                "transport": "streamable-http"
             },
             "jira-agent": {
                 "url": "http://localhost:8004/mcp",
-                "transport": "http"
+                "transport": "streamable-http"
             },
             "calculator-agent": {
                 "url": "http://localhost:8003/mcp",
-                "transport": "http"
+                "transport": "streamable-http"
             },
             "rpa-agent": {
                 "url": "http://localhost:8005/mcp",
-                "transport": "http"
+                "transport": "streamable-http"
             }
         }
 
@@ -217,7 +217,7 @@ class MCPExecutor:
 
     async def _execute_mcp_tool(self, server_name: str, tool_name: str, tool_input: dict[str, Any]) -> Any:
         """
-        Execute MCP tool via HTTP (Streamable-HTTP) connection using FastMCP
+        Execute MCP tool via Streamable-HTTP connection using FastMCP 2.0
         """
         if server_name not in self._servers:
             raise ValueError(f"Unknown server: {server_name}")

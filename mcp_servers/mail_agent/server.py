@@ -175,5 +175,5 @@ def search_emails(query: str, field: str = "all") -> dict:
 
 
 if __name__ == "__main__":
-    # Run as HTTP server on port 8001
-    mcp.run(transport="http", host="0.0.0.0", port=8001)
+    # Run as streamable-HTTP server on port 8001
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=8001)

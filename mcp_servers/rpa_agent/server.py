@@ -223,5 +223,5 @@ def collect_attendance(
 
 
 if __name__ == "__main__":
-    # Run as HTTP server on port 8005
-    mcp.run(transport="http", host="0.0.0.0", port=8005)
+    # Run as streamable-HTTP server on port 8005
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=8005)
