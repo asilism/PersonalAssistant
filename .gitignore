@@ -51,6 +51,7 @@ node_modules/
 
 # Logs
 *.log
+logs/
 
 # Testing
 .pytest_cache/
