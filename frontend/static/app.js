@@ -431,6 +431,9 @@ function addExecutionLogEntry(eventData) {
         } else if (eventData.event_type === 'step_started') {
             html += `<div class="execution-log-details">`;
             html += `<div class="execution-log-detail"><strong>Tool:</strong> ${eventData.data.tool_name}</div>`;
+            if (eventData.data.tool_input && Object.keys(eventData.data.tool_input).length > 0) {
+                html += `<div class="execution-log-detail"><strong>Arguments:</strong> <pre style="margin: 5px 0; white-space: pre-wrap; font-size: 11px;">${JSON.stringify(eventData.data.tool_input, null, 2)}</pre></div>`;
+            }
             html += `</div>`;
         } else if (eventData.event_type === 'step_completed') {
             html += `<div class="execution-log-details">`;

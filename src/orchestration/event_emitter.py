@@ -106,7 +106,8 @@ class ExecutionEventEmitter:
         plan_id: str,
         step_id: str,
         step_description: str,
-        tool_name: str
+        tool_name: str,
+        tool_input: Optional[dict[str, Any]] = None
     ):
         """Emit step started event"""
         event = ExecutionEvent(
@@ -117,7 +118,8 @@ class ExecutionEventEmitter:
                 "plan_id": plan_id,
                 "step_id": step_id,
                 "step_description": step_description,
-                "tool_name": tool_name
+                "tool_name": tool_name,
+                "tool_input": tool_input or {}
             }
         )
         await self.emit(event)
