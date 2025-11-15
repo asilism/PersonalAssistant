@@ -64,6 +64,7 @@ LLM_MODEL=claude-3-5-sonnet-20241022
 
 ### 3. Start MCP Servers (Optional but Recommended)
 
+#### Linux/Mac:
 ```bash
 # Start all MCP servers
 ./start_mcp_servers.sh
@@ -73,6 +74,24 @@ LLM_MODEL=claude-3-5-sonnet-20241022
 
 # Stop all servers
 ./stop_mcp_servers.sh
+```
+
+#### Windows:
+```cmd
+# Start all MCP servers
+start_mcp_servers.bat
+# or
+python start_mcp_servers.py
+
+# Check server status
+status_mcp_servers.bat
+# or
+python status_mcp_servers.py
+
+# Stop all servers
+stop_mcp_servers.bat
+# or
+python stop_mcp_servers.py
 ```
 
 See [README_MCP_SERVERS.md](README_MCP_SERVERS.md) for detailed MCP server management.
@@ -159,9 +178,15 @@ PersonalAssistant/
 │   └── pids/                 # MCP server PID files
 ├── start.sh                  # Linux/Mac startup script
 ├── start.bat                 # Windows startup script
-├── start_mcp_servers.sh      # Start all MCP servers
-├── stop_mcp_servers.sh       # Stop all MCP servers
-├── status_mcp_servers.sh     # Check MCP server status
+├── start_mcp_servers.py      # Start all MCP servers (Python)
+├── stop_mcp_servers.py       # Stop all MCP servers (Python)
+├── status_mcp_servers.py     # Check MCP server status (Python)
+├── start_mcp_servers.sh      # Start all MCP servers (Linux/Mac)
+├── stop_mcp_servers.sh       # Stop all MCP servers (Linux/Mac)
+├── status_mcp_servers.sh     # Check MCP server status (Linux/Mac)
+├── start_mcp_servers.bat     # Start all MCP servers (Windows)
+├── stop_mcp_servers.bat      # Stop all MCP servers (Windows)
+├── status_mcp_servers.bat    # Check MCP server status (Windows)
 ├── README_MCP_SERVERS.md     # MCP server management guide
 ├── README_DATABASE.md        # Database management guide
 ├── requirements.txt
@@ -446,18 +471,35 @@ mypy src/
 
 ### Managing MCP Servers
 
+#### Using Python (Recommended - Cross-platform):
 ```bash
 # Start all MCP servers
-./start_mcp_servers.sh
+python start_mcp_servers.py
 
 # Check status
-./status_mcp_servers.sh
+python status_mcp_servers.py
 
 # Stop all servers
-./stop_mcp_servers.sh
+python stop_mcp_servers.py
 
 # View logs
+# Linux/Mac:
 tail -f logs/mcp/calculator_agent.log
+# Windows:
+type logs\mcp\calculator_agent.log
+```
+
+#### Using Shell Scripts:
+```bash
+# Linux/Mac:
+./start_mcp_servers.sh
+./status_mcp_servers.sh
+./stop_mcp_servers.sh
+
+# Windows:
+start_mcp_servers.bat
+status_mcp_servers.bat
+stop_mcp_servers.bat
 ```
 
 See [README_MCP_SERVERS.md](README_MCP_SERVERS.md) for more details.
