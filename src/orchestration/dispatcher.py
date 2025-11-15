@@ -73,7 +73,8 @@ class TaskDispatcher:
                     plan_id=plan.plan_id,
                     step_id=step.step_id,
                     step_description=step.description,
-                    tool_name=step.tool_name
+                    tool_name=step.tool_name,
+                    tool_input=step.input
                 )
 
                 # Resolve placeholders in step input
