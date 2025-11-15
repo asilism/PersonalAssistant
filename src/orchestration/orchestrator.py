@@ -219,7 +219,11 @@ class Orchestrator:
         payload = state.get("final_payload", {})
         print(f"[Orchestrator] Final payload: {payload}")
 
-        state["type"] = StateType.FINAL.value
+        # Only set to FINAL if not already a terminal state (e.g., HUMAN_IN_THE_LOOP)
+        current_type = state.get("type")
+        if current_type != StateType.HUMAN_IN_THE_LOOP.value:
+            state["type"] = StateType.FINAL.value
+
         return state
 
     async def _error_node(self, state: OrchestrationState) -> OrchestrationState:
@@ -392,9 +396,11 @@ class Orchestrator:
             elif final_state.get("type") == StateType.HUMAN_IN_THE_LOOP.value:
                 # Human input required
                 payload = final_state.get("final_payload", {})
+                # Support both "message" and "question" keys for backward compatibility
+                message = payload.get("message") or payload.get("question", "추가 정보가 필요합니다.")
                 return {
                     "success": False,
-                    "message": payload.get("message", "추가 정보가 필요합니다."),
+                    "message": message,
                     "requires_input": True,
                     "missing_param": payload.get("missing_param"),
                     "failed_step_id": payload.get("failed_step_id"),
