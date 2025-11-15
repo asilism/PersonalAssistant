@@ -214,11 +214,18 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
             print(f"[Planner] Parsing JSON response...")
             print(f"[Planner] Raw JSON content: {content[:500]}...")  # Log first 500 chars
 
-            # Fix unquoted placeholders in JSON before parsing
-            content = self._fix_placeholders_in_json(content)
-            print(f"[Planner] After placeholder fix: {content[:500]}...")  # Log first 500 chars after fix
-
-            response_data = json.loads(content)
+            # Try to parse JSON first, only apply fix if parsing fails
+            try:
+                response_data = json.loads(content)
+                print(f"[Planner] JSON parsing successful")
+            except json.JSONDecodeError as e:
+                print(f"[Planner] Initial JSON parsing failed: {str(e)}")
+                print(f"[Planner] Applying placeholder fix and retrying...")
+                # Fix unquoted placeholders in JSON before parsing
+                content = self._fix_placeholders_in_json(content)
+                print(f"[Planner] After placeholder fix: {content[:500]}...")
+                response_data = json.loads(content)
+                print(f"[Planner] JSON parsing successful after fix")
 
             # Check if this is a tool list request
             if isinstance(response_data, dict) and response_data.get("type") == "tool_list_request":
@@ -561,11 +568,17 @@ Return ONLY the JSON, no other text.
             print(f"[Planner] Parsing decision JSON...")
             print(f"[Planner] Raw decision content: {content[:500]}...")
 
-            # Fix unquoted placeholders in JSON before parsing
-            content = self._fix_placeholders_in_json(content)
-            print(f"[Planner] After placeholder fix: {content[:500]}...")
-
-            decision_data = json.loads(content)
+            # Try to parse JSON first, only apply fix if parsing fails
+            try:
+                decision_data = json.loads(content)
+                print(f"[Planner] Decision JSON parsing successful")
+            except json.JSONDecodeError as e:
+                print(f"[Planner] Initial decision JSON parsing failed: {str(e)}")
+                print(f"[Planner] Applying placeholder fix and retrying...")
+                content = self._fix_placeholders_in_json(content)
+                print(f"[Planner] After placeholder fix: {content[:500]}...")
+                decision_data = json.loads(content)
+                print(f"[Planner] Decision JSON parsing successful after fix")
             decision_type = decision_data["type"]
             print(f"[Planner] Decision type: {decision_type}")
 
@@ -962,10 +975,16 @@ Return ONLY the JSON, no other text."""
             if json_match:
                 content = json_match.group(1)
 
-            # Fix unquoted placeholders in JSON before parsing
-            content = self._fix_placeholders_in_json(content)
-
-            data = json.loads(content)
+            # Try to parse JSON first, only apply fix if parsing fails
+            try:
+                data = json.loads(content)
+                print(f"[Planner] Placeholder resolution JSON parsing successful")
+            except json.JSONDecodeError as e:
+                print(f"[Planner] Initial placeholder resolution JSON parsing failed: {str(e)}")
+                print(f"[Planner] Applying placeholder fix and retrying...")
+                content = self._fix_placeholders_in_json(content)
+                data = json.loads(content)
+                print(f"[Planner] Placeholder resolution JSON parsing successful after fix")
 
             resolved_input = data.get("resolved_input")
             reasoning = data.get("reasoning", "")
