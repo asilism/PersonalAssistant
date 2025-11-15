@@ -26,12 +26,18 @@ from .llm_client import create_llm_client, LLMClient
 from .validators import extract_missing_params
 from .event_emitter import get_event_emitter
 
+# Forward declaration to avoid circular import
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .tracker import TaskTracker
+
 
 class Planner:
     """Planner - Uses LLM to create execution plans"""
 
-    def __init__(self, settings: OrchestrationSettings):
+    def __init__(self, settings: OrchestrationSettings, tracker: Optional['TaskTracker'] = None):
         self.settings = settings
+        self.tracker = tracker
         self.event_emitter = get_event_emitter()
 
         # Determine LLM provider
@@ -70,6 +76,9 @@ class Planner:
         tools_list_detailed = self._format_tools_detailed()
         context_str = self._format_context(state.context)
 
+        # Get recent execution results from previous plans (loaded by Orchestrator in state.context)
+        recent_results_str = await self._format_recent_execution_results(state.context)
+
         # Get current date and time
         current_datetime = datetime.now()
         today_str = current_datetime.strftime("%Y-%m-%d (%A)")
@@ -89,6 +98,8 @@ User request: {state.request_text}
 
 Context:
 {context_str}
+
+{recent_results_str if recent_results_str else ""}
 
 CRITICAL: You MUST use ONLY the exact tool names listed above. DO NOT create variations or guess tool names (e.g., if the tool is "update_event", do NOT use "update_calendar_event").
 
@@ -153,6 +164,23 @@ CRITICAL RULES FOR EMAIL ADDRESSES AND CONTACT INFORMATION:
   * Are available in the provided context
   * Are retrieved from a contact lookup tool (if available)
 - If you don't have a valid email address, use a template variable placeholder like "{{"recipient_email"}}" instead
+
+CRITICAL RULES FOR REUSING PREVIOUS EXECUTION RESULTS:
+- ALWAYS check the "Recent execution results" section above for data from previous requests
+- If the current user request requires data that was ALREADY retrieved in a recent execution:
+  * DO NOT create a new step to fetch the same data again
+  * Instead, assume the data is available from the recent execution
+  * Directly use the data in your plan (you can reference it in step descriptions)
+- Examples:
+  * Previous request: "Search for Jira issues with status Done"
+  * Current request: "Send those issues by email"
+  * GOOD: Skip the search step, directly create email step with the issue data
+  * BAD: Search for issues again, then send email
+- Only re-fetch data if:
+  * The user explicitly asks for updated/fresh data
+  * The previous data is clearly outdated or irrelevant
+  * The search criteria have changed
+- When reusing data, mention in the step description that you're using data from the previous request
 
 Return your plan as a JSON array of steps. Each step should have this format:
 {{
@@ -1018,11 +1046,49 @@ Return ONLY the JSON, no other text."""
                 lines.append(f"  - {msg}")
 
         if context.additional_context:
-            lines.append("Additional context:")
-            for key, value in context.additional_context.items():
-                lines.append(f"  - {key}: {value}")
+            # Handle recent_results separately for better formatting
+            recent_results = context.additional_context.get("recent_results")
+            other_context = {k: v for k, v in context.additional_context.items()
+                           if k not in ["recent_results", "recent_plan_id", "recent_request"]}
+
+            if other_context:
+                lines.append("Additional context:")
+                for key, value in other_context.items():
+                    lines.append(f"  - {key}: {value}")
 
         return "\n".join(lines) if lines else "No additional context"
+
+    async def _format_recent_execution_results(self, context: Optional[ContextBundle]) -> str:
+        """Format recent execution results from previous plans"""
+        if not context or not context.additional_context:
+            return ""
+
+        try:
+            # Check if recent results are already in the context (loaded by Orchestrator)
+            recent_results = context.additional_context.get("recent_results")
+            recent_request = context.additional_context.get("recent_request")
+
+            if not recent_results:
+                return ""
+
+            lines = [
+                "Recent execution results (from previous request):",
+                f"  Previous request: {recent_request}",
+                "  Available data from previous execution:"
+            ]
+
+            for result in recent_results:
+                if result.get("status") == "success":
+                    # Format the output for readability
+                    output_preview = str(result.get("output", ""))[:300]  # First 300 chars
+                    if len(str(result.get("output", ""))) > 300:
+                        output_preview += "..."
+                    lines.append(f"    - {result.get('description', 'Unknown')}: {output_preview}")
+
+            return "\n".join(lines)
+        except Exception as e:
+            print(f"[Planner] Error formatting recent execution results: {e}")
+            return ""
 
     def _format_results(self, results: AggregatedGroupResults, plan: Optional[Plan]) -> str:
         """Format results for prompt"""
