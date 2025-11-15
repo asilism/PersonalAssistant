@@ -829,8 +829,11 @@ Return ONLY valid JSON in this format:
 Return ONLY the JSON, no other text."""
 
         try:
-            response = await self.llm.ainvoke(prompt)
-            content = response.content.strip()
+            content = await self.llm_client.generate(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=2048
+            )
+            content = content.strip()
 
             # Extract JSON from markdown code blocks if present
             json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
