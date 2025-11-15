@@ -182,6 +182,18 @@ CRITICAL RULES FOR REUSING PREVIOUS EXECUTION RESULTS:
   * The search criteria have changed
 - When reusing data, mention in the step description that you're using data from the previous request
 
+CRITICAL - HANDLING POTENTIALLY EMPTY RESULTS:
+- When creating a plan, consider that some steps may return empty or null results
+- DO NOT create dependent steps that blindly assume previous steps will return data
+- If a step's result might be empty (e.g., searching for items that may not exist):
+  * Design your plan to handle the empty case gracefully
+  * Avoid using potentially empty values as required inputs to subsequent steps
+  * Don't pass empty strings "" or null values to search/query parameters
+- Examples:
+  * BAD: Step 1: List meetings → Step 2: Search Jira with meeting.summary (what if no meetings?)
+  * GOOD: Step 1: List meetings → (Let decision phase check if meetings exist before creating Jira search)
+  * The decision phase will handle empty results and decide whether to skip dependent steps
+
 Return your plan as a JSON array of steps. Each step should have this format:
 {{
   "tool_name": "tool_name",
@@ -503,6 +515,20 @@ ANALYZING STEP RESULTS:
   * Use the actual IDs, titles, or other fields from the results
 - You do NOT need to rely only on placeholder syntax like {{{{step_0.events.0.id}}}}
 - Instead, you can examine the step output and create intelligent next steps
+
+CRITICAL - HANDLING EMPTY OR NULL RESULTS:
+- ALWAYS check if previous step results are empty, null, or contain no data
+- If a step returned an empty list [], null, or no items:
+  * DO NOT create follow-up steps that depend on that data
+  * DO NOT use empty values as input to subsequent steps (e.g., don't pass "" to search queries)
+  * Instead, either:
+    a) Skip the dependent steps and mark task as complete with appropriate message
+    b) Return "needsHuman" if user input is needed to proceed
+    c) Adjust the plan to handle the empty case gracefully
+- Examples:
+  * If list_events returns no events, DON'T create a search_issues step with empty meeting summary
+  * If search_issues returns no issues, DON'T try to process non-existent issue data
+  * If a required item is not found, DON'T proceed with placeholder or empty values
 
 DECISION OPTIONS:
 1. "final" - Task is complete, return final response to user
