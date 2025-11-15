@@ -362,42 +362,61 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
             state.retry_counts[step_id] = state.retry_counts.get(step_id, 0) + 1
             print(f"[Planner] Incremented retry count for {step_id}: {state.retry_counts[step_id]}")
 
+        # Check if there are pending steps (not yet executed)
+        completed_step_ids = {step.step_id for step in results.completed_steps}
+        failed_step_ids = {step.step_id for step in results.failed_steps}
+        pending_steps = [
+            step for step in state.plan.steps
+            if step.step_id not in completed_step_ids and step.step_id not in failed_step_ids
+        ]
+
+        # If there are pending steps, continue execution without asking LLM
+        if pending_steps:
+            print(f"[Planner] Found {len(pending_steps)} pending steps that need execution:")
+            for step in pending_steps:
+                print(f"[Planner]   - {step.step_id}: {step.description}")
+            print(f"[Planner] Continuing to DISPATCH to execute pending steps")
+
+            # Emit decision made event
+            await self.event_emitter.emit_decision_made(
+                trace_id=state.trace.trace_id,
+                decision_type="continue",
+                reason=f"Pending steps exist ({len(pending_steps)} steps remaining)",
+                next_action="dispatch"
+            )
+
+            # Transition to DISPATCH
+            state.type = StateType.DISPATCH
+            return state
+
+        # All steps executed - now ask LLM for final decision
+        print(f"[Planner] No pending steps. All steps have been executed.")
+        print(f"[Planner] Asking LLM to make final decision...")
+
         # Build prompt for decision
         results_summary = self._format_results(results, state.plan)
         context_str = self._format_context(state.context)
 
         prompt = f"""You are an AI assistant making STEP-BY-STEP decisions about task execution.
 
-IMPORTANT: You analyze the results of each step ONE AT A TIME and decide the next action.
-This means you can:
-1. Examine the output of the most recent step
-2. Use that output to dynamically determine what to do next
-3. Create new steps based on the actual data returned (not just placeholders)
-4. Filter, search, or process results intelligently before proceeding
+IMPORTANT: All planned steps have been executed. Now you need to decide if the task is complete or if additional steps are needed.
 
 Original request: {state.request_text}
 
 Context:
 {context_str}
 
-Execution results so far:
+Execution results (all steps have been executed):
 {results_summary}
 
 ANALYZING STEP RESULTS:
 - Look at the actual data returned by each completed step
-- If a step returned a list of items (e.g., calendar events), you can now:
+- If a step returned a list of items (e.g., calendar events), you can:
   * Check if the desired item exists in the list
   * Create a new step to process specific items based on their properties
   * Use the actual IDs, titles, or other fields from the results
 - You do NOT need to rely only on placeholder syntax like {{{{step_0.events.0.id}}}}
 - Instead, you can examine the step output and create intelligent next steps
-
-IMPORTANT - PENDING STEPS:
-- The execution results above show "Pending steps (already planned, not yet executed)"
-- These steps are ALREADY in the plan and will be executed automatically
-- DO NOT create duplicate steps that are already in the pending list
-- If the pending steps are sufficient to complete the task, choose "final" or wait for them to execute
-- Only choose "nextSteps" if you need to add NEW steps that are NOT in the pending list
 
 DECISION OPTIONS:
 1. "final" - Task is complete, return final response to user
