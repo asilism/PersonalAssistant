@@ -200,6 +200,12 @@ class MCPExecutor:
         if tool_name == "send_email":
             to_field = tool_input.get("to", "")
 
+            # Auto-convert comma-separated string to list (defensive fallback)
+            if isinstance(to_field, str) and "," in to_field:
+                to_field = [email.strip() for email in to_field.split(",")]
+                tool_input["to"] = to_field
+                print(f"[MCPExecutor] Auto-converted comma-separated emails to list: {to_field}")
+
             # Handle both string and list types for 'to' field
             if isinstance(to_field, list):
                 # Validate each email in the list
