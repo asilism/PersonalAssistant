@@ -15,14 +15,18 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel
 import uvicorn
 
 from orchestration.orchestrator import Orchestrator
 from orchestration.settings_manager import SettingsManager
+
+from orchestration.event_emitter import get_event_emitter
+
 from orchestration.mcp_executor import MCPExecutor
 from orchestration.types import ToolDefinition
+
 
 # Configure logging
 logging.basicConfig(
@@ -178,6 +182,71 @@ async def orchestrate(request: OrchestrationRequest):
         )
 
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/orchestrate/stream")
+async def orchestrate_stream(request: OrchestrationRequest):
+    """Execute an orchestration request with streaming logs via SSE"""
+    try:
+        orchestrator = get_orchestrator(request.user_id, request.tenant)
+        session_id = request.session_id or str(uuid.uuid4())
+        trace_id = str(uuid.uuid4())
+
+        event_emitter = get_event_emitter()
+
+        async def event_generator():
+            """Generate SSE events"""
+            try:
+                # Start streaming events for this trace_id
+                event_stream = event_emitter.stream_events(trace_id)
+
+                # Run orchestrator in background task
+                async def run_orchestrator():
+                    try:
+                        await orchestrator.run(
+                            session_id=session_id,
+                            request_text=request.request_text,
+                            trace_id=trace_id
+                        )
+                    except Exception as e:
+                        logger.error(f"Error in orchestrator.run: {e}")
+                        await event_emitter.emit_execution_error(
+                            trace_id=trace_id,
+                            error=str(e),
+                            error_type=type(e).__name__
+                        )
+
+                # Start the orchestrator task
+                orchestrator_task = asyncio.create_task(run_orchestrator())
+
+                # Stream events
+                async for event_data in event_stream:
+                    yield event_data
+
+                # Wait for orchestrator to complete
+                await orchestrator_task
+
+            except Exception as e:
+                logger.error(f"Error in event_generator: {e}")
+                error_data = {
+                    "event_type": "stream_error",
+                    "error": str(e)
+                }
+                yield f"data: {json.dumps(error_data)}\n\n"
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"  # Disable nginx buffering
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error in orchestrate_stream: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

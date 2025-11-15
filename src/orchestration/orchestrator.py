@@ -19,6 +19,7 @@ from .tracker import TaskTracker
 from .planner import Planner
 from .dispatcher import TaskDispatcher
 from .listener import ResultListener
+from .event_emitter import get_event_emitter
 
 
 class OrchestrationState(TypedDict):
@@ -55,6 +56,7 @@ class Orchestrator:
         self.config_loader = ConfigLoader()
         self.tracker = TaskTracker()
         self.listener = ResultListener(self.tracker)
+        self.event_emitter = get_event_emitter()
 
         # Settings and planner will be initialized on first run
         self.settings = None
@@ -149,6 +151,15 @@ class Orchestrator:
         print(f"[Orchestrator] Session: {state.get('session_id')}")
         print(f"[Orchestrator] Request: {state.get('request_text', '')[:100]}...")
 
+        trace_id = state.get('trace_id', '')
+
+        # Emit node entered event
+        await self.event_emitter.emit_node_entered(
+            trace_id=trace_id,
+            node_name="planning",
+            state_type=state.get('type', '')
+        )
+
         try:
             # Convert to Pydantic State
             pydantic_state = self._to_pydantic_state(state)
@@ -159,12 +170,27 @@ class Orchestrator:
 
             print(f"[Orchestrator] Planning completed, next state: {result_state.type}")
 
+            # Emit node exited event
+            await self.event_emitter.emit_node_exited(
+                trace_id=trace_id,
+                node_name="planning",
+                next_state_type=result_state.type.value
+            )
+
             # Convert back
             return self._from_pydantic_state(result_state)
         except Exception as e:
             print(f"[Orchestrator] ERROR in planning node: {str(e)}")
             import traceback
             print(f"[Orchestrator] Traceback:\n{traceback.format_exc()}")
+
+            # Emit error event
+            await self.event_emitter.emit_execution_error(
+                trace_id=trace_id,
+                error=str(e),
+                error_type="PlanningNodeError"
+            )
+
             state["type"] = StateType.ERROR.value
             state["error"] = f"Planning node failed: {str(e)}"
             return state
@@ -175,6 +201,15 @@ class Orchestrator:
         plan_id = state.get("plan", {}).get("plan_id") if state.get("plan") else "N/A"
         print(f"[Orchestrator] Plan ID: {plan_id}")
 
+        trace_id = state.get('trace_id', '')
+
+        # Emit node entered event
+        await self.event_emitter.emit_node_entered(
+            trace_id=trace_id,
+            node_name="dispatch",
+            state_type=state.get('type', '')
+        )
+
         try:
             # Convert to Pydantic State
             pydantic_state = self._to_pydantic_state(state)
@@ -184,12 +219,27 @@ class Orchestrator:
 
             print(f"[Orchestrator] Dispatch completed, next state: {result_state.type}")
 
+            # Emit node exited event
+            await self.event_emitter.emit_node_exited(
+                trace_id=trace_id,
+                node_name="dispatch",
+                next_state_type=result_state.type.value
+            )
+
             # Convert back
             return self._from_pydantic_state(result_state)
         except Exception as e:
             print(f"[Orchestrator] ERROR in dispatch node: {str(e)}")
             import traceback
             print(f"[Orchestrator] Traceback:\n{traceback.format_exc()}")
+
+            # Emit error event
+            await self.event_emitter.emit_execution_error(
+                trace_id=trace_id,
+                error=str(e),
+                error_type="DispatchNodeError"
+            )
+
             state["type"] = StateType.ERROR.value
             state["error"] = f"Dispatch node failed: {str(e)}"
             return state
@@ -202,6 +252,15 @@ class Orchestrator:
             print(f"[Orchestrator] Completed steps: {results.get('completed_steps', [])}")
             print(f"[Orchestrator] Failed steps: {results.get('failed_steps', [])}")
 
+        trace_id = state.get('trace_id', '')
+
+        # Emit node entered event
+        await self.event_emitter.emit_node_entered(
+            trace_id=trace_id,
+            node_name="decide",
+            state_type=state.get('type', '')
+        )
+
         try:
             # Convert to Pydantic State
             pydantic_state = self._to_pydantic_state(state)
@@ -212,12 +271,27 @@ class Orchestrator:
 
             print(f"[Orchestrator] Decision completed, next state: {result_state.type}")
 
+            # Emit node exited event
+            await self.event_emitter.emit_node_exited(
+                trace_id=trace_id,
+                node_name="decide",
+                next_state_type=result_state.type.value
+            )
+
             # Convert back
             return self._from_pydantic_state(result_state)
         except Exception as e:
             print(f"[Orchestrator] ERROR in decide node: {str(e)}")
             import traceback
             print(f"[Orchestrator] Traceback:\n{traceback.format_exc()}")
+
+            # Emit error event
+            await self.event_emitter.emit_execution_error(
+                trace_id=trace_id,
+                error=str(e),
+                error_type="DecideNodeError"
+            )
+
             state["type"] = StateType.ERROR.value
             state["error"] = f"Decide node failed: {str(e)}"
             return state
@@ -403,6 +477,15 @@ class Orchestrator:
         # Run the graph
         start_time = datetime.now()
 
+        # Emit execution started event
+        await self.event_emitter.emit_execution_started(
+            trace_id=trace_id,
+            session_id=session_id,
+            request_text=request_text,
+            user_id=self.user_id,
+            tenant=self.tenant
+        )
+
         try:
             # Invoke the graph
             final_state = await self.graph.ainvoke(initial_state)
@@ -421,6 +504,14 @@ class Orchestrator:
                     user_id=self.user_id,
                     tenant=self.tenant,
                     content=response_message
+                )
+
+                # Emit execution completed event
+                await self.event_emitter.emit_execution_completed(
+                    trace_id=trace_id,
+                    success=True,
+                    message=response_message,
+                    execution_time=execution_time
                 )
 
                 return {
@@ -445,6 +536,14 @@ class Orchestrator:
                     content=message
                 )
 
+                # Emit execution completed event (requires human input)
+                await self.event_emitter.emit_execution_completed(
+                    trace_id=trace_id,
+                    success=False,
+                    message=f"Requires human input: {message}",
+                    execution_time=execution_time
+                )
+
                 return {
                     "success": False,
                     "message": message,
@@ -463,6 +562,13 @@ class Orchestrator:
                     user_id=self.user_id,
                     tenant=self.tenant,
                     content=f"Error: {error_message}"
+                )
+
+                # Emit execution error event
+                await self.event_emitter.emit_execution_error(
+                    trace_id=trace_id,
+                    error=error_message,
+                    error_type="ExecutionError"
                 )
 
                 return {

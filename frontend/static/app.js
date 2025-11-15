@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Execute orchestration request
+// Execute orchestration request with SSE streaming
 async function executeRequest() {
     const requestText = document.getElementById('requestText').value;
     const userId = document.getElementById('userId').value;
@@ -192,8 +192,12 @@ async function executeRequest() {
     // Add loading bubble
     const loadingId = addMessageBubble('assistant', '', true);
 
+    // Clear previous logs
+    clearExecutionLogs();
+
     try {
-        const response = await fetch('/api/orchestrate', {
+        // Use fetch to initiate SSE stream
+        const response = await fetch('/api/orchestrate/stream', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -206,30 +210,74 @@ async function executeRequest() {
             })
         });
 
-        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Process SSE stream
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let finalMessage = '';
+        let executionCompleted = false;
+
+        while (true) {
+            const { done, value } = await reader.read();
+
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop(); // Keep incomplete line in buffer
+
+            for (const line of lines) {
+                if (!line.trim() || line.startsWith(':')) continue;
+
+                const dataMatch = line.match(/^data: (.+)$/);
+                if (!dataMatch) continue;
+
+                try {
+                    const eventData = JSON.parse(dataMatch[1]);
+
+                    // Check for done signal
+                    if (eventData.done) {
+                        executionCompleted = true;
+                        break;
+                    }
+
+                    // Add execution log entry
+                    addExecutionLogEntry(eventData);
+
+                    // Store final message if execution completed
+                    if (eventData.event_type === 'execution_completed') {
+                        finalMessage = eventData.message;
+                    }
+                } catch (e) {
+                    console.error('Error parsing SSE data:', e);
+                }
+            }
+
+            if (executionCompleted) break;
+        }
 
         // Remove loading bubble
         removeMessageBubble(loadingId);
 
-        if (response.ok) {
-            // Add assistant response bubble
-            addMessageBubble('assistant', data.message);
-
-            // Add results if available
-            if (data.results) {
-                addMessageBubble('assistant', formatResults(data.results));
-            }
-
-            // Add log information
-            addLogEntry(data);
+        // Add assistant response bubble with final message
+        if (finalMessage) {
+            addMessageBubble('assistant', finalMessage);
         } else {
-            addMessageBubble('error', data.detail || 'An error occurred');
-            addLogEntry({ error: data.detail, success: false });
+            addMessageBubble('assistant', 'Execution completed');
         }
+
     } catch (error) {
         removeMessageBubble(loadingId);
         addMessageBubble('error', `Network error: ${error.message}`);
-        addLogEntry({ error: error.message, success: false });
+        addExecutionLogEntry({
+            event_type: 'execution_error',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
     } finally {
         submitBtn.disabled = false;
     }
@@ -333,6 +381,104 @@ function addLogEntry(data) {
 
     logEntry.innerHTML = html;
     logsContent.appendChild(logEntry);
+}
+
+// Clear execution logs
+function clearExecutionLogs() {
+    const logsContent = document.getElementById('logsContent');
+    logsContent.innerHTML = '<div class="execution-logs-header">Execution Logs (Real-time)</div>';
+}
+
+// Add execution log entry (real-time SSE logs)
+function addExecutionLogEntry(eventData) {
+    const logsContent = document.getElementById('logsContent');
+
+    // Create log entry element
+    const logEntry = document.createElement('div');
+    logEntry.className = 'execution-log-entry';
+
+    // Get event type icon and color
+    const eventInfo = getEventTypeInfo(eventData.event_type);
+
+    // Format timestamp
+    const timestamp = new Date(eventData.timestamp).toLocaleTimeString();
+
+    // Build log entry HTML
+    let html = `
+        <div class="execution-log-header" style="color: ${eventInfo.color};">
+            <span class="execution-log-icon">${eventInfo.icon}</span>
+            <span class="execution-log-type">${eventInfo.label}</span>
+            <span class="execution-log-time">${timestamp}</span>
+        </div>
+    `;
+
+    if (eventData.message) {
+        html += `<div class="execution-log-message">${escapeHtml(eventData.message)}</div>`;
+    }
+
+    // Add specific data based on event type
+    if (eventData.data) {
+        if (eventData.event_type === 'plan_created' && eventData.data.steps) {
+            html += `<div class="execution-log-details">`;
+            html += `<div class="execution-log-detail"><strong>Plan ID:</strong> ${eventData.data.plan_id}</div>`;
+            html += `<div class="execution-log-detail"><strong>Steps:</strong></div>`;
+            html += `<ul style="margin: 5px 0; padding-left: 20px;">`;
+            eventData.data.steps.forEach((step, index) => {
+                html += `<li>${step.description} (${step.tool_name})</li>`;
+            });
+            html += `</ul>`;
+            html += `</div>`;
+        } else if (eventData.event_type === 'step_started') {
+            html += `<div class="execution-log-details">`;
+            html += `<div class="execution-log-detail"><strong>Tool:</strong> ${eventData.data.tool_name}</div>`;
+            html += `</div>`;
+        } else if (eventData.event_type === 'step_completed') {
+            html += `<div class="execution-log-details">`;
+            html += `<div class="execution-log-detail"><strong>Duration:</strong> ${eventData.data.duration.toFixed(2)}ms</div>`;
+            if (eventData.data.output) {
+                html += `<div class="execution-log-detail"><strong>Output:</strong> <pre style="margin: 5px 0; white-space: pre-wrap; font-size: 11px;">${JSON.stringify(eventData.data.output, null, 2).substring(0, 200)}${JSON.stringify(eventData.data.output, null, 2).length > 200 ? '...' : ''}</pre></div>`;
+            }
+            html += `</div>`;
+        } else if (eventData.event_type === 'step_failed') {
+            html += `<div class="execution-log-details">`;
+            html += `<div class="execution-log-detail" style="color: #f44336;"><strong>Error:</strong> ${escapeHtml(eventData.data.error)}</div>`;
+            html += `<div class="execution-log-detail"><strong>Duration:</strong> ${eventData.data.duration.toFixed(2)}ms</div>`;
+            html += `</div>`;
+        } else if (eventData.event_type === 'decision_made') {
+            html += `<div class="execution-log-details">`;
+            html += `<div class="execution-log-detail"><strong>Decision:</strong> ${eventData.data.decision_type}</div>`;
+            html += `<div class="execution-log-detail"><strong>Next Action:</strong> ${eventData.data.next_action}</div>`;
+            html += `</div>`;
+        } else if (eventData.event_type === 'node_entered' || eventData.event_type === 'node_exited') {
+            html += `<div class="execution-log-details">`;
+            html += `<div class="execution-log-detail"><strong>Node:</strong> ${eventData.data.node_name}</div>`;
+            html += `</div>`;
+        }
+    }
+
+    logEntry.innerHTML = html;
+    logsContent.appendChild(logEntry);
+
+    // Auto-scroll to bottom
+    logsContent.scrollTop = logsContent.scrollHeight;
+}
+
+// Get event type info (icon, color, label)
+function getEventTypeInfo(eventType) {
+    const eventTypes = {
+        'execution_started': { icon: '🚀', color: '#2196F3', label: 'Execution Started' },
+        'plan_created': { icon: '📋', color: '#4CAF50', label: 'Plan Created' },
+        'step_started': { icon: '▶️', color: '#FF9800', label: 'Step Started' },
+        'step_completed': { icon: '✅', color: '#4CAF50', label: 'Step Completed' },
+        'step_failed': { icon: '❌', color: '#f44336', label: 'Step Failed' },
+        'decision_made': { icon: '🤔', color: '#9C27B0', label: 'Decision Made' },
+        'node_entered': { icon: '📥', color: '#00BCD4', label: 'Node Entered' },
+        'node_exited': { icon: '📤', color: '#00BCD4', label: 'Node Exited' },
+        'execution_completed': { icon: '🎉', color: '#4CAF50', label: 'Execution Completed' },
+        'execution_error': { icon: '⚠️', color: '#f44336', label: 'Execution Error' }
+    };
+
+    return eventTypes[eventType] || { icon: '📄', color: '#757575', label: eventType };
 }
 
 // Toggle logs section - removed (logs now always visible in right panel)
