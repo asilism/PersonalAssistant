@@ -3,9 +3,10 @@ Planner - Plans task execution using LLM
 """
 
 import json
+import re
 import uuid
 import os
-from typing import Optional, Any
+from typing import Optional, Any, List
 from anthropic import Anthropic
 
 from .types import (
@@ -13,6 +14,7 @@ from .types import (
     StateType,
     Plan,
     Step,
+    StepResult,
     Decision,
     OrchestrationSettings,
     ContextBundle,
@@ -370,24 +372,14 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
             if step.step_id not in completed_step_ids and step.step_id not in failed_step_ids
         ]
 
-        # If there are pending steps, continue execution without asking LLM
+        # If there are pending steps, resolve placeholders with LLM
         if pending_steps:
-            print(f"[Planner] Found {len(pending_steps)} pending steps that need execution:")
+            print(f"[Planner] Found {len(pending_steps)} pending steps:")
             for step in pending_steps:
                 print(f"[Planner]   - {step.step_id}: {step.description}")
-            print(f"[Planner] Continuing to DISPATCH to execute pending steps")
 
-            # Emit decision made event
-            await self.event_emitter.emit_decision_made(
-                trace_id=state.trace.trace_id,
-                decision_type="continue",
-                reason=f"Pending steps exist ({len(pending_steps)} steps remaining)",
-                next_action="dispatch"
-            )
-
-            # Transition to DISPATCH
-            state.type = StateType.DISPATCH
-            return state
+            # Resolve placeholders for next step with LLM assistance
+            return await self._resolve_placeholders_for_next_step(state, pending_steps, results)
 
         # All steps executed - now ask LLM for final decision
         print(f"[Planner] No pending steps. All steps have been executed.")
@@ -636,6 +628,247 @@ Return ONLY the JSON, no other text.
             state.type = StateType.ERROR
             state.error = f"Decision making failed: {str(e)}"
             return state
+
+    async def _resolve_placeholders_for_next_step(
+        self,
+        state: State,
+        pending_steps: List[Step],
+        results: AggregatedGroupResults
+    ) -> State:
+        """
+        Resolve placeholders for the next pending step using LLM
+
+        Args:
+            state: Current state
+            pending_steps: List of pending steps to execute
+            results: Results from executed steps
+
+        Returns:
+            Updated state with resolved placeholders and DISPATCH type
+        """
+        # Find next step to execute (first pending step with satisfied dependencies)
+        next_step = self._find_next_executable_step(pending_steps, results)
+
+        if not next_step:
+            # No executable step found, transition to error
+            print(f"[Planner] ERROR: No executable step found among pending steps")
+            state.type = StateType.ERROR
+            state.error = "No executable step found"
+            return state
+
+        print(f"[Planner] Next step to execute: {next_step.step_id} - {next_step.description}")
+
+        # Check if step has placeholders that need resolving
+        has_placeholders = self._check_for_placeholders(next_step.input)
+
+        if not has_placeholders:
+            # No placeholders, just continue to dispatch
+            print(f"[Planner] No placeholders found in {next_step.step_id}, continuing to DISPATCH")
+            await self.event_emitter.emit_decision_made(
+                trace_id=state.trace.trace_id,
+                decision_type="continue",
+                reason=f"Executing next step: {next_step.step_id}",
+                next_action="dispatch"
+            )
+            state.type = StateType.DISPATCH
+            return state
+
+        # Get most recent step result for context
+        latest_result = results.completed_steps[-1] if results.completed_steps else None
+
+        if not latest_result:
+            # No previous results, can't resolve placeholders
+            print(f"[Planner] WARNING: No previous step results available for placeholder resolution")
+            state.type = StateType.DISPATCH
+            return state
+
+        # Call LLM to resolve placeholders
+        print(f"[Planner] Calling LLM to resolve placeholders for {next_step.step_id}")
+
+        try:
+            resolved_input = await self._call_llm_for_placeholder_resolution(
+                next_step, latest_result, results, state
+            )
+
+            if resolved_input:
+                # Update the step in the plan with resolved input
+                for i, step in enumerate(state.plan.steps):
+                    if step.step_id == next_step.step_id:
+                        state.plan.steps[i].input = resolved_input
+                        print(f"[Planner] Updated {next_step.step_id} with resolved input: {resolved_input}")
+                        break
+        except Exception as e:
+            print(f"[Planner] ERROR: Failed to resolve placeholders: {str(e)}")
+            import traceback
+            print(f"[Planner] Traceback:\n{traceback.format_exc()}")
+            # Continue anyway - dispatcher will try to resolve with PlaceholderResolver
+
+        # Emit decision made event
+        await self.event_emitter.emit_decision_made(
+            trace_id=state.trace.trace_id,
+            decision_type="continue",
+            reason=f"Resolved placeholders for {next_step.step_id}, executing next",
+            next_action="dispatch"
+        )
+
+        # Transition to DISPATCH
+        state.type = StateType.DISPATCH
+        return state
+
+    def _find_next_executable_step(
+        self,
+        pending_steps: List[Step],
+        results: AggregatedGroupResults
+    ) -> Optional[Step]:
+        """
+        Find the next step that can be executed (all dependencies satisfied)
+
+        Args:
+            pending_steps: List of pending steps
+            results: Results from executed steps
+
+        Returns:
+            Next executable step or None
+        """
+        completed_step_ids = {step.step_id for step in results.completed_steps}
+
+        for step in pending_steps:
+            # Check if all dependencies are satisfied
+            if not step.dependencies:
+                # No dependencies, can execute
+                return step
+
+            # Check if all dependencies are completed
+            deps_satisfied = all(dep in completed_step_ids for dep in step.dependencies)
+            if deps_satisfied:
+                return step
+
+        # No executable step found
+        return None
+
+    def _check_for_placeholders(self, data: Any) -> bool:
+        """
+        Check if data contains any placeholders ({{...}}, ${...}, or {...})
+
+        Args:
+            data: Data to check (can be dict, list, str, or primitive)
+
+        Returns:
+            True if placeholders found, False otherwise
+        """
+        import re
+
+        # Pattern matches: {{...}}, ${...}, or {...}
+        placeholder_pattern = re.compile(r'(\{\{([^}]+)\}\}|\$\{([^}]+)\}|\{([^}]+)\})')
+
+        if isinstance(data, str):
+            return bool(placeholder_pattern.search(data))
+        elif isinstance(data, dict):
+            return any(self._check_for_placeholders(v) for v in data.values())
+        elif isinstance(data, list):
+            return any(self._check_for_placeholders(item) for item in data)
+        else:
+            return False
+
+    async def _call_llm_for_placeholder_resolution(
+        self,
+        next_step: Step,
+        latest_result: 'StepResult',
+        all_results: AggregatedGroupResults,
+        state: State
+    ) -> Optional[dict]:
+        """
+        Call LLM to resolve placeholders in next step's input
+
+        Args:
+            next_step: The step with placeholders to resolve
+            latest_result: Most recent step result
+            all_results: All step results for context
+            state: Current state
+
+        Returns:
+            Resolved input dict or None if resolution failed
+        """
+        # Build prompt for LLM
+        prompt = f"""You are helping resolve placeholders in a task execution step.
+
+MOST RECENT STEP EXECUTED:
+- Step ID: {latest_result.step_id}
+- Tool: {latest_result.tool_name if hasattr(latest_result, 'tool_name') else 'unknown'}
+- Output: {json.dumps(latest_result.output, indent=2)}
+
+ALL COMPLETED STEPS (for reference):
+{self._format_all_step_results(all_results)}
+
+NEXT STEP TO EXECUTE:
+- Step ID: {next_step.step_id}
+- Description: {next_step.description}
+- Tool: {next_step.tool_name}
+- Input (with placeholders): {json.dumps(next_step.input, indent=2)}
+
+YOUR TASK:
+1. Analyze the output from previous steps (especially the most recent one)
+2. Find the values that match the placeholder descriptions
+3. Return the resolved input for {next_step.step_id}
+
+IMPORTANT:
+- If a placeholder describes a filter or search (e.g., "event where title='X'"), find the matching item
+- Extract the exact field value requested (e.g., if placeholder asks for "id", return just the id)
+- Preserve all non-placeholder values as-is
+- If you cannot resolve a placeholder, keep it as-is and explain in reasoning
+
+Return ONLY valid JSON in this format:
+{{
+  "resolved_input": {{
+    // The complete input dict with all placeholders resolved
+    // Example: {{"event_id": "event_2", "updates": {{"end": "2024-03-20T16:00:00"}}}}
+  }},
+  "reasoning": "Brief explanation of how you resolved the placeholders"
+}}
+
+Return ONLY the JSON, no other text."""
+
+        try:
+            response = await self.llm.ainvoke(prompt)
+            content = response.content.strip()
+
+            # Extract JSON from markdown code blocks if present
+            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
+            if json_match:
+                content = json_match.group(1)
+
+            data = json.loads(content)
+
+            resolved_input = data.get("resolved_input")
+            reasoning = data.get("reasoning", "")
+
+            print(f"[Planner] LLM resolved placeholders:")
+            print(f"[Planner]   Reasoning: {reasoning}")
+            print(f"[Planner]   Resolved input: {json.dumps(resolved_input, indent=2)}")
+
+            return resolved_input
+
+        except json.JSONDecodeError as e:
+            print(f"[Planner] ERROR: Failed to parse LLM response as JSON")
+            print(f"[Planner] JSONDecodeError: {str(e)}")
+            print(f"[Planner] Response: {content}")
+            return None
+        except Exception as e:
+            print(f"[Planner] ERROR: Failed to call LLM for placeholder resolution")
+            print(f"[Planner] Exception: {str(e)}")
+            import traceback
+            print(f"[Planner] Traceback:\n{traceback.format_exc()}")
+            return None
+
+    def _format_all_step_results(self, results: AggregatedGroupResults) -> str:
+        """Format all step results for LLM context"""
+        lines = []
+
+        for step_result in results.completed_steps:
+            lines.append(f"- {step_result.step_id}:")
+            lines.append(f"  Output: {json.dumps(step_result.output, indent=4)}")
+
+        return "\n".join(lines) if lines else "No previous steps"
 
     def _normalize_dependencies(self, deps: Any) -> list[str]:
         """
