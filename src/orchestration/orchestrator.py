@@ -46,9 +46,10 @@ class Orchestrator:
     Orchestrator - LangGraph-based state machine for task orchestration
     """
 
-    def __init__(self, user_id: str, tenant: str):
+    def __init__(self, user_id: str, tenant: str, preloaded_mcp_tools: list = None):
         self.user_id = user_id
         self.tenant = tenant
+        self.preloaded_mcp_tools = preloaded_mcp_tools or []
 
         # Initialize components
         self.config_loader = ConfigLoader()
@@ -71,10 +72,18 @@ class Orchestrator:
             from .mcp_executor import MCPExecutor
 
             self.mcp_executor = MCPExecutor()
-            await self.mcp_executor.initialize_servers()
-            mcp_tools = await self.mcp_executor.discover_tools()
 
-            print(f"[Orchestrator] Discovered {len(mcp_tools)} MCP tools")
+            # Use preloaded tools if available, otherwise discover
+            if self.preloaded_mcp_tools:
+                print(f"[Orchestrator] Using {len(self.preloaded_mcp_tools)} preloaded MCP tools")
+                mcp_tools = self.preloaded_mcp_tools
+                # Still initialize servers for execution
+                await self.mcp_executor.initialize_servers()
+            else:
+                print(f"[Orchestrator] No preloaded tools, discovering now...")
+                await self.mcp_executor.initialize_servers()
+                mcp_tools = await self.mcp_executor.discover_tools()
+                print(f"[Orchestrator] Discovered {len(mcp_tools)} MCP tools")
 
             # Get settings with MCP tools
             self.settings = await self.config_loader.get_settings(
