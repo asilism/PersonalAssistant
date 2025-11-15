@@ -14,17 +14,19 @@ from .types import (
     PlanState,
     PlanSummary
 )
+from .settings_manager import SettingsManager, ChatMessage
 
 
 class TaskTracker:
     """TaskTracker - Tracks plan execution state and history"""
 
-    def __init__(self):
+    def __init__(self, settings_manager: Optional[SettingsManager] = None):
         # In-memory storage (in production, use a database)
         self._plans: dict[str, Plan] = {}
         self._plan_states: dict[str, PlanState] = {}
         self._step_results: dict[str, list[StepResult]] = {}
         self._session_history: dict[str, list[PlanSummary]] = {}
+        self._settings_manager = settings_manager or SettingsManager()
 
     async def persist_plan(self, plan: Plan) -> None:
         """Persist a new plan"""
@@ -127,3 +129,51 @@ class TaskTracker:
     def get_step_results(self, plan_id: str) -> list[StepResult]:
         """Get all step results for a plan"""
         return self._step_results.get(plan_id, [])
+
+    # Chat History Methods
+    async def save_user_message(
+        self,
+        session_id: str,
+        user_id: str,
+        tenant: str,
+        content: str
+    ) -> bool:
+        """Save user message to chat history"""
+        return self._settings_manager.save_chat_message(
+            session_id=session_id,
+            user_id=user_id,
+            tenant=tenant,
+            role="user",
+            content=content
+        )
+
+    async def save_assistant_message(
+        self,
+        session_id: str,
+        user_id: str,
+        tenant: str,
+        content: str
+    ) -> bool:
+        """Save assistant message to chat history"""
+        return self._settings_manager.save_chat_message(
+            session_id=session_id,
+            user_id=user_id,
+            tenant=tenant,
+            role="assistant",
+            content=content
+        )
+
+    async def load_chat_history(
+        self,
+        session_id: str,
+        limit: Optional[int] = 10
+    ) -> list[ChatMessage]:
+        """Load chat history for a session"""
+        return self._settings_manager.get_chat_history(
+            session_id=session_id,
+            limit=limit
+        )
+
+    async def clear_chat_history(self, session_id: str) -> bool:
+        """Clear chat history for a session"""
+        return self._settings_manager.delete_chat_history(session_id)

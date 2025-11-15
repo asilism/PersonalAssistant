@@ -309,6 +309,54 @@ async def delete_mcp_server(server_name: str, user_id: str = "test_user", tenant
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/chat-history")
+async def get_chat_history(session_id: str, limit: Optional[int] = None):
+    """Get chat history for a session"""
+    try:
+        logger.info(f"Getting chat history for session_id={session_id}, limit={limit}")
+        messages = settings_manager.get_chat_history(session_id=session_id, limit=limit)
+
+        return {
+            "success": True,
+            "session_id": session_id,
+            "messages": [
+                {
+                    "id": msg.id,
+                    "role": msg.role,
+                    "content": msg.content,
+                    "created_at": msg.created_at
+                }
+                for msg in messages
+            ],
+            "count": len(messages)
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting chat history for session_id={session_id}: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/chat-history")
+async def delete_chat_history(session_id: str):
+    """Delete chat history for a session"""
+    try:
+        logger.info(f"Deleting chat history for session_id={session_id}")
+        success = settings_manager.delete_chat_history(session_id=session_id)
+
+        if success:
+            logger.info(f"Chat history deleted successfully for session_id={session_id}")
+            return {"success": True, "message": "Chat history deleted successfully"}
+        else:
+            logger.warning(f"No chat history found for session_id={session_id}")
+            return {"success": True, "message": "No chat history found"}
+
+    except Exception as e:
+        logger.error(f"Error deleting chat history for session_id={session_id}: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def main():
     """Run the API server"""
     print("=" * 80)
