@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Annotated, Optional, TypedDict
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
+from langgraph.checkpoint.memory import MemorySaver
 
 from .types import (
     State,
@@ -57,6 +58,9 @@ class Orchestrator:
         self.tracker = TaskTracker()
         self.listener = ResultListener(self.tracker)
         self.event_emitter = get_event_emitter()
+
+        # Initialize LangGraph checkpointer for state persistence
+        self.checkpointer = MemorySaver()
 
         # Settings and planner will be initialized on first run
         self.settings = None
@@ -143,7 +147,7 @@ class Orchestrator:
         workflow.add_edge("finalize", END)
         workflow.add_edge("error_handler", END)
 
-        return workflow.compile()
+        return workflow.compile(checkpointer=self.checkpointer)
 
     async def _plan_node(self, state: OrchestrationState) -> OrchestrationState:
         """Planning node"""
@@ -457,36 +461,7 @@ class Orchestrator:
         for msg in chat_history:
             conversation_history.append(f"{msg.role}: {msg.content}")
 
-        # Load recent execution results for context
-        additional_context = {}
-        try:
-            recent_history = await self.tracker.get_history(session_id, self.user_id)
-            if recent_history.recent_plans:
-                # Get the most recent plan (regardless of status) to reuse successful step results
-                # This is important for HITL scenarios where the plan is not yet completed
-                # but has already executed some steps successfully
-                most_recent = recent_history.recent_plans[-1]
-                recent_results = self.tracker.get_step_results(most_recent.plan_id)
-                if recent_results:
-                    # Filter for successful results only
-                    successful_results = [r for r in recent_results if r.status == "success"]
-                    if successful_results:
-                        # Store recent results in additional context
-                        additional_context["recent_plan_id"] = most_recent.plan_id
-                        additional_context["recent_request"] = most_recent.request_text
-                        additional_context["recent_results"] = [
-                            {
-                                "step_id": r.step_id,
-                                "description": r.description,
-                                "output": r.output,
-                                "status": r.status
-                            }
-                            for r in successful_results
-                        ]
-        except Exception as e:
-            print(f"[Orchestrator] Warning: Could not load recent execution results: {e}")
-
-        # Initial state
+        # Initial state - LangGraph checkpointer will handle resume automatically
         initial_state: OrchestrationState = {
             "type": StateType.INIT.value,
             "session_id": session_id,
@@ -494,14 +469,17 @@ class Orchestrator:
             "tenant": self.tenant,
             "request_text": request_text,
             "trace_id": trace_id,
-            "context": {"session_id": session_id, "conversation_history": conversation_history, "additional_context": additional_context},
-            "plan": None,
+            "context": {"session_id": session_id, "conversation_history": conversation_history, "additional_context": {}},
+            "plan": None,  # Will be created by planner or restored from checkpoint
             "plan_state": None,
             "results": None,
             "error": None,
             "final_payload": None,
             "retry_counts": {}  # Initialize retry tracking
         }
+
+        # Configure thread_id for checkpointing (use session_id as thread_id)
+        thread_config = {"configurable": {"thread_id": session_id}}
 
         # Run the graph
         start_time = datetime.now()
@@ -516,8 +494,8 @@ class Orchestrator:
         )
 
         try:
-            # Invoke the graph
-            final_state = await self.graph.ainvoke(initial_state)
+            # Invoke the graph with thread config for checkpointing
+            final_state = await self.graph.ainvoke(initial_state, config=thread_config)
 
             end_time = datetime.now()
             execution_time = (end_time - start_time).total_seconds()
@@ -553,7 +531,7 @@ class Orchestrator:
                     "plan": final_state.get("plan")  # Include full plan for analysis
                 }
             elif final_state.get("type") == StateType.HUMAN_IN_THE_LOOP.value:
-                # Human input required
+                # Human input required - LangGraph checkpoint will preserve state
                 payload = final_state.get("final_payload", {})
                 # Support both "message" and "question" keys for backward compatibility
                 message = payload.get("message") or payload.get("question", "추가 정보가 필요합니다.")
