@@ -363,7 +363,7 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
             print(f"[Planner] Incremented retry count for {step_id}: {state.retry_counts[step_id]}")
 
         # Build prompt for decision
-        results_summary = self._format_results(results)
+        results_summary = self._format_results(results, state.plan)
 
         prompt = f"""You are an AI assistant making STEP-BY-STEP decisions about task execution.
 
@@ -387,6 +387,13 @@ ANALYZING STEP RESULTS:
   * Use the actual IDs, titles, or other fields from the results
 - You do NOT need to rely only on placeholder syntax like {{{{step_0.events.0.id}}}}
 - Instead, you can examine the step output and create intelligent next steps
+
+IMPORTANT - PENDING STEPS:
+- The execution results above show "Pending steps (already planned, not yet executed)"
+- These steps are ALREADY in the plan and will be executed automatically
+- DO NOT create duplicate steps that are already in the pending list
+- If the pending steps are sufficient to complete the task, choose "final" or wait for them to execute
+- Only choose "nextSteps" if you need to add NEW steps that are NOT in the pending list
 
 DECISION OPTIONS:
 1. "final" - Task is complete, return final response to user
@@ -485,8 +492,8 @@ Return ONLY the JSON, no other text.
                         step_id = step_data["id"]
                         print(f"[Planner]   Retry detected for step: {step_id}")
                     else:
-                        # New step - generate new ID
-                        step_id = f"step_{len(state.plan.steps) + i + 1}"
+                        # New step - generate new ID (consistent with initial plan: step_0, step_1, ...)
+                        step_id = f"step_{len(state.plan.steps) + i}"
                         print(f"[Planner]   New step created: {step_id}")
 
                     # Get tool_name from either 'tool_name', 'tool', or 'action' field
@@ -687,7 +694,7 @@ Return ONLY the JSON, no other text.
 
         return "\n".join(lines) if lines else "No additional context"
 
-    def _format_results(self, results: AggregatedGroupResults) -> str:
+    def _format_results(self, results: AggregatedGroupResults, plan: Optional[Plan]) -> str:
         """Format results for prompt"""
         lines = [
             f"Total steps: {results.total_steps}",
@@ -706,5 +713,20 @@ Return ONLY the JSON, no other text.
             lines.append("Failed steps:")
             for step_result in results.failed_steps:
                 lines.append(f"  - {step_result.step_id}: {step_result.error}")
+
+        # Add pending steps (not yet executed)
+        if plan:
+            completed_step_ids = {step.step_id for step in results.completed_steps}
+            failed_step_ids = {step.step_id for step in results.failed_steps}
+            pending_steps = [
+                step for step in plan.steps
+                if step.step_id not in completed_step_ids and step.step_id not in failed_step_ids
+            ]
+
+            if pending_steps:
+                lines.append("")
+                lines.append("Pending steps (already planned, not yet executed):")
+                for step in pending_steps:
+                    lines.append(f"  - {step.step_id}: {step.description} (tool: {step.tool_name})")
 
         return "\n".join(lines)
