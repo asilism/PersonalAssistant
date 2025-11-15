@@ -16,8 +16,8 @@ mcp = FastMCP("mail-agent")
 emails_db: list[dict] = [
     {
         "id": "email_1",
-        "from": "boss@example.com",
-        "to": "user@example.com",
+        "from": "sungjun87.lee@samsung.com",
+        "to": "jaehyun.kim@samsung.com",
         "subject": "Weekly Report Required",
         "body": "Please send me the weekly report by Friday.",
         "timestamp": "2025-10-20T10:00:00Z",
@@ -25,8 +25,8 @@ emails_db: list[dict] = [
     },
     {
         "id": "email_2",
-        "from": "team@example.com",
-        "to": "user@example.com",
+        "from": "dev-team@samsung.com",
+        "to": "jaehyun.kim@samsung.com",
         "subject": "Team Meeting Tomorrow",
         "body": "Don't forget about the team meeting at 2 PM tomorrow.",
         "timestamp": "2025-10-20T14:30:00Z",
@@ -88,7 +88,7 @@ def send_email(to: str, subject: str, body: str) -> dict:
     email_id = f"email_{len(emails_db) + 1}"
     new_email = {
         "id": email_id,
-        "from": "user@example.com",
+        "from": "jaehyun.kim@samsung.com",
         "to": to,
         "subject": subject,
         "body": body,

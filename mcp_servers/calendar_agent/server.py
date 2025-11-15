@@ -19,7 +19,7 @@ events_db: list[dict] = [
         "description": "Weekly team sync",
         "start_time": "2025-10-22T14:00:00Z",
         "end_time": "2025-10-22T15:00:00Z",
-        "attendees": ["user@example.com", "team@example.com"],
+        "attendees": ["jaehyun.kim@samsung.com", "dev-team@samsung.com"],
         "location": "Conference Room A"
     },
     {
@@ -28,7 +28,7 @@ events_db: list[dict] = [
         "description": "Q4 project review",
         "start_time": "2025-10-23T10:00:00Z",
         "end_time": "2025-10-23T11:30:00Z",
-        "attendees": ["user@example.com", "boss@example.com"],
+        "attendees": ["jaehyun.kim@samsung.com", "sungjun87.lee@samsung.com"],
         "location": "Virtual"
     }
 ]

@@ -20,8 +20,8 @@ issues_db: list[dict] = [
         "description": "Add OAuth2 authentication to the application",
         "status": "In Progress",
         "priority": "High",
-        "assignee": "john@example.com",
-        "reporter": "boss@example.com",
+        "assignee": "minho.park@samsung.com",
+        "reporter": "sungjun87.lee@samsung.com",
         "created_at": "2025-10-15T09:00:00Z",
         "updated_at": "2025-10-20T14:30:00Z"
     },
@@ -32,8 +32,8 @@ issues_db: list[dict] = [
         "description": "Login page doesn't work well on mobile devices",
         "status": "To Do",
         "priority": "Medium",
-        "assignee": "jane@example.com",
-        "reporter": "user@example.com",
+        "assignee": "soyeon.choi@samsung.com",
+        "reporter": "jaehyun.kim@samsung.com",
         "created_at": "2025-10-18T11:00:00Z",
         "updated_at": "2025-10-18T11:00:00Z"
     }
@@ -71,7 +71,7 @@ def create_issue(
         "status": "To Do",
         "priority": priority,
         "assignee": assignee,
-        "reporter": "user@example.com",
+        "reporter": "jaehyun.kim@samsung.com",
         "issue_type": issue_type,
         "created_at": datetime.now().isoformat(),
         "updated_at": datetime.now().isoformat()
