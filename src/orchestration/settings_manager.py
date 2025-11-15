@@ -33,6 +33,17 @@ class MCPServerSettings(BaseModel):
     env_vars: Optional[Dict[str, str]] = None
 
 
+class ChatMessage(BaseModel):
+    """Chat message model"""
+    id: Optional[int] = None
+    session_id: str
+    user_id: str
+    tenant: str
+    role: str  # "user" or "assistant"
+    content: str
+    created_at: Optional[str] = None
+
+
 class SettingsManager:
     """Manages application settings with SQLite storage and encryption"""
 
@@ -158,6 +169,30 @@ class SettingsManager:
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_mcp_user_tenant
                 ON mcp_server_settings(user_id, tenant)
+            """)
+
+            # Create chat history table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chat_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    tenant TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Create index for chat history (for fast session lookups)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_chat_session
+                ON chat_history(session_id, created_at)
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_chat_user_tenant
+                ON chat_history(user_id, tenant, created_at)
             """)
 
             conn.commit()
@@ -445,6 +480,106 @@ class SettingsManager:
                 DELETE FROM mcp_server_settings
                 WHERE user_id = ? AND tenant = ? AND server_name = ?
             """, (user_id, tenant, server_name))
+
+            deleted = cursor.rowcount > 0
+            conn.commit()
+
+        return deleted
+
+    # Chat History Methods
+    def save_chat_message(
+        self,
+        session_id: str,
+        user_id: str,
+        tenant: str,
+        role: str,
+        content: str
+    ) -> bool:
+        """Save a chat message to history"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO chat_history (session_id, user_id, tenant, role, content)
+                VALUES (?, ?, ?, ?, ?)
+            """, (session_id, user_id, tenant, role, content))
+
+            conn.commit()
+
+        return True
+
+    def get_chat_history(
+        self,
+        session_id: str,
+        limit: Optional[int] = None
+    ) -> list[ChatMessage]:
+        """Get chat history for a session"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            if limit:
+                # Get last N messages
+                cursor.execute("""
+                    SELECT id, session_id, user_id, tenant, role, content, created_at
+                    FROM chat_history
+                    WHERE session_id = ?
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                """, (session_id, limit))
+            else:
+                # Get all messages
+                cursor.execute("""
+                    SELECT id, session_id, user_id, tenant, role, content, created_at
+                    FROM chat_history
+                    WHERE session_id = ?
+                    ORDER BY created_at ASC
+                """, (session_id,))
+
+            messages = []
+            rows = cursor.fetchall()
+
+            # If we used LIMIT with DESC, reverse to get chronological order
+            if limit:
+                rows = reversed(rows)
+
+            for row in rows:
+                msg_id, session_id, user_id, tenant, role, content, created_at = row
+                messages.append(ChatMessage(
+                    id=msg_id,
+                    session_id=session_id,
+                    user_id=user_id,
+                    tenant=tenant,
+                    role=role,
+                    content=content,
+                    created_at=created_at
+                ))
+
+            return messages
+
+    def delete_chat_history(self, session_id: str) -> bool:
+        """Delete all chat history for a session"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                DELETE FROM chat_history
+                WHERE session_id = ?
+            """, (session_id,))
+
+            deleted = cursor.rowcount > 0
+            conn.commit()
+
+        return deleted
+
+    def delete_all_chat_history(self, user_id: str, tenant: str) -> bool:
+        """Delete all chat history for a user/tenant"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                DELETE FROM chat_history
+                WHERE user_id = ? AND tenant = ?
+            """, (user_id, tenant))
 
             deleted = cursor.rowcount > 0
             conn.commit()

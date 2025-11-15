@@ -77,10 +77,81 @@ function updateModelOptions() {
     });
 }
 
+// Session ID management
+let sessionId = null;
+
+function getOrCreateSessionId() {
+    if (!sessionId) {
+        // Try to get from localStorage
+        sessionId = localStorage.getItem('sessionId');
+        if (!sessionId) {
+            // Create new session ID
+            sessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('sessionId', sessionId);
+        }
+    }
+    return sessionId;
+}
+
+// Load chat history
+async function loadChatHistory() {
+    const sessionId = getOrCreateSessionId();
+    const chatMessages = document.getElementById('chatMessages');
+
+    try {
+        const response = await fetch(`/api/chat-history?session_id=${sessionId}`);
+        const data = await response.json();
+
+        if (response.ok && data.messages && data.messages.length > 0) {
+            // Clear existing messages
+            chatMessages.innerHTML = '';
+
+            // Add each message
+            data.messages.forEach(msg => {
+                addMessageBubble(msg.role, msg.content, false, false);
+            });
+        }
+    } catch (error) {
+        console.error('Failed to load chat history:', error);
+    }
+}
+
+// Clear chat history
+async function clearChatHistory() {
+    if (!confirm('정말로 대화 이력을 삭제하시겠습니까?')) {
+        return;
+    }
+
+    const sessionId = getOrCreateSessionId();
+    const chatMessages = document.getElementById('chatMessages');
+
+    try {
+        const response = await fetch(`/api/chat-history?session_id=${sessionId}`, {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            // Clear UI
+            chatMessages.innerHTML = '<div class="placeholder">메시지를 입력하세요...</div>';
+
+            // Generate new session ID
+            sessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('sessionId', sessionId);
+
+            alert('대화 이력이 삭제되었습니다.');
+        }
+    } catch (error) {
+        alert('대화 이력 삭제에 실패했습니다: ' + error.message);
+    }
+}
+
 // Initialize model options on page load
 document.addEventListener('DOMContentLoaded', () => {
     updateModelOptions();
     loadCurrentSettings();
+    loadChatHistory();
 
     // Set up form submission
     document.getElementById('requestForm').addEventListener('submit', async (e) => {
@@ -98,6 +169,15 @@ async function executeRequest() {
     const chatMessages = document.getElementById('chatMessages');
 
     if (!requestText.trim()) return;
+
+    // Get session ID
+    const currentSessionId = getOrCreateSessionId();
+
+    // Remove placeholder if it exists
+    const placeholder = chatMessages.querySelector('.placeholder');
+    if (placeholder) {
+        placeholder.remove();
+    }
 
     // Add user message bubble
     addMessageBubble('user', requestText);
@@ -121,7 +201,8 @@ async function executeRequest() {
             body: JSON.stringify({
                 request_text: requestText,
                 user_id: userId,
-                tenant: tenant
+                tenant: tenant,
+                session_id: currentSessionId
             })
         });
 
@@ -155,9 +236,9 @@ async function executeRequest() {
 }
 
 // Add message bubble
-function addMessageBubble(type, content, isLoading = false) {
+function addMessageBubble(type, content, isLoading = false, showTimestamp = true) {
     const chatMessages = document.getElementById('chatMessages');
-    const messageId = 'msg-' + Date.now();
+    const messageId = 'msg-' + Date.now() + '-' + Math.random();
 
     const messageDiv = document.createElement('div');
     messageDiv.id = messageId;
@@ -184,10 +265,12 @@ function addMessageBubble(type, content, isLoading = false) {
             `;
         }
 
-        const timestamp = document.createElement('div');
-        timestamp.className = 'message-timestamp';
-        timestamp.textContent = new Date().toLocaleTimeString();
-        messageDiv.appendChild(timestamp);
+        if (showTimestamp) {
+            const timestamp = document.createElement('div');
+            timestamp.className = 'message-timestamp';
+            timestamp.textContent = new Date().toLocaleTimeString();
+            messageDiv.appendChild(timestamp);
+        }
     }
 
     chatMessages.appendChild(messageDiv);

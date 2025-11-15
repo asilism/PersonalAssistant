@@ -355,6 +355,25 @@ class Orchestrator:
             import uuid
             trace_id = str(uuid.uuid4())
 
+        # Save user message to chat history
+        await self.tracker.save_user_message(
+            session_id=session_id,
+            user_id=self.user_id,
+            tenant=self.tenant,
+            content=request_text
+        )
+
+        # Load chat history for context (last 10 messages)
+        chat_history = await self.tracker.load_chat_history(
+            session_id=session_id,
+            limit=10
+        )
+
+        # Format chat history for context
+        conversation_history = []
+        for msg in chat_history:
+            conversation_history.append(f"{msg.role}: {msg.content}")
+
         # Initial state
         initial_state: OrchestrationState = {
             "type": StateType.INIT.value,
@@ -363,7 +382,7 @@ class Orchestrator:
             "tenant": self.tenant,
             "request_text": request_text,
             "trace_id": trace_id,
-            "context": {"session_id": session_id, "conversation_history": [], "additional_context": {}},
+            "context": {"session_id": session_id, "conversation_history": conversation_history, "additional_context": {}},
             "plan": None,
             "plan_state": None,
             "results": None,
@@ -382,12 +401,22 @@ class Orchestrator:
             end_time = datetime.now()
             execution_time = (end_time - start_time).total_seconds()
 
-            # Build response
+            # Build response and save assistant message
             if final_state.get("type") == StateType.FINAL.value:
                 payload = final_state.get("final_payload", {})
+                response_message = payload.get("message", "Task completed successfully")
+
+                # Save assistant response to chat history
+                await self.tracker.save_assistant_message(
+                    session_id=session_id,
+                    user_id=self.user_id,
+                    tenant=self.tenant,
+                    content=response_message
+                )
+
                 return {
                     "success": True,
-                    "message": payload.get("message", "Task completed successfully"),
+                    "message": response_message,
                     "results": payload.get("data"),
                     "execution_time": execution_time,
                     "plan_id": final_state.get("plan", {}).get("plan_id") if final_state.get("plan") else None,
@@ -398,6 +427,15 @@ class Orchestrator:
                 payload = final_state.get("final_payload", {})
                 # Support both "message" and "question" keys for backward compatibility
                 message = payload.get("message") or payload.get("question", "추가 정보가 필요합니다.")
+
+                # Save assistant response to chat history
+                await self.tracker.save_assistant_message(
+                    session_id=session_id,
+                    user_id=self.user_id,
+                    tenant=self.tenant,
+                    content=message
+                )
+
                 return {
                     "success": False,
                     "message": message,
@@ -408,15 +446,35 @@ class Orchestrator:
                     "plan_id": final_state.get("plan", {}).get("plan_id") if final_state.get("plan") else None
                 }
             elif final_state.get("type") == StateType.ERROR.value:
+                error_message = final_state.get("error", "Unknown error")
+
+                # Save error message to chat history
+                await self.tracker.save_assistant_message(
+                    session_id=session_id,
+                    user_id=self.user_id,
+                    tenant=self.tenant,
+                    content=f"Error: {error_message}"
+                )
+
                 return {
                     "success": False,
-                    "message": final_state.get("error", "Unknown error"),
+                    "message": error_message,
                     "execution_time": execution_time
                 }
             else:
+                incomplete_message = "Execution incomplete"
+
+                # Save incomplete message to chat history
+                await self.tracker.save_assistant_message(
+                    session_id=session_id,
+                    user_id=self.user_id,
+                    tenant=self.tenant,
+                    content=incomplete_message
+                )
+
                 return {
                     "success": False,
-                    "message": "Execution incomplete",
+                    "message": incomplete_message,
                     "execution_time": execution_time
                 }
 
