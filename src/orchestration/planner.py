@@ -364,6 +364,7 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
 
         # Build prompt for decision
         results_summary = self._format_results(results, state.plan)
+        context_str = self._format_context(state.context)
 
         prompt = f"""You are an AI assistant making STEP-BY-STEP decisions about task execution.
 
@@ -375,6 +376,9 @@ This means you can:
 4. Filter, search, or process results intelligently before proceeding
 
 Original request: {state.request_text}
+
+Context:
+{context_str}
 
 Execution results so far:
 {results_summary}
