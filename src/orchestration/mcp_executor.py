@@ -198,12 +198,22 @@ class MCPExecutor:
         """
         # Email validation for send_email tool
         if tool_name == "send_email":
-            to_address = tool_input.get("to", "")
-            is_valid, error_msg = validate_email(to_address)
+            to_field = tool_input.get("to", "")
 
-            if not is_valid:
-                print(f"[MCPExecutor] Email validation failed for {tool_name}: {error_msg}")
-                return f"Email validation failed: {error_msg}"
+            # Handle both string and list types for 'to' field
+            if isinstance(to_field, list):
+                # Validate each email in the list
+                for email in to_field:
+                    is_valid, error_msg = validate_email(email)
+                    if not is_valid:
+                        print(f"[MCPExecutor] Email validation failed for {tool_name}: {error_msg}")
+                        return f"Email validation failed: {error_msg}"
+            else:
+                # Single email address (string)
+                is_valid, error_msg = validate_email(to_field)
+                if not is_valid:
+                    print(f"[MCPExecutor] Email validation failed for {tool_name}: {error_msg}")
+                    return f"Email validation failed: {error_msg}"
 
         # Add more validations for other tools as needed
 
