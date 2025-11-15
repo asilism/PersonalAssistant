@@ -91,7 +91,7 @@ class Orchestrator:
             self.settings = await self.config_loader.get_settings(
                 self.user_id, self.tenant, mcp_tools=mcp_tools
             )
-            self.planner = Planner(self.settings)
+            self.planner = Planner(self.settings, self.tracker)
             self.dispatcher = TaskDispatcher(self.tracker, self.mcp_executor)
 
     def _build_graph(self) -> StateGraph:
@@ -457,6 +457,32 @@ class Orchestrator:
         for msg in chat_history:
             conversation_history.append(f"{msg.role}: {msg.content}")
 
+        # Load recent execution results for context
+        additional_context = {}
+        try:
+            recent_history = await self.tracker.get_history(session_id, self.user_id)
+            if recent_history.recent_plans:
+                # Get the most recent completed plan
+                recent_completed = [p for p in recent_history.recent_plans if p.status.value == "completed"]
+                if recent_completed:
+                    most_recent = recent_completed[-1]
+                    recent_results = self.tracker.get_step_results(most_recent.plan_id)
+                    if recent_results:
+                        # Store recent results in additional context
+                        additional_context["recent_plan_id"] = most_recent.plan_id
+                        additional_context["recent_request"] = most_recent.request_text
+                        additional_context["recent_results"] = [
+                            {
+                                "step_id": r.step_id,
+                                "description": r.description,
+                                "output": r.output,
+                                "status": r.status
+                            }
+                            for r in recent_results if r.status == "success"
+                        ]
+        except Exception as e:
+            print(f"[Orchestrator] Warning: Could not load recent execution results: {e}")
+
         # Initial state
         initial_state: OrchestrationState = {
             "type": StateType.INIT.value,
@@ -465,7 +491,7 @@ class Orchestrator:
             "tenant": self.tenant,
             "request_text": request_text,
             "trace_id": trace_id,
-            "context": {"session_id": session_id, "conversation_history": conversation_history, "additional_context": {}},
+            "context": {"session_id": session_id, "conversation_history": conversation_history, "additional_context": additional_context},
             "plan": None,
             "plan_state": None,
             "results": None,
