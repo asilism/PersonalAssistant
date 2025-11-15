@@ -698,3 +698,75 @@ async function deleteMCPServer(serverName) {
         alert(`Network error: ${error.message}`);
     }
 }
+
+// Load MCP tools
+async function loadMCPTools() {
+    const container = document.getElementById('mcpToolsList');
+    const loadBtn = document.getElementById('loadToolsBtn');
+
+    container.innerHTML = '<div class="loading">Loading MCP tools...</div>';
+    loadBtn.disabled = true;
+    loadBtn.textContent = '🔧 Loading...';
+
+    try {
+        const response = await fetch('/api/tools');
+        const data = await response.json();
+
+        if (response.ok) {
+            let html = '';
+
+            if (data.tools && data.tools.length > 0) {
+                html = `
+                    <div class="tools-summary" style="margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+                        <strong>Total Tools Discovered:</strong> ${data.count}
+                    </div>
+                    <div class="tools-list">
+                `;
+
+                data.tools.forEach((tool, index) => {
+                    // Format input schema for display
+                    let schemaHtml = '';
+                    if (tool.input_schema && tool.input_schema.properties) {
+                        const properties = tool.input_schema.properties;
+                        const required = tool.input_schema.required || [];
+
+                        schemaHtml = '<div class="tool-schema"><strong>Parameters:</strong><ul style="margin: 5px 0; padding-left: 20px;">';
+
+                        for (const [propName, propDetails] of Object.entries(properties)) {
+                            const isRequired = required.includes(propName);
+                            const requiredBadge = isRequired ? '<span style="color: #f44336; font-size: 11px;">[required]</span>' : '<span style="color: #999; font-size: 11px;">[optional]</span>';
+                            schemaHtml += `<li><code>${propName}</code> ${requiredBadge} - ${propDetails.description || propDetails.type || 'No description'}</li>`;
+                        }
+
+                        schemaHtml += '</ul></div>';
+                    }
+
+                    html += `
+                        <div class="tool-item" style="margin-bottom: 15px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 4px;">
+                            <div class="tool-header" style="margin-bottom: 10px;">
+                                <strong style="font-size: 16px; color: #2196F3;">${index + 1}. ${tool.name}</strong>
+                            </div>
+                            <div class="tool-description" style="margin-bottom: 10px; color: #666;">
+                                ${tool.description || 'No description available'}
+                            </div>
+                            ${schemaHtml}
+                        </div>
+                    `;
+                });
+
+                html += '</div>';
+            } else {
+                html = '<p style="color: #f44336;">No tools available. Please configure MCP servers first.</p>';
+            }
+
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = `<p style="color: #f44336;">Failed to load tools: ${data.detail || 'Unknown error'}</p>`;
+        }
+    } catch (error) {
+        container.innerHTML = `<p style="color: #f44336;">Network error: ${error.message}</p>`;
+    } finally {
+        loadBtn.disabled = false;
+        loadBtn.textContent = '🔧 Load Available Tools';
+    }
+}
