@@ -20,6 +20,7 @@ from .types import (
     PlanState
 )
 from .llm_client import create_llm_client, LLMClient
+from .validators import extract_missing_params
 
 
 class Planner:
@@ -242,6 +243,29 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
             state.type = StateType.ERROR
             state.error = "No results available for decision"
             return state
+
+        # Check for validation errors that require human input
+        for failed_step in results.failed_steps:
+            if failed_step.error and "Email validation failed" in failed_step.error:
+                print(f"[Planner] Detected email validation failure in step {failed_step.step_id}")
+                print(f"[Planner] Error: {failed_step.error}")
+
+                # Extract missing parameter information
+                missing_param_info = extract_missing_params(failed_step.error)
+                question = missing_param_info.get("question", "유효한 입력이 필요합니다.")
+
+                print(f"[Planner] Transitioning to HUMAN_IN_THE_LOOP")
+                print(f"[Planner] Question: {question}")
+
+                # Transition to Human-in-the-loop
+                state.type = StateType.HUMAN_IN_THE_LOOP
+                state.final_payload = {
+                    "message": question,
+                    "error": failed_step.error,
+                    "failed_step_id": failed_step.step_id,
+                    "missing_param": missing_param_info
+                }
+                return state
 
         # Check if any steps have exceeded max retries
         max_retries = self.settings.max_retries  # Default is 3 from types.py

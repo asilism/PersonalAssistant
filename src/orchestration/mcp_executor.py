@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from fastmcp import Client
 
 from .types import Step, StepResult, ToolDefinition
+from .validators import validate_email
 
 
 class MCPExecutor:
@@ -112,6 +113,11 @@ class MCPExecutor:
         start_time = datetime.now()
 
         try:
+            # Pre-execution validation for specific tools
+            validation_error = self._validate_tool_input(step.tool_name, step.input)
+            if validation_error:
+                raise ValueError(validation_error)
+
             # Find which server has this tool
             server_name = await self._find_server_for_tool(step.tool_name)
 
@@ -147,6 +153,30 @@ class MCPExecutor:
                 executed_at=start_time,
                 duration=duration
             )
+
+    def _validate_tool_input(self, tool_name: str, tool_input: dict) -> Optional[str]:
+        """
+        Validate tool input parameters before execution
+
+        Args:
+            tool_name: Name of the tool
+            tool_input: Input parameters for the tool
+
+        Returns:
+            Error message if validation fails, None if valid
+        """
+        # Email validation for send_email tool
+        if tool_name == "send_email":
+            to_address = tool_input.get("to", "")
+            is_valid, error_msg = validate_email(to_address)
+
+            if not is_valid:
+                print(f"[MCPExecutor] Email validation failed for {tool_name}: {error_msg}")
+                return f"Email validation failed: {error_msg}"
+
+        # Add more validations for other tools as needed
+
+        return None
 
     def _extract_error_message(self, exception: Exception) -> str:
         """

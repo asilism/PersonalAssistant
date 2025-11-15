@@ -4,6 +4,7 @@ Mail Agent MCP Server
 Provides email management tools: send, read, delete, search
 """
 
+import re
 from datetime import datetime
 from typing import Optional
 from fastmcp import FastMCP
@@ -46,6 +47,29 @@ def send_email(to: str, subject: str, body: str) -> dict:
     Returns:
         Result of the send operation
     """
+    # Validate email address
+    if not to:
+        return {
+            "success": False,
+            "error": "Email validation failed: Email address is required"
+        }
+
+    # Check for template variables
+    template_pattern = r'\{\{.*?\}\}'
+    if re.search(template_pattern, to):
+        return {
+            "success": False,
+            "error": f"Email validation failed: Email address contains unresolved template variable: {to}"
+        }
+
+    # Check email format
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(email_pattern, to.strip()):
+        return {
+            "success": False,
+            "error": f"Email validation failed: Invalid email address format: {to}"
+        }
+
     # Create new email
     email_id = f"email_{len(emails_db) + 1}"
     new_email = {
