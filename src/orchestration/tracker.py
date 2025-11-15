@@ -40,13 +40,39 @@ class TaskTracker:
 
         if update.last_step_result:
             results = self._step_results.get(update.plan_id, [])
-            results.append(update.last_step_result)
+
+            # Check if this step_id already exists
+            existing_index = next(
+                (i for i, r in enumerate(results) if r.step_id == update.last_step_result.step_id),
+                None
+            )
+
+            if existing_index is not None:
+                # Update existing result
+                results[existing_index] = update.last_step_result
+            else:
+                # Add new result
+                results.append(update.last_step_result)
+
             self._step_results[update.plan_id] = results
 
     async def append_step_result(self, plan_id: str, result: StepResult) -> None:
-        """Append a step result"""
+        """Append a step result (prevents duplicates for same step_id)"""
         results = self._step_results.get(plan_id, [])
-        results.append(result)
+
+        # Check if this step_id already exists
+        existing_index = next(
+            (i for i, r in enumerate(results) if r.step_id == result.step_id),
+            None
+        )
+
+        if existing_index is not None:
+            # Update existing result
+            results[existing_index] = result
+        else:
+            # Add new result
+            results.append(result)
+
         self._step_results[plan_id] = results
 
     async def finalize_conversation(

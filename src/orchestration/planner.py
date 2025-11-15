@@ -643,9 +643,9 @@ Return ONLY the JSON, no other text.
                 if isinstance(dep, str):
                     normalized.append(dep)
                 elif isinstance(dep, int):
-                    # Convert integer to step_id format (1-indexed)
-                    # LLM returns 0-based index, but step_ids start from 1
-                    step_id = f"step_{dep + 1}"
+                    # Convert integer to step_id format (0-indexed)
+                    # LLM returns 0-based index (0 means step_0, 1 means step_1, etc.)
+                    step_id = f"step_{dep}"
                     normalized.append(step_id)
                     print(f"[Planner]   Info: Converted integer dependency {dep} to '{step_id}'")
                 else:
