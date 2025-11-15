@@ -94,6 +94,14 @@ For each step, specify:
 3. description: what this step does
 4. dependencies: which previous step IDs this depends on (empty list if none)
 
+PLACEHOLDER SYNTAX FOR REFERENCING PREVIOUS STEPS:
+- To reference a previous step's entire output: use {{step_N}} or {{step_N.result}}
+  Example: {{"numbers": [{{step_1.result}}, 150]}}
+- To reference a specific field: use {{step_N.field_name}}
+  Example: {{"event_id": {{step_1.id}}}}
+- Dependencies are specified as integers (0 for first step, 1 for second step, etc.)
+  Example: "dependencies": [0] means this step depends on the first step
+
 CRITICAL RULES FOR EMAIL ADDRESSES AND CONTACT INFORMATION:
 - NEVER fabricate or guess email addresses (e.g., DO NOT create "name@example.com" or "username@domain.com")
 - NEVER use placeholder domains like @example.com, @test.com, @sample.com
@@ -416,13 +424,73 @@ Return ONLY the JSON, no other text.
                 next_steps_data = decision_data["payload"].get("steps", [])
                 print(f"[Planner] Processing {len(next_steps_data)} next steps...")
 
-                # Validate and normalize next steps
+                # Process each next step
+                updated_steps = []
                 for i, step_data in enumerate(next_steps_data):
-                    print(f"[Planner]   Validating next step {i+1}: {step_data.get('description', 'N/A')}")
+                    print(f"[Planner]   Processing next step {i+1}: {step_data.get('description', 'N/A')}")
+
+                    # Normalize dependencies
                     raw_deps = step_data.get("dependencies", [])
                     normalized_deps = self._normalize_dependencies(raw_deps)
-                    step_data["dependencies"] = normalized_deps
                     print(f"[Planner]   Dependencies normalized: {raw_deps} -> {normalized_deps}")
+
+                    # Determine step_id (check if LLM provided 'id' field for retry)
+                    if "id" in step_data:
+                        step_id = step_data["id"]
+                        print(f"[Planner]   Retry detected for step: {step_id}")
+                    else:
+                        # New step - generate new ID
+                        step_id = f"step_{len(state.plan.steps) + i + 1}"
+                        print(f"[Planner]   New step created: {step_id}")
+
+                    # Get tool_name from either 'tool_name', 'tool', or 'action' field
+                    tool_name = step_data.get("tool_name") or step_data.get("tool") or step_data.get("action")
+                    if not tool_name:
+                        print(f"[Planner]   ERROR: No tool_name found in step_data: {step_data}")
+                        continue
+
+                    # Get input from either 'input' or 'parameters' field
+                    step_input = step_data.get("input") or step_data.get("parameters", {})
+
+                    # Create step object
+                    step = Step(
+                        step_id=step_id,
+                        tool_name=tool_name,
+                        input=step_input,
+                        description=step_data.get("description", ""),
+                        dependencies=normalized_deps
+                    )
+                    updated_steps.append(step)
+                    print(f"[Planner]   ✓ Step created: {step_id} with tool {tool_name}")
+
+                # Update plan with new/updated steps
+                if updated_steps:
+                    # Check if we're updating existing steps or adding new ones
+                    existing_step_ids = {s.step_id for s in state.plan.steps}
+                    new_step_ids = {s.step_id for s in updated_steps}
+
+                    # If updating existing steps, replace them
+                    if new_step_ids & existing_step_ids:
+                        print(f"[Planner]   Updating existing steps: {new_step_ids & existing_step_ids}")
+                        # Create new steps list with updates
+                        final_steps = []
+                        updated_by_id = {s.step_id: s for s in updated_steps}
+                        for step in state.plan.steps:
+                            if step.step_id in updated_by_id:
+                                final_steps.append(updated_by_id[step.step_id])
+                            else:
+                                final_steps.append(step)
+                        state.plan.steps = final_steps
+                    else:
+                        # Adding new steps
+                        print(f"[Planner]   Adding {len(updated_steps)} new steps to plan")
+                        state.plan.steps.extend(updated_steps)
+
+                    # Update dependencies dict
+                    for step in updated_steps:
+                        state.plan.dependencies[step.step_id] = step.dependencies
+
+                    print(f"[Planner]   Plan now has {len(state.plan.steps)} total steps")
 
                 # Emit decision made event
                 await self.event_emitter.emit_decision_made(
@@ -432,8 +500,7 @@ Return ONLY the JSON, no other text.
                     next_action="dispatch"
                 )
 
-                # For simplicity, we'll transition to DISPATCH
-                # In production, you'd add steps to the existing plan
+                # Transition to DISPATCH
                 state.type = StateType.DISPATCH
                 return state
 
@@ -523,9 +590,11 @@ Return ONLY the JSON, no other text.
                 if isinstance(dep, str):
                     normalized.append(dep)
                 elif isinstance(dep, int):
-                    # Convert integer to step_id format
-                    normalized.append(f"step_{dep}")
-                    print(f"[Planner]   Warning: Converted integer dependency {dep} to 'step_{dep}'")
+                    # Convert integer to step_id format (1-indexed)
+                    # LLM returns 0-based index, but step_ids start from 1
+                    step_id = f"step_{dep + 1}"
+                    normalized.append(step_id)
+                    print(f"[Planner]   Info: Converted integer dependency {dep} to '{step_id}'")
                 else:
                     print(f"[Planner]   Warning: Unknown dependency type {type(dep)}: {dep}")
             return normalized

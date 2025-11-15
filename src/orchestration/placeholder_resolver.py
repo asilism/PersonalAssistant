@@ -11,7 +11,8 @@ from .types import Step, StepResult
 class PlaceholderResolver:
     """Resolves placeholders like {{step_id}} or {{step_id.field}} in step inputs"""
 
-    PLACEHOLDER_PATTERN = re.compile(r'\{\{([^}]+)\}\}')
+    # Support both {{}} and ${} patterns for flexibility
+    PLACEHOLDER_PATTERN = re.compile(r'(\{\{([^}]+)\}\}|\$\{([^}]+)\})')
 
     def __init__(self):
         self._step_outputs: Dict[str, Any] = {}
@@ -71,8 +72,8 @@ class PlaceholderResolver:
         Resolve placeholders in a string
 
         Supports:
-        - {{step_id}} - replaces with entire output
-        - {{step_id.field}} - replaces with specific field from output
+        - {{step_id}} or ${step_id} - replaces with entire output
+        - {{step_id.field}} or ${step_id.field} - replaces with specific field from output
         - {{step_id.field.nested}} - supports nested field access
         """
         # Find all placeholders in the string
@@ -83,7 +84,8 @@ class PlaceholderResolver:
 
         # If the entire string is a single placeholder, return the value directly
         if len(matches) == 1 and matches[0].group(0) == text:
-            placeholder = matches[0].group(1)
+            # Extract placeholder content (from group 2 for {{}} or group 3 for ${})
+            placeholder = matches[0].group(2) or matches[0].group(3)
             value = self._get_placeholder_value(placeholder)
             if value is not None:
                 print(f"[PlaceholderResolver] Resolved '{text}' -> {value}")
@@ -95,7 +97,8 @@ class PlaceholderResolver:
         # If there are multiple placeholders or mixed text, do string replacement
         resolved_text = text
         for match in reversed(matches):  # Process in reverse to maintain positions
-            placeholder = match.group(1)
+            # Extract placeholder content (from group 2 for {{}} or group 3 for ${})
+            placeholder = match.group(2) or match.group(3)
             value = self._get_placeholder_value(placeholder)
             if value is not None:
                 # Convert value to string for insertion
