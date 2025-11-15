@@ -92,6 +92,19 @@ For each step, specify:
 3. description: what this step does
 4. dependencies: which previous step IDs this depends on (empty list if none)
 
+CRITICAL RULES FOR EMAIL ADDRESSES AND CONTACT INFORMATION:
+- NEVER fabricate or guess email addresses (e.g., DO NOT create "name@example.com" or "username@domain.com")
+- NEVER use placeholder domains like @example.com, @test.com, @sample.com
+- If the user provides only a name (e.g., "send email to John") without an email address:
+  * DO NOT guess the email address
+  * Instead, use a placeholder like "{{"contact_email"}}" in the input
+  * The system will ask the user for the correct email address
+- Only use actual email addresses that:
+  * Were explicitly provided by the user in their request
+  * Are available in the provided context
+  * Are retrieved from a contact lookup tool (if available)
+- If you don't have a valid email address, use a template variable placeholder like "{{"recipient_email"}}" instead
+
 Return your plan as a JSON array of steps. Each step should have this format:
 {{
   "tool_name": "tool_name",

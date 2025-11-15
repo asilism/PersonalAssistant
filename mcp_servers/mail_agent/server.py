@@ -70,6 +70,20 @@ def send_email(to: str, subject: str, body: str) -> dict:
             "error": f"Email validation failed: Invalid email address format: {to}"
         }
 
+    # Block common placeholder/fake domains
+    blocked_domains = [
+        'example.com', 'example.org', 'example.net',
+        'test.com', 'test.org', 'test.net',
+        'sample.com', 'sample.org', 'sample.net',
+        'placeholder.com', 'dummy.com', 'fake.com'
+    ]
+    email_domain = to.strip().split('@')[-1].lower()
+    if email_domain in blocked_domains:
+        return {
+            "success": False,
+            "error": f"Email validation failed: '{email_domain}' is a placeholder domain. Please provide a valid email address for the recipient."
+        }
+
     # Create new email
     email_id = f"email_{len(emails_db) + 1}"
     new_email = {
