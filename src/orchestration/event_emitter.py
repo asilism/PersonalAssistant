@@ -231,18 +231,25 @@ class ExecutionEventEmitter:
         trace_id: str,
         success: bool,
         message: str,
-        execution_time: float
+        execution_time: float,
+        results: Optional[dict] = None
     ):
         """Emit execution completed event"""
+        event_data = {
+            "success": success,
+            "message": message,
+            "execution_time": execution_time
+        }
+
+        # Include results if provided
+        if results is not None:
+            event_data["results"] = results
+
         event = ExecutionEvent(
             event_type=ExecutionEventType.EXECUTION_COMPLETED,
             trace_id=trace_id,
             message=f"Execution completed: {message}",
-            data={
-                "success": success,
-                "message": message,
-                "execution_time": execution_time
-            }
+            data=event_data
         )
         await self.emit(event)
 
