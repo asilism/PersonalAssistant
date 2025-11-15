@@ -26,7 +26,6 @@ class TaskTracker:
         self._plan_states: dict[str, PlanState] = {}
         self._step_results: dict[str, list[StepResult]] = {}
         self._session_history: dict[str, list[PlanSummary]] = {}
-        self._session_active_plans: dict[str, str] = {}  # session_id -> plan_id mapping
         self._settings_manager = settings_manager or SettingsManager()
 
     async def persist_plan(self, plan: Plan) -> None:
@@ -206,29 +205,3 @@ class TaskTracker:
     async def clear_chat_history(self, session_id: str) -> bool:
         """Clear chat history for a session"""
         return self._settings_manager.delete_chat_history(session_id)
-
-    # Active Plan Management
-    def set_active_plan(self, session_id: str, plan_id: str) -> None:
-        """Set the active plan for a session"""
-        self._session_active_plans[session_id] = plan_id
-
-    def get_active_plan(self, session_id: str) -> Optional[Plan]:
-        """
-        Get the active plan for a session (if it's in NEEDS_HUMAN or IN_PROGRESS state)
-        Returns None if no active plan or plan is completed/failed
-        """
-        plan_id = self._session_active_plans.get(session_id)
-        if not plan_id:
-            return None
-
-        plan_state = self._plan_states.get(plan_id)
-        if plan_state in [PlanState.NEEDS_HUMAN, PlanState.IN_PROGRESS, PlanState.PENDING]:
-            return self._plans.get(plan_id)
-
-        # Plan is completed or failed, clear active plan
-        return None
-
-    def clear_active_plan(self, session_id: str) -> None:
-        """Clear the active plan for a session"""
-        if session_id in self._session_active_plans:
-            del self._session_active_plans[session_id]
