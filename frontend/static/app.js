@@ -122,11 +122,11 @@ async function clearChatHistory() {
         return;
     }
 
-    const sessionId = getOrCreateSessionId();
+    const currentSessionId = getOrCreateSessionId();
     const chatMessages = document.getElementById('chatMessages');
 
     try {
-        const response = await fetch(`/api/chat-history?session_id=${sessionId}`, {
+        const response = await fetch(`/api/chat-history?session_id=${currentSessionId}`, {
             method: 'DELETE'
         });
 
