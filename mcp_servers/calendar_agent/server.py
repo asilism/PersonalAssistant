@@ -76,7 +76,7 @@ events_db: list[dict] = [
         "description": "Initial client presentation",
         "start_time": "2025-11-18T09:00:00Z",
         "end_time": "2025-11-18T10:30:00Z",
-        "attendees": ["jaehyun.kim@samsung.com", "sungjun87.lee@samsung.com", "client@example.com"],
+        "attendees": ["jaehyun.kim@samsung.com", "sungjun87.lee@samsung.com", "client@gkorea.kr"],
         "location": "Virtual"
     },
     {
@@ -85,7 +85,7 @@ events_db: list[dict] = [
         "description": "Technical deep dive",
         "start_time": "2025-11-18T10:30:00Z",
         "end_time": "2025-11-18T12:00:00Z",
-        "attendees": ["jaehyun.kim@samsung.com", "sungjun87.lee@samsung.com", "client@example.com"],
+        "attendees": ["jaehyun.kim@samsung.com", "sungjun87.lee@samsung.com", "client@korea.kr"],
         "location": "Virtual"
     },
     {
@@ -94,7 +94,7 @@ events_db: list[dict] = [
         "description": "Answer client questions",
         "start_time": "2025-11-18T13:00:00Z",
         "end_time": "2025-11-18T14:30:00Z",
-        "attendees": ["jaehyun.kim@samsung.com", "dev-team@samsung.com", "client@example.com"],
+        "attendees": ["jaehyun.kim@samsung.com", "dev-team@samsung.com", "client@korea.kr"],
         "location": "Virtual"
     },
     {
