@@ -12,6 +12,7 @@ import traceback
 from datetime import datetime
 from typing import Optional
 from pathlib import Path
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
@@ -20,7 +21,12 @@ import uvicorn
 
 from orchestration.orchestrator import Orchestrator
 from orchestration.settings_manager import SettingsManager
+
 from orchestration.event_emitter import get_event_emitter
+
+from orchestration.mcp_executor import MCPExecutor
+from orchestration.types import ToolDefinition
+
 
 # Configure logging
 logging.basicConfig(
@@ -77,11 +83,48 @@ class TestConnectionRequest(BaseModel):
     base_url: Optional[str] = None
 
 
-# Create FastAPI app
+# Global MCP tools cache
+global_mcp_tools = []
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler to preload MCP tools on startup"""
+    global global_mcp_tools
+
+    logger.info("=" * 80)
+    logger.info("Starting Personal Assistant - Preloading MCP tools...")
+    logger.info("=" * 80)
+
+    try:
+        # Create MCP executor and discover tools
+        mcp_executor = MCPExecutor()
+        await mcp_executor.initialize_servers()
+        global_mcp_tools = await mcp_executor.discover_tools()
+
+        logger.info(f"✓ Successfully preloaded {len(global_mcp_tools)} MCP tools")
+        logger.info("=" * 80)
+
+        # Cleanup MCP executor after discovery
+        await mcp_executor.cleanup()
+
+    except Exception as e:
+        logger.error(f"✗ Failed to preload MCP tools: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        logger.warning("Server will continue, but first request may be slow")
+
+    yield
+
+    # Cleanup on shutdown
+    logger.info("Shutting down Personal Assistant...")
+
+
+# Create FastAPI app with lifespan
 app = FastAPI(
     title="Personal Assistant Orchestration Service",
     description="LangGraph-based orchestration with MCP integration",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Mount static files
@@ -99,7 +142,11 @@ def get_orchestrator(user_id: str, tenant: str) -> Orchestrator:
     """Get or create an orchestrator for a user"""
     key = f"{tenant}:{user_id}"
     if key not in orchestrators:
-        orchestrators[key] = Orchestrator(user_id=user_id, tenant=tenant)
+        orchestrators[key] = Orchestrator(
+            user_id=user_id,
+            tenant=tenant,
+            preloaded_mcp_tools=global_mcp_tools
+        )
     return orchestrators[key]
 
 
@@ -282,6 +329,19 @@ async def test_connection(request: TestConnectionRequest):
 async def list_tools():
     """List available MCP tools"""
     try:
+        # Use preloaded tools if available
+        if global_mcp_tools:
+            tools = [
+                {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "input_schema": tool.input_schema
+                }
+                for tool in global_mcp_tools
+            ]
+            return {"tools": tools, "count": len(tools)}
+
+        # Fallback to orchestrator-based discovery
         orchestrator = get_orchestrator("system", "system")
 
         if not orchestrator.settings:

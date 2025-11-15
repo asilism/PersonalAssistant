@@ -71,12 +71,13 @@ class MCPExecutor:
         print(f"[MCPExecutor] Initialized {len(self._servers)} MCP servers")
 
     async def discover_tools(self) -> List[ToolDefinition]:
-        """Discover all available tools from MCP servers"""
+        """Discover all available tools from MCP servers (in parallel)"""
         all_tools = []
 
-        for server_name, server_info in self._servers.items():
+        async def discover_from_server(server_name: str, server_info: dict):
+            """Discover tools from a single server"""
             if server_info["status"] != "ready":
-                continue
+                return []
 
             try:
                 config = server_info["config"]
@@ -88,21 +89,39 @@ class MCPExecutor:
                     # List tools
                     tools_result = await client.list_tools()
 
+                    tools = []
                     for tool in tools_result:
                         tool_def = ToolDefinition(
                             name=tool.name,
                             description=tool.description or "",
                             input_schema=tool.inputSchema
                         )
-                        all_tools.append(tool_def)
+                        tools.append(tool_def)
                         self._available_tools[tool.name] = tool_def
 
                     print(f"[MCPExecutor] Discovered {len(tools_result)} tools from {server_name}")
+                    return tools
 
             except Exception as e:
                 print(f"[MCPExecutor] Error discovering tools from {server_name}: {e}")
                 import traceback
                 traceback.print_exc()
+                return []
+
+        # Discover from all servers in parallel
+        tasks = [
+            discover_from_server(server_name, server_info)
+            for server_name, server_info in self._servers.items()
+        ]
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Combine results
+        for result in results:
+            if isinstance(result, list):
+                all_tools.extend(result)
+            elif isinstance(result, Exception):
+                print(f"[MCPExecutor] Exception during parallel discovery: {result}")
 
         return all_tools
 
