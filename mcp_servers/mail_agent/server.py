@@ -7,7 +7,6 @@ Provides email management tools: send, read, delete, search
 from datetime import datetime
 from typing import Optional
 from fastmcp import FastMCP
-import uvicorn
 
 # Create FastMCP server
 mcp = FastMCP("mail-agent")
@@ -177,4 +176,4 @@ def search_emails(query: str, field: str = "all") -> dict:
 
 if __name__ == "__main__":
     # Run as HTTP server on port 8001
-    uvicorn.run(mcp.get_asgi_app(), host="0.0.0.0", port=8001)
+    mcp.run(transport="http", host="0.0.0.0", port=8001)

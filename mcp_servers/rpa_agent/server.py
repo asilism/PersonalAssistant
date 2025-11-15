@@ -7,7 +7,6 @@ Provides RPA automation tools: news search, report writing, attendance collectio
 from datetime import datetime
 from typing import Optional
 from fastmcp import FastMCP
-import uvicorn
 
 # Create FastMCP server
 mcp = FastMCP("rpa-agent")
@@ -225,4 +224,4 @@ def collect_attendance(
 
 if __name__ == "__main__":
     # Run as HTTP server on port 8005
-    uvicorn.run(mcp.get_asgi_app(), host="0.0.0.0", port=8005)
+    mcp.run(transport="http", host="0.0.0.0", port=8005)
