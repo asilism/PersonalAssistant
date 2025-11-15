@@ -38,14 +38,35 @@ class TaskDispatcher:
         # Save plan to tracker
         await self.tracker.persist_plan(plan)
 
-        # Clear resolver for new plan execution
-        self.resolver.clear()
+        # Get existing results to preserve successful step outputs
+        existing_results = await self.tracker.get_aggregated_results_for_group(plan.plan_id)
+
+        # Clear resolver only if this is a fresh plan (no existing results)
+        if not existing_results or existing_results.total_steps == 0:
+            self.resolver.clear()
+            print("[TaskDispatcher] Fresh plan - cleared resolver")
+        else:
+            # Preserve successful step outputs in resolver
+            print(f"[TaskDispatcher] Preserving {len(existing_results.completed_steps)} successful step outputs")
+            for completed_step in existing_results.completed_steps:
+                if completed_step.output is not None:
+                    self.resolver.register_step_result(completed_step.step_id, completed_step.output)
 
         # Execute steps
         try:
             # For simplicity, execute steps sequentially
             # In production, respect dependencies and execute in parallel when possible
             for step in plan.steps:
+                # Skip already successful steps
+                already_completed = any(
+                    r.step_id == step.step_id and r.status == "success"
+                    for r in existing_results.completed_steps
+                ) if existing_results else False
+
+                if already_completed:
+                    print(f"[TaskDispatcher] Skipping already completed step: {step.step_id}")
+                    continue
+
                 # Emit step started event
                 await self.event_emitter.emit_step_started(
                     trace_id=state.trace.trace_id,
