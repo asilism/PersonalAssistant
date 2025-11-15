@@ -161,3 +161,26 @@ class PlanUpdate(BaseModel):
     completed_steps: int
     total_steps: int
     last_step_result: Optional[StepResult] = None
+
+
+class ExecutionEventType(str, Enum):
+    """Execution event types for streaming"""
+    EXECUTION_STARTED = "execution_started"
+    PLAN_CREATED = "plan_created"
+    STEP_STARTED = "step_started"
+    STEP_COMPLETED = "step_completed"
+    STEP_FAILED = "step_failed"
+    DECISION_MADE = "decision_made"
+    EXECUTION_COMPLETED = "execution_completed"
+    EXECUTION_ERROR = "execution_error"
+    NODE_ENTERED = "node_entered"
+    NODE_EXITED = "node_exited"
+
+
+class ExecutionEvent(BaseModel):
+    """Execution event for streaming logs"""
+    event_type: ExecutionEventType
+    trace_id: str
+    timestamp: datetime = Field(default_factory=datetime.now)
+    data: dict[str, Any] = Field(default_factory=dict)
+    message: Optional[str] = None

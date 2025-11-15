@@ -21,6 +21,7 @@ from .types import (
 )
 from .llm_client import create_llm_client, LLMClient
 from .validators import extract_missing_params
+from .event_emitter import get_event_emitter
 
 
 class Planner:
@@ -28,6 +29,7 @@ class Planner:
 
     def __init__(self, settings: OrchestrationSettings):
         self.settings = settings
+        self.event_emitter = get_event_emitter()
 
         # Determine LLM provider
         llm_provider = os.getenv("LLM_PROVIDER", "anthropic")
@@ -220,6 +222,23 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
 
             print(f"[Planner] Plan created successfully with {len(steps)} steps")
 
+            # Emit plan created event
+            steps_data = [
+                {
+                    "step_id": step.step_id,
+                    "tool_name": step.tool_name,
+                    "description": step.description,
+                    "dependencies": step.dependencies
+                }
+                for step in steps
+            ]
+            await self.event_emitter.emit_plan_created(
+                trace_id=state.trace.trace_id,
+                plan_id=plan_id,
+                steps=steps_data,
+                total_steps=len(steps)
+            )
+
             # Update state
             state.plan = plan
             state.plan_state = PlanState.PENDING
@@ -378,6 +397,15 @@ Return ONLY the JSON, no other text.
             if decision_type == "final":
                 # Task complete
                 print(f"[Planner] Decision: Task completed")
+
+                # Emit decision made event
+                await self.event_emitter.emit_decision_made(
+                    trace_id=state.trace.trace_id,
+                    decision_type="final",
+                    reason="All steps completed successfully",
+                    next_action="finalize"
+                )
+
                 state.type = StateType.FINAL
                 state.final_payload = decision_data["payload"]
                 return state
@@ -396,6 +424,14 @@ Return ONLY the JSON, no other text.
                     step_data["dependencies"] = normalized_deps
                     print(f"[Planner]   Dependencies normalized: {raw_deps} -> {normalized_deps}")
 
+                # Emit decision made event
+                await self.event_emitter.emit_decision_made(
+                    trace_id=state.trace.trace_id,
+                    decision_type="nextSteps",
+                    reason=f"Additional {len(next_steps_data)} steps required",
+                    next_action="dispatch"
+                )
+
                 # For simplicity, we'll transition to DISPATCH
                 # In production, you'd add steps to the existing plan
                 state.type = StateType.DISPATCH
@@ -404,6 +440,15 @@ Return ONLY the JSON, no other text.
             elif decision_type == "needsHuman":
                 # Needs human input
                 print(f"[Planner] Decision: Human intervention required")
+
+                # Emit decision made event
+                await self.event_emitter.emit_decision_made(
+                    trace_id=state.trace.trace_id,
+                    decision_type="needsHuman",
+                    reason=decision_data.get("reason", "Human intervention required"),
+                    next_action="human_in_the_loop"
+                )
+
                 state.type = StateType.HUMAN_IN_THE_LOOP
                 state.final_payload = decision_data["payload"]
                 return state
@@ -413,6 +458,15 @@ Return ONLY the JSON, no other text.
                 print(f"[Planner] Decision: Task failed")
                 error_msg = decision_data["payload"].get("error", "Task failed")
                 print(f"[Planner] Error: {error_msg}")
+
+                # Emit decision made event
+                await self.event_emitter.emit_decision_made(
+                    trace_id=state.trace.trace_id,
+                    decision_type="failed",
+                    reason=error_msg,
+                    next_action="error"
+                )
+
                 state.type = StateType.ERROR
                 state.error = error_msg
                 return state

@@ -9,6 +9,7 @@ from .types import State, StateType, PlanState, PlanUpdate
 from .mcp_executor import MCPExecutor
 from .tracker import TaskTracker
 from .placeholder_resolver import PlaceholderResolver
+from .event_emitter import get_event_emitter
 
 
 class TaskDispatcher:
@@ -18,6 +19,7 @@ class TaskDispatcher:
         self.tracker = tracker
         self.executor = executor
         self.resolver = PlaceholderResolver()
+        self.event_emitter = get_event_emitter()
 
     async def invoke(self, state: State) -> State:
         """
@@ -44,11 +46,40 @@ class TaskDispatcher:
             # For simplicity, execute steps sequentially
             # In production, respect dependencies and execute in parallel when possible
             for step in plan.steps:
+                # Emit step started event
+                await self.event_emitter.emit_step_started(
+                    trace_id=state.trace.trace_id,
+                    plan_id=plan.plan_id,
+                    step_id=step.step_id,
+                    step_description=step.description,
+                    tool_name=step.tool_name
+                )
+
                 # Resolve placeholders in step input
                 resolved_step = self.resolver.resolve_step_input(step)
 
                 # Execute step with resolved input
                 result = await self.executor.execute_step(resolved_step)
+
+                # Emit step completed or failed event
+                if result.status == "success":
+                    await self.event_emitter.emit_step_completed(
+                        trace_id=state.trace.trace_id,
+                        plan_id=plan.plan_id,
+                        step_id=step.step_id,
+                        step_description=step.description,
+                        output=result.output,
+                        duration=result.duration
+                    )
+                else:
+                    await self.event_emitter.emit_step_failed(
+                        trace_id=state.trace.trace_id,
+                        plan_id=plan.plan_id,
+                        step_id=step.step_id,
+                        step_description=step.description,
+                        error=result.error or "Unknown error",
+                        duration=result.duration
+                    )
 
                 # Register successful step outputs for future placeholder resolution
                 if result.status == "success" and result.output is not None:
