@@ -148,5 +148,5 @@ def power(base: float, exponent: float) -> dict:
 
 
 if __name__ == "__main__":
-    # Run as HTTP server on port 8003
-    mcp.run(transport="http", host="0.0.0.0", port=8003)
+    # Run as streamable-HTTP server on port 8003
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=8003)
