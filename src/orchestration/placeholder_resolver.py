@@ -138,18 +138,25 @@ class PlaceholderResolver:
 
         # Check if step output exists
         if step_id not in self._step_outputs:
-            print(f"[PlaceholderResolver] Step '{step_id}' not found in outputs")
+            print(f"[PlaceholderResolver] ERROR: Step '{step_id}' not found in registered outputs: {list(self._step_outputs.keys())}")
             return None
 
         value = self._step_outputs[step_id]
+        print(f"[PlaceholderResolver] Resolving '{normalized_placeholder}': Starting with step '{step_id}' = {type(value).__name__}")
 
         # Navigate through nested fields
-        for part in parts[1:]:
+        current_path = step_id
+        for i, part in enumerate(parts[1:], 1):
+            prev_value = value
             if isinstance(value, dict):
                 if part in value:
                     value = value[part]
+                    current_path += f".{part}"
+                    print(f"[PlaceholderResolver]   [{i}/{len(parts)-1}] {current_path} = {type(value).__name__}" +
+                          (f" (length {len(value)})" if isinstance(value, (list, dict)) else ""))
                 else:
-                    print(f"[PlaceholderResolver] Field '{part}' not found in {value}")
+                    available_keys = list(value.keys()) if isinstance(value, dict) else []
+                    print(f"[PlaceholderResolver] ERROR: Field '{part}' not found in dict at '{current_path}'. Available keys: {available_keys}")
                     return None
             elif isinstance(value, list):
                 # Support array indexing like events.0
@@ -157,16 +164,20 @@ class PlaceholderResolver:
                     index = int(part)
                     if 0 <= index < len(value):
                         value = value[index]
+                        current_path += f".{part}"
+                        print(f"[PlaceholderResolver]   [{i}/{len(parts)-1}] {current_path} = {type(value).__name__}" +
+                              (f" (length {len(value)})" if isinstance(value, (list, dict)) else ""))
                     else:
-                        print(f"[PlaceholderResolver] Index {index} out of range for list of length {len(value)}")
+                        print(f"[PlaceholderResolver] ERROR: Index {index} out of range at '{current_path}'. List has {len(prev_value)} elements (valid indices: 0-{len(prev_value)-1})")
                         return None
                 except ValueError:
-                    print(f"[PlaceholderResolver] Invalid list index: '{part}'")
+                    print(f"[PlaceholderResolver] ERROR: Invalid list index '{part}' at '{current_path}'. Expected integer, got '{part}'")
                     return None
             else:
-                print(f"[PlaceholderResolver] Cannot access field '{part}' on {type(value)}")
+                print(f"[PlaceholderResolver] ERROR: Cannot access field '{part}' on {type(value).__name__} at '{current_path}'. Value is not a dict or list.")
                 return None
 
+        print(f"[PlaceholderResolver] ✓ Successfully resolved '{normalized_placeholder}' = {value}")
         return value
 
     def _evaluate_expression(self, expression: str) -> Optional[Any]:

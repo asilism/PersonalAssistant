@@ -67,18 +67,18 @@ class TaskDispatcher:
                     print(f"[TaskDispatcher] Skipping already completed step: {step.step_id}")
                     continue
 
-                # Emit step started event
+                # Resolve placeholders in step input BEFORE emitting event
+                resolved_step = self.resolver.resolve_step_input(step)
+
+                # Emit step started event with resolved input
                 await self.event_emitter.emit_step_started(
                     trace_id=state.trace.trace_id,
                     plan_id=plan.plan_id,
                     step_id=step.step_id,
                     step_description=step.description,
                     tool_name=step.tool_name,
-                    tool_input=step.input
+                    tool_input=resolved_step.input  # Use resolved input for logging
                 )
-
-                # Resolve placeholders in step input
-                resolved_step = self.resolver.resolve_step_input(step)
 
                 # Execute step with resolved input
                 result = await self.executor.execute_step(resolved_step)
