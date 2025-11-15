@@ -52,10 +52,11 @@ class TaskDispatcher:
                 if completed_step.output is not None:
                     self.resolver.register_step_result(completed_step.step_id, completed_step.output)
 
-        # Execute steps
+        # Execute steps - STEP-BY-STEP approach
+        # Execute only ONE step at a time, then return to decision making
         try:
-            # For simplicity, execute steps sequentially
-            # In production, respect dependencies and execute in parallel when possible
+            # Find the first incomplete step
+            executed_step = False
             for step in plan.steps:
                 # Skip already successful steps
                 already_completed = any(
@@ -66,6 +67,9 @@ class TaskDispatcher:
                 if already_completed:
                     print(f"[TaskDispatcher] Skipping already completed step: {step.step_id}")
                     continue
+
+                # Found an incomplete step - execute it
+                print(f"[TaskDispatcher] Executing step: {step.step_id} ({step.description})")
 
                 # Resolve placeholders in step input BEFORE emitting event
                 resolved_step = self.resolver.resolve_step_input(step)
@@ -120,26 +124,36 @@ class TaskDispatcher:
                 )
                 await self.tracker.persist_plan_update(update)
 
-                # If step failed and is critical, stop execution
-                if result.status == "failure":
-                    # For now, continue execution even on failure
-                    # In production, check if step is critical
-                    pass
+                # Mark that we executed a step
+                executed_step = True
 
-            # All steps executed, gather results
+                # IMPORTANT: Execute only ONE step, then return to decision making
+                # This allows LLM to analyze the result before proceeding
+                print(f"[TaskDispatcher] Step {step.step_id} executed, transitioning to decision making")
+                break
+
+            # Gather current results
             results = await self.tracker.get_aggregated_results_for_group(plan.plan_id)
             state.results = results
 
-            # Update plan state to completed
-            update = PlanUpdate(
-                plan_id=plan.plan_id,
-                status=PlanState.COMPLETED,
-                completed_steps=len(results.completed_steps),
-                total_steps=results.total_steps
-            )
-            await self.tracker.persist_plan_update(update)
+            # Check if all steps are completed
+            all_completed = len(results.completed_steps) + len(results.failed_steps) >= results.total_steps
 
-            # Transition to decision making
+            if all_completed:
+                print(f"[TaskDispatcher] All steps executed ({results.total_steps} total)")
+                # Update plan state to completed
+                update = PlanUpdate(
+                    plan_id=plan.plan_id,
+                    status=PlanState.COMPLETED,
+                    completed_steps=len(results.completed_steps),
+                    total_steps=results.total_steps
+                )
+                await self.tracker.persist_plan_update(update)
+            else:
+                print(f"[TaskDispatcher] Progress: {len(results.completed_steps)}/{results.total_steps} completed, {len(results.failed_steps)} failed")
+
+            # Always transition to decision making after executing a step
+            # This allows LLM to analyze results and decide next action
             state.type = StateType.PLAN_OR_DECIDE
             return state
 
