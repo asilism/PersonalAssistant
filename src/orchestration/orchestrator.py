@@ -462,12 +462,15 @@ class Orchestrator:
         try:
             recent_history = await self.tracker.get_history(session_id, self.user_id)
             if recent_history.recent_plans:
-                # Get the most recent completed plan
-                recent_completed = [p for p in recent_history.recent_plans if p.status.value == "completed"]
-                if recent_completed:
-                    most_recent = recent_completed[-1]
-                    recent_results = self.tracker.get_step_results(most_recent.plan_id)
-                    if recent_results:
+                # Get the most recent plan (regardless of status) to reuse successful step results
+                # This is important for HITL scenarios where the plan is not yet completed
+                # but has already executed some steps successfully
+                most_recent = recent_history.recent_plans[-1]
+                recent_results = self.tracker.get_step_results(most_recent.plan_id)
+                if recent_results:
+                    # Filter for successful results only
+                    successful_results = [r for r in recent_results if r.status == "success"]
+                    if successful_results:
                         # Store recent results in additional context
                         additional_context["recent_plan_id"] = most_recent.plan_id
                         additional_context["recent_request"] = most_recent.request_text
@@ -478,7 +481,7 @@ class Orchestrator:
                                 "output": r.output,
                                 "status": r.status
                             }
-                            for r in recent_results if r.status == "success"
+                            for r in successful_results
                         ]
         except Exception as e:
             print(f"[Orchestrator] Warning: Could not load recent execution results: {e}")
