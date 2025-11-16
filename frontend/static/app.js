@@ -62,7 +62,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // Model options for each provider
 const modelOptions = {
     anthropic: [
-        'claude-sonnet-4-5-20250929'
+        'claude-sonnet-4-5-20250929',
+        'claude-haiku-4-5-20251001'
     ],
     openai: [
         'gpt-4-turbo-preview',
@@ -70,10 +71,8 @@ const modelOptions = {
         'gpt-3.5-turbo'
     ],
     openrouter: [
-        'anthropic/claude-3.5-sonnet',
-        'openai/gpt-4-turbo',
-        'google/gemini-pro',
-        'meta-llama/llama-3-70b-instruct'
+        'openai/gpt-oss-20b:free',
+        'openai/gpt-oss-120b:free',
     ]
 };
 
