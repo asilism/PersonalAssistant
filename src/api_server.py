@@ -465,17 +465,29 @@ async def get_chat_history(session_id: str, limit: Optional[int] = None):
 
 @app.delete("/api/chat-history")
 async def delete_chat_history(session_id: str):
-    """Delete chat history for a session"""
+    """Delete chat history for a session and return a new session ID"""
     try:
         logger.info(f"Deleting chat history for session_id={session_id}")
         success = settings_manager.delete_chat_history(session_id=session_id)
 
+        # Generate new session ID for fresh start
+        new_session_id = str(uuid.uuid4())
+        logger.info(f"Generated new session_id={new_session_id} for fresh conversation")
+
         if success:
             logger.info(f"Chat history deleted successfully for session_id={session_id}")
-            return {"success": True, "message": "Chat history deleted successfully"}
+            return {
+                "success": True,
+                "message": "Chat history deleted successfully",
+                "new_session_id": new_session_id
+            }
         else:
             logger.warning(f"No chat history found for session_id={session_id}")
-            return {"success": True, "message": "No chat history found"}
+            return {
+                "success": True,
+                "message": "No chat history found",
+                "new_session_id": new_session_id
+            }
 
     except Exception as e:
         logger.error(f"Error deleting chat history for session_id={session_id}: {str(e)}")

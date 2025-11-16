@@ -426,6 +426,16 @@ class Orchestrator:
             "retry_counts": state.retry_counts
         }
 
+    def _extract_recent_results(self, chat_history: list) -> str:
+        """Extract recent execution results from chat history"""
+        # Look for the most recent assistant message with execution results
+        for msg in reversed(chat_history):
+            if msg.role == "assistant":
+                # Return the most recent assistant response
+                # This could contain calendar events, emails, etc.
+                return msg.content
+        return ""
+
     async def run(self, session_id: str, request_text: str, trace_id: Optional[str] = None) -> dict:
         """
         Run the orchestrator with a user request
@@ -460,6 +470,9 @@ class Orchestrator:
         conversation_history = []
         for msg in chat_history:
             conversation_history.append(f"{msg.role}: {msg.content}")
+
+        # Extract recent results for context
+        recent_results = self._extract_recent_results(chat_history)
 
         # Configure thread_id for checkpointing (use session_id as thread_id)
         thread_config = {"configurable": {"thread_id": session_id}}
@@ -536,7 +549,13 @@ class Orchestrator:
                 "tenant": self.tenant,
                 "request_text": request_text,
                 "trace_id": trace_id,
-                "context": {"session_id": session_id, "conversation_history": conversation_history, "additional_context": {}},
+                "context": {
+                    "session_id": session_id,
+                    "conversation_history": conversation_history,
+                    "additional_context": {
+                        "recent_results": recent_results
+                    }
+                },
                 "plan": None,  # Will be created by planner or restored from checkpoint
                 "plan_state": None,
                 "results": None,

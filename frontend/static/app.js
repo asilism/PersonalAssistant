@@ -150,11 +150,18 @@ async function clearChatHistory() {
             // Clear UI
             chatMessages.innerHTML = '<div class="placeholder">메시지를 입력하세요...</div>';
 
-            // Generate new session ID
-            sessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('sessionId', sessionId);
+            // Use new session ID from backend
+            if (data.new_session_id) {
+                sessionId = data.new_session_id;
+                localStorage.setItem('sessionId', sessionId);
+                console.log('New session started with ID:', sessionId);
+            } else {
+                // Fallback: Generate new session ID (backward compatibility)
+                sessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('sessionId', sessionId);
+            }
 
-            alert('대화 이력이 삭제되었습니다.');
+            alert('대화 이력이 삭제되었습니다. 새로운 대화가 시작됩니다.');
         }
     } catch (error) {
         alert('대화 이력 삭제에 실패했습니다: ' + error.message);
