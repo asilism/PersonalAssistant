@@ -247,6 +247,191 @@ INIT → PLAN_OR_DECIDE → DISPATCH → PLAN_OR_DECIDE → ... → FINAL
 - **FINAL**: Task completed
 - **ERROR**: Error occurred
 
+### Detailed Orchestration Sequence Diagrams
+
+#### 1. Normal Execution Flow (Success Case)
+
+This diagram shows the happy path where planning and execution succeed without errors:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant API as API Server
+    participant Orch as Orchestrator
+    participant Planner
+    participant Dispatcher as Task Dispatcher
+    participant Executor as MCP Executor
+    participant MCP as MCP Server
+    participant Tracker as Task Tracker
+
+    User->>API: POST /api/orchestrate
+    API->>Orch: run(session_id, request_text)
+
+    Note over Orch: State: INIT → PLAN_OR_DECIDE
+
+    Orch->>Planner: create_plan(request, tools)
+    Planner->>Planner: LLM generates plan with steps
+    Planner-->>Orch: Plan(steps=[step_0, step_1, ...])
+
+    Note over Orch: State: PLAN_OR_DECIDE → DISPATCH
+
+    loop For each step in plan
+        Orch->>Dispatcher: dispatch(step)
+        Dispatcher->>Dispatcher: Find next executable step
+        Dispatcher->>Dispatcher: Resolve placeholders {{step_N.field}}
+
+        Dispatcher->>Executor: execute_step(step)
+        Executor->>Executor: Pre-execution validation
+        Executor->>MCP: call_tool(tool_name, input)
+        MCP-->>Executor: Tool result
+        Executor-->>Dispatcher: StepResult(status="success", output)
+
+        Dispatcher->>Tracker: save_result(step_id, result)
+        Tracker-->>Dispatcher: Result saved
+
+        Dispatcher-->>Orch: Step completed
+
+        Note over Orch: State: DISPATCH → PLAN_OR_DECIDE
+
+        Orch->>Planner: decide_next(tracker)
+        Planner->>Planner: Check remaining steps
+        alt More steps to execute
+            Planner-->>Orch: Decision: continue
+            Note over Orch: State: PLAN_OR_DECIDE → DISPATCH
+        else All steps completed
+            Planner->>Planner: LLM analyzes all results
+            Planner-->>Orch: Decision: final
+            Note over Orch: State: PLAN_OR_DECIDE → FINAL
+        end
+    end
+
+    Orch-->>API: Result(success=true, results)
+    API-->>User: 200 OK with results
+```
+
+#### 2. Error Handling and Recovery Flow
+
+This diagram shows how the system handles errors, retries, and human intervention:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Orch as Orchestrator
+    participant Planner
+    participant Dispatcher as Task Dispatcher
+    participant Executor as MCP Executor
+    participant MCP as MCP Server
+    participant Tracker as Task Tracker
+
+    Note over Orch: Executing step_1
+
+    Orch->>Dispatcher: dispatch(step_1)
+    Dispatcher->>Executor: execute_step(step_1)
+
+    alt Validation Error (HITL)
+        Executor->>Executor: validate_tool_input()
+        Executor->>Executor: Email validation failed
+        Executor-->>Dispatcher: StepResult(status="failure", error="Email validation failed")
+        Dispatcher-->>Orch: Step failed
+
+        Orch->>Planner: decide_next(tracker)
+        Planner->>Planner: Detect HITL requirement
+        Planner-->>Orch: Decision: needsHuman
+
+        Note over Orch: State: HUMAN_IN_THE_LOOP
+        Orch-->>User: Request: "Please provide valid email"
+
+        User->>Orch: HITL Response: "john.doe@company.com"
+
+        Note over Orch: Reset failed step & retry count
+        Orch->>Tracker: reset_step(step_1)
+
+        Note over Orch: State: HUMAN_IN_THE_LOOP → DISPATCH
+        Orch->>Dispatcher: dispatch(step_1) [retry]
+        Dispatcher->>Executor: execute_step(step_1, corrected_input)
+        Executor->>MCP: call_tool(tool_name, corrected_input)
+        MCP-->>Executor: Success
+        Executor-->>Dispatcher: StepResult(status="success")
+
+    else Retryable Error
+        Executor->>MCP: call_tool(tool_name, input)
+        MCP-->>Executor: Network timeout error
+        Executor-->>Dispatcher: StepResult(status="failure", error="Timeout")
+        Dispatcher-->>Orch: Step failed
+
+        Orch->>Planner: decide_next(tracker)
+        Planner->>Planner: Check retry count (1/3)
+        Planner->>Tracker: increment_retry_count(step_1)
+        Planner-->>Orch: Decision: retry
+
+        Note over Orch: State: PLAN_OR_DECIDE → DISPATCH
+        Orch->>Dispatcher: dispatch(step_1) [retry 1]
+        Dispatcher->>Executor: execute_step(step_1)
+        Executor->>MCP: call_tool(tool_name, input)
+        MCP-->>Executor: Success
+        Executor-->>Dispatcher: StepResult(status="success")
+
+    else Max Retries Exceeded
+        Note over Planner: Retry count: 3/3
+        Planner->>Planner: Check retry count (3/3)
+        Planner-->>Orch: Decision: failed (max retries)
+
+        Note over Orch: State: PLAN_OR_DECIDE → ERROR
+        Orch-->>User: Error: "Step failed after 3 retries"
+
+    else Non-retryable Error
+        Executor->>MCP: call_tool(tool_name, input)
+        Executor-->>Dispatcher: Error: "No MCP server found"
+        Dispatcher-->>Orch: Step failed
+
+        Orch->>Planner: decide_next(tracker)
+        Planner->>Planner: Detect non-retryable error
+        Planner-->>Orch: Decision: failed (non-retryable)
+
+        Note over Orch: State: PLAN_OR_DECIDE → ERROR
+        Orch-->>User: Error: "Tool not available"
+
+    else Dynamic Replanning
+        Note over Planner: All steps completed
+        Planner->>Planner: LLM analyzes results
+        Planner->>Planner: Need additional steps
+        Planner-->>Orch: Decision: nextSteps([step_4, step_5])
+
+        Note over Orch: State: PLAN_OR_DECIDE → DISPATCH
+        Orch->>Dispatcher: dispatch(step_4)
+        Note over Orch: Continue execution...
+    end
+```
+
+#### 3. Key Error Handling Mechanisms
+
+**Pre-execution Validation:**
+- Email format validation (blocks placeholder/fake domains)
+- Input schema validation
+- Unresolved template variable detection
+- Returns HITL request if validation fails
+
+**Retry Strategy:**
+- Per-step retry tracking with configurable limits (default: 3)
+- Non-retryable errors (e.g., "No MCP server found") fail immediately
+- Exponential backoff can be configured for network errors
+
+**Human-in-the-Loop (HITL):**
+- Triggered by validation failures or ambiguous situations
+- Preserves execution state using LangGraph checkpointer
+- User provides correction → System resets failed step → Retry with corrected input
+- Retry count is reset after HITL correction
+
+**Infinite Loop Prevention:**
+- Tracks total decision count (max: 10)
+- Prevents runaway loops in complex scenarios
+- Forces termination if excessive decision cycles occur
+
+**Dynamic Replanning:**
+- After all steps complete, LLM can add more steps based on results
+- Enables adaptive task execution
+- Example: Search results empty → Add step to retry with different query
+
 ## MCP Agent Servers
 
 The service includes 5 fully-functional MCP agent servers:
