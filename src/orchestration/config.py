@@ -79,6 +79,7 @@ class ConfigLoader:
         available_tools = mcp_tools if mcp_tools else self._get_default_tools()
 
         return OrchestrationSettings(
+            llm_provider=llm_provider,
             llm_model=llm_model,
             llm_api_key=llm_api_key,
             llm_base_url=llm_base_url,

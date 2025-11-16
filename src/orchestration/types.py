@@ -43,6 +43,7 @@ class ToolDefinition(BaseModel):
 
 class OrchestrationSettings(BaseModel):
     """Orchestration settings"""
+    llm_provider: str  # anthropic, openai, openrouter
     llm_model: str
     llm_api_key: str
     llm_base_url: Optional[str] = None
