@@ -54,12 +54,14 @@ class OrchestrationResponse(BaseModel):
 
 
 class SettingsRequest(BaseModel):
+    config_name: str  # Configuration name (e.g., "Claude Prod", "GPT Dev")
     provider: str
     api_key: str
     model: str
     base_url: Optional[str] = None
     max_retries: Optional[int] = 3
     timeout: Optional[int] = 30000
+    is_active: Optional[bool] = False  # Whether to set as active configuration
     user_id: Optional[str] = "test_user"
     tenant: Optional[str] = "test_tenant"
 
@@ -274,17 +276,19 @@ async def get_settings(user_id: str = "test_user", tenant: str = "test_tenant"):
 async def save_settings(request: SettingsRequest):
     """Save LLM settings"""
     try:
-        logger.info(f"Saving settings for user_id={request.user_id}, tenant={request.tenant}, provider={request.provider}, model={request.model}")
+        logger.info(f"Saving settings for user_id={request.user_id}, tenant={request.tenant}, config_name={request.config_name}, provider={request.provider}, model={request.model}")
 
         success = settings_manager.save_llm_settings(
             user_id=request.user_id,
             tenant=request.tenant,
+            config_name=request.config_name,
             provider=request.provider,
             api_key=request.api_key,
             model=request.model,
             base_url=request.base_url,
             max_retries=request.max_retries,
-            timeout=request.timeout
+            timeout=request.timeout,
+            is_active=request.is_active
         )
 
         if success:
@@ -294,14 +298,14 @@ async def save_settings(request: SettingsRequest):
                 del orchestrators[key]
                 logger.info(f"Cleared orchestrator cache for {key}")
 
-            logger.info(f"Settings saved successfully for user_id={request.user_id}")
-            return {"success": True, "message": "Settings saved successfully"}
+            logger.info(f"Settings saved successfully for user_id={request.user_id}, config_name={request.config_name}")
+            return {"success": True, "message": f"Settings '{request.config_name}' saved successfully"}
         else:
-            logger.error(f"Failed to save settings for user_id={request.user_id}")
+            logger.error(f"Failed to save settings for user_id={request.user_id}, config_name={request.config_name}")
             raise HTTPException(status_code=500, detail="Failed to save settings")
 
     except Exception as e:
-        logger.error(f"Error saving settings for user_id={request.user_id}, tenant={request.tenant}: {str(e)}")
+        logger.error(f"Error saving settings for user_id={request.user_id}, tenant={request.tenant}, config_name={request.config_name}: {str(e)}")
         logger.error(f"Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -321,6 +325,68 @@ async def test_connection(request: TestConnectionRequest):
         return result
     except Exception as e:
         logger.error(f"Error testing connection for provider={request.provider}: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/settings/{config_name}/activate")
+async def activate_settings(config_name: str, user_id: str = "test_user", tenant: str = "test_tenant"):
+    """Activate a specific LLM configuration"""
+    try:
+        logger.info(f"Activating settings config_name={config_name} for user_id={user_id}, tenant={tenant}")
+
+        success = settings_manager.set_active_llm_settings(
+            user_id=user_id,
+            tenant=tenant,
+            config_name=config_name
+        )
+
+        if success:
+            # Clear orchestrator cache to force reload with new active settings
+            key = f"{tenant}:{user_id}"
+            if key in orchestrators:
+                del orchestrators[key]
+                logger.info(f"Cleared orchestrator cache for {key}")
+
+            logger.info(f"Configuration '{config_name}' activated successfully")
+            return {"success": True, "message": f"Configuration '{config_name}' activated successfully"}
+        else:
+            logger.error(f"Configuration '{config_name}' not found")
+            raise HTTPException(status_code=404, detail=f"Configuration '{config_name}' not found")
+
+    except Exception as e:
+        logger.error(f"Error activating settings config_name={config_name}: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/settings/{config_name}")
+async def delete_settings(config_name: str, user_id: str = "test_user", tenant: str = "test_tenant"):
+    """Delete a specific LLM configuration"""
+    try:
+        logger.info(f"Deleting settings config_name={config_name} for user_id={user_id}, tenant={tenant}")
+
+        success = settings_manager.delete_llm_settings(
+            user_id=user_id,
+            tenant=tenant,
+            config_name=config_name
+        )
+
+        if success:
+            # Clear orchestrator cache to force reload
+            key = f"{tenant}:{user_id}"
+            if key in orchestrators:
+                del orchestrators[key]
+                logger.info(f"Cleared orchestrator cache for {key}")
+
+            logger.info(f"Configuration '{config_name}' deleted successfully")
+            return {"success": True, "message": f"Configuration '{config_name}' deleted successfully"}
+        else:
+            logger.error(f"Configuration '{config_name}' not found")
+            raise HTTPException(status_code=404, detail=f"Configuration '{config_name}' not found")
+
+    except Exception as e:
+        logger.error(f"Error deleting settings config_name={config_name}: {str(e)}")
         logger.error(f"Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 

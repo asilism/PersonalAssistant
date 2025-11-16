@@ -101,9 +101,38 @@
         <div id="settings-tab" class="tab-content">
             <div class="settings-container">
                 <h2>⚙️ LLM Settings</h2>
-                <p style="color: #666; margin-bottom: 20px;">Configure your LLM provider and API credentials</p>
+                <p style="color: #666; margin-bottom: 20px;">Manage multiple LLM configurations and select which one to use</p>
 
-                <div class="settings-card">
+                <!-- Saved Configurations List -->
+                <div class="current-settings-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3>Saved Configurations</h3>
+                        <button onclick="showAddConfigForm()" id="addConfigBtn" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                            ➕ Add New Configuration
+                        </button>
+                    </div>
+                    <div id="configsList">
+                        <div class="loading">Loading configurations...</div>
+                    </div>
+                </div>
+
+                <!-- Add/Edit Configuration Form (initially hidden) -->
+                <div class="settings-card" id="configFormCard" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 id="formTitle">Add New Configuration</h3>
+                        <button onclick="cancelConfigForm()" style="padding: 6px 12px; background: #999; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Cancel
+                        </button>
+                    </div>
+
+                    <input type="hidden" id="editingConfigName">
+
+                    <div class="form-group">
+                        <label for="configName">Configuration Name *</label>
+                        <input type="text" id="configName" placeholder="e.g., Claude Prod, GPT Dev" required>
+                        <small style="color: #666;">A unique name to identify this configuration</small>
+                    </div>
+
                     <div class="form-group">
                         <label for="llmProvider">LLM Provider</label>
                         <select id="llmProvider" onchange="updateModelOptions()">
@@ -144,20 +173,23 @@
                         <small style="color: #666;">Request timeout in milliseconds</small>
                     </div>
 
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="setAsActive">
+                            Set as active configuration
+                        </label>
+                        <small style="color: #666; display: block; margin-top: 5px;">
+                            If checked, this configuration will be used immediately
+                        </small>
+                    </div>
+
                     <div class="settings-actions">
                         <button onclick="testConnection()" id="testBtn">🧪 Test Connection</button>
-                        <button onclick="saveSettings()" id="saveBtn">💾 Save Settings</button>
+                        <button onclick="saveSettings()" id="saveBtn">💾 Save Configuration</button>
                     </div>
 
                     <div id="settingsResult" class="settings-result">
                         <!-- Result messages will appear here -->
-                    </div>
-                </div>
-
-                <div class="current-settings-card">
-                    <h3>Current Settings</h3>
-                    <div id="currentSettings">
-                        <div class="loading">Loading...</div>
                     </div>
                 </div>
             </div>
