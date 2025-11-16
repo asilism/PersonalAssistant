@@ -332,6 +332,8 @@ class Orchestrator:
 
         if state_type == StateType.DISPATCH.value:
             return "dispatch"
+        elif state_type == StateType.FINAL.value:
+            return "finalize"
         elif state_type == StateType.ERROR.value:
             return "error_handler"
         else:

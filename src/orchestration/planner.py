@@ -1170,6 +1170,20 @@ Return ONLY the JSON, no other text."""
             if not recent_results:
                 return ""
 
+            # Handle case where recent_results is a string (raw content from assistant message)
+            # instead of a structured list of results
+            if isinstance(recent_results, str):
+                lines = [
+                    "Recent execution results (from previous request):",
+                    f"  Previous request: {recent_request}",
+                    "  Available data from previous execution:",
+                    f"    {recent_results[:500]}"  # First 500 chars of the string
+                ]
+                if len(recent_results) > 500:
+                    lines.append("    ...")
+                return "\n".join(lines)
+
+            # Handle structured results (list of dicts)
             lines = [
                 "Recent execution results (from previous request):",
                 f"  Previous request: {recent_request}",
@@ -1177,7 +1191,7 @@ Return ONLY the JSON, no other text."""
             ]
 
             for result in recent_results:
-                if result.get("status") == "success":
+                if isinstance(result, dict) and result.get("status") == "success":
                     # Format the output for readability
                     output_preview = str(result.get("output", ""))[:300]  # First 300 chars
                     if len(str(result.get("output", ""))) > 300:
