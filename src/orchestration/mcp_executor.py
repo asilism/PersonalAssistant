@@ -48,10 +48,6 @@ class MCPExecutor:
             "rpa-agent": {
                 "url": "http://localhost:8005/mcp",
                 "transport": "streamable-http"
-            },
-            "contact-agent": {
-                "url": "http://localhost:8006/mcp",
-                "transport": "streamable-http"
             }
         }
 
@@ -260,12 +256,16 @@ class MCPExecutor:
         """Find which server provides a specific tool"""
         # Tool name to server mapping
         tool_server_map = {
-            # Mail agent
+            # Mail agent (includes contact lookup)
             "send_email": "mail-agent",
             "read_emails": "mail-agent",
             "get_email": "mail-agent",
             "delete_email": "mail-agent",
             "search_emails": "mail-agent",
+            "search_contacts": "mail-agent",
+            "get_contact_by_name": "mail-agent",
+            "get_contact_email": "mail-agent",
+            "list_all_contacts": "mail-agent",
 
             # Calendar agent
             "create_event": "calendar-agent",
@@ -292,12 +292,6 @@ class MCPExecutor:
             "search_latest_news": "rpa-agent",
             "write_report": "rpa-agent",
             "collect_attendance": "rpa-agent",
-
-            # Contact agent
-            "search_contacts": "contact-agent",
-            "get_contact_by_name": "contact-agent",
-            "get_contact_email": "contact-agent",
-            "list_all_contacts": "contact-agent",
         }
 
         return tool_server_map.get(tool_name)
