@@ -13,19 +13,115 @@ mcp = FastMCP("rpa-agent")
 
 # Mock data stores
 news_data = [
+    # Technology News
     {
         "title": "AI Breakthrough in Natural Language Processing",
         "source": "Tech News Daily",
-        "date": "2025-10-21",
+        "date": "2025-11-15",
         "summary": "Researchers announce major improvements in language model efficiency",
-        "url": "https://example.com/news/ai-breakthrough"
+        "url": "https://technews.com/news/ai-breakthrough"
     },
     {
         "title": "New Productivity Tools Released",
         "source": "Business Today",
-        "date": "2025-10-20",
+        "date": "2025-11-14",
         "summary": "Leading software companies unveil next-generation productivity suites",
-        "url": "https://example.com/news/productivity-tools"
+        "url": "https://business.com/news/productivity-tools"
+    },
+    {
+        "title": "Samsung Announces New Galaxy Series",
+        "source": "Samsung Newsroom",
+        "date": "2025-11-13",
+        "summary": "Samsung unveils latest flagship smartphones with advanced AI features and enhanced camera systems",
+        "url": "https://samsung.com/news/galaxy-series"
+    },
+    {
+        "title": "Samsung Electronics Reports Strong Q4 Results",
+        "source": "Financial Times",
+        "date": "2025-11-12",
+        "summary": "Samsung Electronics exceeds market expectations with record semiconductor sales",
+        "url": "https://ft.com/samsung-q4-results"
+    },
+    {
+        "title": "Quantum Computing Advances at Samsung Research",
+        "source": "Science Daily",
+        "date": "2025-11-11",
+        "summary": "Samsung researchers make breakthrough in quantum chip design",
+        "url": "https://sciencedaily.com/quantum-samsung"
+    },
+    # Business News
+    {
+        "title": "Global Tech Companies Focus on AI Integration",
+        "source": "Bloomberg",
+        "date": "2025-11-10",
+        "summary": "Major technology firms increase investment in artificial intelligence platforms",
+        "url": "https://bloomberg.com/ai-integration"
+    },
+    {
+        "title": "Startup Ecosystem Thrives in South Korea",
+        "source": "Korea Herald",
+        "date": "2025-11-09",
+        "summary": "Korean startups attract record foreign investment in tech sector",
+        "url": "https://koreaherald.com/startup-ecosystem"
+    },
+    {
+        "title": "Cloud Computing Market Expands Rapidly",
+        "source": "Tech Crunch",
+        "date": "2025-11-08",
+        "summary": "Cloud service providers report 40% year-over-year growth",
+        "url": "https://techcrunch.com/cloud-market"
+    },
+    # Product & Innovation News
+    {
+        "title": "Smart Home Devices Gain AI Capabilities",
+        "source": "CNET",
+        "date": "2025-11-07",
+        "summary": "New generation of smart home devices feature advanced AI assistants",
+        "url": "https://cnet.com/smart-home-ai"
+    },
+    {
+        "title": "5G Network Coverage Reaches 90% in Major Cities",
+        "source": "Telecom Today",
+        "date": "2025-11-06",
+        "summary": "Telecommunications providers achieve milestone in 5G deployment",
+        "url": "https://telecomtoday.com/5g-coverage"
+    },
+    # Industry News
+    {
+        "title": "Semiconductor Industry Faces Supply Chain Challenges",
+        "source": "Industry Week",
+        "date": "2025-11-05",
+        "summary": "Global chip manufacturers work to optimize production and distribution",
+        "url": "https://industryweek.com/semiconductor-supply"
+    },
+    {
+        "title": "Cybersecurity Threats Evolve with AI",
+        "source": "Security Magazine",
+        "date": "2025-11-04",
+        "summary": "Security experts warn of AI-powered cyber attacks and develop countermeasures",
+        "url": "https://securitymag.com/ai-threats"
+    },
+    {
+        "title": "Green Technology Investment Surges",
+        "source": "Environmental Tech",
+        "date": "2025-11-03",
+        "summary": "Companies increase spending on sustainable technology solutions",
+        "url": "https://envtech.com/green-investment"
+    },
+    # Jira & Project Management News
+    {
+        "title": "Agile Methodology Adoption Increases",
+        "source": "Project Management Today",
+        "date": "2025-11-02",
+        "summary": "More organizations embrace agile frameworks for software development",
+        "url": "https://pmtoday.com/agile-adoption"
+    },
+    {
+        "title": "Jira Releases New Automation Features",
+        "source": "Atlassian Blog",
+        "date": "2025-11-01",
+        "summary": "Latest Jira update includes enhanced workflow automation and AI-powered issue tracking",
+        "url": "https://atlassian.com/jira-automation"
     }
 ]
 

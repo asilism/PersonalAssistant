@@ -256,12 +256,16 @@ class MCPExecutor:
         """Find which server provides a specific tool"""
         # Tool name to server mapping
         tool_server_map = {
-            # Mail agent
+            # Mail agent (includes contact lookup)
             "send_email": "mail-agent",
             "read_emails": "mail-agent",
             "get_email": "mail-agent",
             "delete_email": "mail-agent",
             "search_emails": "mail-agent",
+            "search_contacts": "mail-agent",
+            "get_contact_by_name": "mail-agent",
+            "get_contact_email": "mail-agent",
+            "list_all_contacts": "mail-agent",
 
             # Calendar agent
             "create_event": "calendar-agent",
