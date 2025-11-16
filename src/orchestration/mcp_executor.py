@@ -48,6 +48,10 @@ class MCPExecutor:
             "rpa-agent": {
                 "url": "http://localhost:8005/mcp",
                 "transport": "streamable-http"
+            },
+            "contact-agent": {
+                "url": "http://localhost:8006/mcp",
+                "transport": "streamable-http"
             }
         }
 
@@ -288,6 +292,12 @@ class MCPExecutor:
             "search_latest_news": "rpa-agent",
             "write_report": "rpa-agent",
             "collect_attendance": "rpa-agent",
+
+            # Contact agent
+            "search_contacts": "contact-agent",
+            "get_contact_by_name": "contact-agent",
+            "get_contact_email": "contact-agent",
+            "list_all_contacts": "contact-agent",
         }
 
         return tool_server_map.get(tool_name)

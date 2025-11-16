@@ -155,15 +155,23 @@ IMPORTANT: FILTERING AND SEARCHING IN ARRAYS
 CRITICAL RULES FOR EMAIL ADDRESSES AND CONTACT INFORMATION:
 - NEVER fabricate or guess email addresses (e.g., DO NOT create "name@example.com" or "username@domain.com")
 - NEVER use placeholder domains like @example.com, @test.com, @sample.com
-- If the user provides only a name (e.g., "send email to John") without an email address:
-  * DO NOT guess the email address
-  * Instead, use a placeholder like "{{"contact_email"}}" in the input
-  * The system will ask the user for the correct email address
+- If the user provides only a name (e.g., "send email to 김민지" or "email to John") without an email address:
+  * ALWAYS use the contact lookup tool first to find the email address
+  * Use the "get_contact_email" tool with the person's name (supports Korean and English names)
+  * Then use the retrieved email address in subsequent steps (e.g., send_email)
+  * Example plan for "send email to 김민지":
+    Step 0: get_contact_email with name="김민지"
+    Step 1: send_email with to="{{{{step_0.email}}}}"
+- Contact lookup tools available:
+  * "get_contact_email" - Get email by name (Korean or English)
+  * "search_contacts" - Search contacts by name, department, etc.
+  * "get_contact_by_name" - Get full contact details by name
+  * "list_all_contacts" - List all contacts (with optional department filter)
 - Only use actual email addresses that:
   * Were explicitly provided by the user in their request
   * Are available in the provided context
-  * Are retrieved from a contact lookup tool (if available)
-- If you don't have a valid email address, use a template variable placeholder like "{{"recipient_email"}}" instead
+  * Are retrieved from contact lookup tools (get_contact_email, search_contacts, etc.)
+- If contact lookup fails and you don't have a valid email address, use a template variable placeholder like "{{"recipient_email"}}" and the system will ask the user
 
 CRITICAL RULES FOR REUSING PREVIOUS EXECUTION RESULTS:
 - ALWAYS check the "Recent execution results" section above for data from previous requests

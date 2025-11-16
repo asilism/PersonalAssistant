@@ -23,6 +23,7 @@ MCP_SERVERS = {
     "calculator_agent": {"port": 8003},
     "jira_agent": {"port": 8004},
     "rpa_agent": {"port": 8005},
+    "contact_agent": {"port": 8006},
 }
 
 
