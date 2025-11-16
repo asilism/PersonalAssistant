@@ -55,6 +55,9 @@ class TaskDispatcher:
         # Execute steps - STEP-BY-STEP approach
         # Execute only ONE step at a time, then return to decision making
         try:
+            # Max retries for failed steps (default from OrchestrationSettings)
+            MAX_RETRIES = 3
+
             # Find the first incomplete step
             executed_step = False
             for step in plan.steps:
@@ -67,6 +70,21 @@ class TaskDispatcher:
                 if already_completed:
                     print(f"[TaskDispatcher] Skipping already completed step: {step.step_id}")
                     continue
+
+                # Check if this step has exceeded max retries
+                retry_count = state.retry_counts.get(step.step_id, 0)
+                if retry_count >= MAX_RETRIES:
+                    print(f"[TaskDispatcher] Skipping step {step.step_id} - exceeded max retries ({retry_count}/{MAX_RETRIES})")
+                    continue
+
+                # Check if step dependencies are satisfied
+                if step.dependencies:
+                    completed_step_ids = {s.step_id for s in existing_results.completed_steps} if existing_results else set()
+                    deps_satisfied = all(dep in completed_step_ids for dep in step.dependencies)
+                    if not deps_satisfied:
+                        missing_deps = [dep for dep in step.dependencies if dep not in completed_step_ids]
+                        print(f"[TaskDispatcher] Skipping step {step.step_id} - dependencies not satisfied: {missing_deps}")
+                        continue
 
                 # Found an incomplete step - execute it
                 print(f"[TaskDispatcher] Executing step: {step.step_id} ({step.description})")

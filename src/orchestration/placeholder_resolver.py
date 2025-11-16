@@ -62,6 +62,17 @@ class PlaceholderResolver:
         if isinstance(value, str):
             return self._resolve_string(value)
         elif isinstance(value, dict):
+            # Check if this dict is actually a placeholder in dict form
+            # Some LLMs (like OpenRouter) may generate: {"step_0.result": ""}
+            # instead of the expected string format: "{{step_0.result}}"
+            if self._is_dict_placeholder(value):
+                # Extract the placeholder key and resolve it as a string
+                placeholder_key = list(value.keys())[0]
+                print(f"[PlaceholderResolver] Detected dict placeholder: {value} -> resolving as {{{{placeholder_key}}}}")
+                resolved = self._get_placeholder_value(placeholder_key)
+                if resolved is not None:
+                    return resolved
+                # If resolution failed, fall through to normal dict handling
             return self._resolve_dict(value)
         elif isinstance(value, list):
             return [self._resolve_value(item) for item in value]
@@ -350,6 +361,44 @@ class PlaceholderResolver:
             print(f"[PlaceholderResolver] Normalized array indexing: '{placeholder}' -> '{normalized}'")
 
         return normalized
+
+    def _is_dict_placeholder(self, data: dict) -> bool:
+        """
+        Check if a dict is actually a placeholder in dict form
+
+        Some LLMs may generate placeholders as: {"step_0.result": ""}
+        instead of the expected string format: "{{step_0.result}}"
+
+        This method detects such patterns:
+        - Dict has exactly one key
+        - The key starts with "step_" (step ID pattern)
+        - The value is empty string or any simple value
+
+        Args:
+            data: Dictionary to check
+
+        Returns:
+            True if this dict represents a placeholder, False otherwise
+        """
+        if not isinstance(data, dict):
+            return False
+
+        # Must have exactly one key
+        if len(data) != 1:
+            return False
+
+        key = list(data.keys())[0]
+
+        # Key must start with "step_" pattern (e.g., "step_0", "step_0.result", "step_1.field")
+        if not isinstance(key, str) or not key.startswith("step_"):
+            return False
+
+        # Value should be empty string or simple value (not nested structures)
+        value = data[key]
+        if isinstance(value, (dict, list)):
+            return False
+
+        return True
 
     def clear(self) -> None:
         """Clear all registered step outputs"""
