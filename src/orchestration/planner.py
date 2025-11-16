@@ -40,18 +40,15 @@ class Planner:
         self.tracker = tracker
         self.event_emitter = get_event_emitter()
 
-        # Determine LLM provider
-        llm_provider = os.getenv("LLM_PROVIDER", "anthropic")
-
-        # Create LLM client
+        # Create LLM client using provider from settings
         self.llm_client: LLMClient = create_llm_client(
             api_key=settings.llm_api_key,
             model=settings.llm_model,
-            provider=llm_provider,
+            provider=settings.llm_provider,
             base_url=settings.llm_base_url
         )
 
-        print(f"[Planner] Using {llm_provider} with model {settings.llm_model}")
+        print(f"[Planner] Using {settings.llm_provider} with model {settings.llm_model}")
 
     async def invoke(self, state: State) -> State:
         """
