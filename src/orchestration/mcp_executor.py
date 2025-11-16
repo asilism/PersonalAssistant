@@ -262,10 +262,7 @@ class MCPExecutor:
             "get_email": "mail-agent",
             "delete_email": "mail-agent",
             "search_emails": "mail-agent",
-            "search_contacts": "mail-agent",
-            "get_contact_by_name": "mail-agent",
-            "get_contact_email": "mail-agent",
-            "list_all_contacts": "mail-agent",
+            "lookup_contact": "mail-agent",
 
             # Calendar agent
             "create_event": "calendar-agent",
