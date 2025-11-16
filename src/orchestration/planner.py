@@ -118,22 +118,33 @@ For each step, specify:
 4. dependencies: which previous step IDs this depends on (empty list if none)
 
 PLACEHOLDER SYNTAX FOR REFERENCING PREVIOUS STEPS:
-IMPORTANT: Always use DOUBLE curly braces {{{{ }}}} for placeholders!
+CRITICAL: Placeholders MUST be STRING values wrapped in DOUBLE curly braces {{{{ }}}}
 
+✅ CORRECT FORMAT (placeholders as strings):
 - To reference a previous step's entire output: use {{{{step_N}}}} or {{{{step_N.result}}}}
-  Example: {{"numbers": [{{{{step_0.result}}}}, 150]}}
+  Example: {{"numbers": ["{{{{step_0.result}}}}", 150]}}
+  Example: {{"value": "{{{{step_0}}}}"}}
   NOTE: Steps are 0-indexed (step_0 is the first step, step_1 is the second, etc.)
 
 - To reference a specific field: use {{{{step_N.field_name}}}}
-  Example: {{"event_id": {{{{step_0.id}}}}}}
+  Example: {{"event_id": "{{{{step_0.id}}}}"}}
+  Example: {{"title": "{{{{step_1.name}}}}"}}
 
 - To access nested fields: use {{{{step_N.field.nested_field}}}}
-  Example: {{"title": {{{{step_0.event.title}}}}}}
+  Example: {{"title": "{{{{step_0.event.title}}}}"}}
 
 - To access array elements: use {{{{step_N.array_field.INDEX}}}} (dot notation)
-  Example: {{"event_id": {{{{step_0.events.0.id}}}}}}
-  Example: {{"recipient": {{{{step_1.events.0.attendees.0}}}}}}
+  Example: {{"event_id": "{{{{step_0.events.0.id}}}}"}}
+  Example: {{"recipient": "{{{{step_1.events.0.attendees.0}}}}"}}
   NOTE: Array indices use dot notation (events.0.id) NOT bracket notation (events[0].id)
+
+❌ FORBIDDEN FORMATS (will cause errors):
+- NEVER use dict/object format: {{"numbers": [{{"step_0.result": ""}}, 150]}} ❌ WRONG!
+- NEVER use placeholder key: {{"numbers": [{{"placeholder": "step_0"}}, 150]}} ❌ WRONG!
+- NEVER use ref key: {{"value": {{"ref": "step_0"}}}} ❌ WRONG!
+- Placeholders MUST be quoted strings, NOT objects or dicts
+
+✅ ALWAYS use this format: "{{{{step_N.field}}}}" (quoted string with double braces)
 
 IMPORTANT: FILTERING AND SEARCHING IN ARRAYS
 - When the user asks for a specific item (e.g., "update Project Review event"), DO NOT blindly use index 0
@@ -552,10 +563,21 @@ DECISION OPTIONS:
 4. "failed" - Task failed and cannot continue
 
 PLACEHOLDER SYNTAX FOR NEXT STEPS (when needed):
-- To reference previous step output: {{{{step_N}}}} or {{{{step_N.field_name}}}}
-- To access array elements: {{{{step_N.array.0.id}}}} (use dot notation)
+CRITICAL: Placeholders MUST be STRING values wrapped in DOUBLE curly braces {{{{ }}}}
+
+✅ CORRECT FORMAT:
+- Reference step output: {{"value": "{{{{step_N}}}}"}} or {{"id": "{{{{step_N.field_name}}}}"}}
+- Array elements: {{"event_id": "{{{{step_N.array.0.id}}}}"}} (use dot notation)
+- Example: {{"numbers": ["{{{{step_0.result}}}}", 150]}}
 - NOTE: Steps are 0-indexed (step_0 is first step, step_1 is second, etc.)
-- But prefer using actual values from the results when possible!
+
+❌ FORBIDDEN FORMATS:
+- NEVER: {{"value": {{"step_0": ""}}}} ❌
+- NEVER: {{"value": {{"placeholder": "step_0"}}}} ❌
+- NEVER: {{"value": {{"ref": "step_0.result"}}}} ❌
+- Placeholders MUST be quoted strings: "{{{{step_N}}}}" ✅
+
+Prefer using actual values from results when possible!
 
 Return your decision as JSON:
 {{
