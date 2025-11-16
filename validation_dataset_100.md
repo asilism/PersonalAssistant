@@ -39,12 +39,12 @@
 19. PROJ-3 이슈를 "Done" 상태로 변경해줘
 20. "Bug fix"라는 설명이 포함된 이슈를 검색해줘
 
-### Contact Agent (21-25)
+### Contact Lookup (21-25)
 21. 김민지의 이메일 주소를 찾아줘
-22. Engineering 부서의 모든 연락처를 보여줘
-23. "Haneul"이 포함된 연락처를 검색해줘
+22. 박지수의 연락처 정보를 알려줘
+23. "Haneul"이라는 이름으로 연락처를 찾아줘
 24. 이하늘의 전화번호를 알려줘
-25. 모든 연락처 목록을 보여줘
+25. minji@samsung.com 이메일 주소의 연락처 정보를 보여줘
 
 ---
 
@@ -164,17 +164,15 @@
 #### Calculator Agent
 - add, subtract, multiply, divide, power
 
-#### Mail Agent
+#### Mail Agent (Email + Contact Lookup)
 - send_email, read_emails, get_email, delete_email, search_emails
+- **lookup_contact** - Universal contact lookup by name or email
 
 #### Calendar Agent
 - create_event, read_event, update_event, delete_event, list_events
 
 #### Jira Agent
 - create_issue, read_issue, update_issue, delete_issue, search_issues
-
-#### Contact Agent (NEW)
-- search_contacts, get_contact_by_name, get_contact_email, list_all_contacts
 
 #### RPA Agent
 - search_latest_news, write_report, collect_attendance
@@ -204,13 +202,21 @@
 
 ### Contact Lookup 기능 활용
 
-- 이름만 제공된 경우 자동으로 contact lookup 수행
-- 한국어 이름과 영어 이름 모두 지원
-- 부서별 연락처 조회 가능
-- 이메일 주소 자동 검색 및 치환
+**lookup_contact** 툴 특징:
+- 범용 연락처 조회 툴 (이름 또는 이메일로 검색)
+- 한국어 이름과 영어 이름 모두 지원 (예: "김민지", "Minji Kim")
+- Exact match 및 partial match 지원
+- 이메일 주소로도 검색 가능 (예: "minji@samsung.com")
+- 반환값: name, name_en, email, phone, department, position
+
+사용 예시:
+- lookup_contact("김민지") → 김민지의 전체 연락처 정보
+- lookup_contact("Haneul") → 이하늘의 연락처 정보 (부분 매칭)
+- lookup_contact("minji@samsung.com") → 이메일로 연락처 조회
 
 ---
 
 **생성일**: 2025-11-16
-**버전**: 1.0
+**버전**: 1.1
 **목적**: Personal Assistant 시스템 검증 및 테스트
+**변경사항 (v1.1)**: Contact lookup 툴을 4개에서 1개(lookup_contact)로 통합 및 간소화

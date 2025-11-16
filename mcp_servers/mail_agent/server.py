@@ -583,147 +583,67 @@ def search_emails(query: str, field: str = "all") -> dict:
 
 
 @mcp.tool()
-def search_contacts(
-    query: str,
-    search_field: str = "all"
-) -> dict:
-    """Search for contacts by name, email, or other fields
+def lookup_contact(query: str) -> dict:
+    """Lookup contact information by name or email address
+
+    This is a universal contact lookup tool that searches by:
+    - Name (Korean or English, exact or partial match)
+    - Email address
 
     Args:
-        query: Search query (supports Korean names, English names, or email)
-        search_field: Field to search in (name, email, department, all)
+        query: Person's name (e.g., "김민지", "Minji Kim") or email address (e.g., "minji@samsung.com")
 
     Returns:
-        List of matching contacts
+        Contact details including name, email, phone, department, position if found
+
+    Examples:
+        - lookup_contact("김민지") -> Returns Minji Kim's full contact info
+        - lookup_contact("Haneul") -> Returns Haneul Lee's contact info
+        - lookup_contact("minji@samsung.com") -> Returns contact by email
     """
     query_lower = query.lower().strip()
-    results = []
 
+    # Check if query is an email address
+    if "@" in query:
+        # Email search
+        for contact in contacts_db:
+            if query_lower == contact.get("email", "").lower():
+                return {
+                    "success": True,
+                    "contact": contact,
+                    "match_type": "email"
+                }
+
+        return {
+            "success": False,
+            "error": f"No contact found for email: {query}"
+        }
+
+    # Name search - try exact match first
     for contact in contacts_db:
-        if search_field == "all":
-            # Search in all fields
-            searchable = [
-                contact.get("name", ""),
-                contact.get("name_en", ""),
-                contact.get("email", ""),
-                contact.get("department", ""),
-                contact.get("position", "")
-            ]
-            if any(query_lower in field.lower() for field in searchable if field):
-                results.append(contact)
-        elif search_field == "name":
-            # Search in both Korean and English names
-            if (query_lower in contact.get("name", "").lower() or
-                query_lower in contact.get("name_en", "").lower()):
-                results.append(contact)
-        elif search_field == "email":
-            if query_lower in contact.get("email", "").lower():
-                results.append(contact)
-        elif search_field == "department":
-            if query_lower in contact.get("department", "").lower():
-                results.append(contact)
-
-    return {
-        "success": True,
-        "query": query,
-        "count": len(results),
-        "contacts": results
-    }
-
-
-@mcp.tool()
-def get_contact_by_name(name: str) -> dict:
-    """Get contact details by exact or partial name match (supports Korean and English names)
-
-    Args:
-        name: Person's name (Korean or English)
-
-    Returns:
-        Contact details if found
-    """
-    name_lower = name.lower().strip()
-
-    # Try exact match first
-    for contact in contacts_db:
-        if (contact.get("name", "").lower() == name_lower or
-            contact.get("name_en", "").lower() == name_lower):
+        if (contact.get("name", "").lower() == query_lower or
+            contact.get("name_en", "").lower() == query_lower):
             return {
                 "success": True,
                 "contact": contact,
-                "match_type": "exact"
+                "match_type": "exact_name"
             }
 
-    # Try partial match
+    # Name search - try partial match
     for contact in contacts_db:
-        if (name_lower in contact.get("name", "").lower() or
-            name_lower in contact.get("name_en", "").lower()):
+        if (query_lower in contact.get("name", "").lower() or
+            query_lower in contact.get("name_en", "").lower()):
             return {
                 "success": True,
                 "contact": contact,
-                "match_type": "partial"
+                "match_type": "partial_name"
             }
 
     return {
         "success": False,
-        "error": f"No contact found for name: {name}",
-        "suggestion": "Try searching with search_contacts for partial matches"
+        "error": f"No contact found for: {query}",
+        "suggestion": "Please check the spelling or try a different name/email"
     }
-
-
-@mcp.tool()
-def get_contact_email(name: str) -> dict:
-    """Get email address for a person by name (convenience function)
-
-    Args:
-        name: Person's name (Korean or English)
-
-    Returns:
-        Email address if contact found
-    """
-    result = get_contact_by_name(name)
-
-    if result.get("success"):
-        contact = result["contact"]
-        return {
-            "success": True,
-            "name": name,
-            "email": contact["email"],
-            "name_ko": contact.get("name", ""),
-            "name_en": contact.get("name_en", "")
-        }
-    else:
-        return {
-            "success": False,
-            "error": f"No email found for name: {name}",
-            "suggestion": "Please verify the name or use search_contacts to find similar names"
-        }
-
-
-@mcp.tool()
-def list_all_contacts(department: Optional[str] = None) -> dict:
-    """List all contacts, optionally filtered by department
-
-    Args:
-        department: Optional department filter
-
-    Returns:
-        List of contacts
-    """
-    if department:
-        dept_lower = department.lower()
-        filtered = [c for c in contacts_db if dept_lower in c.get("department", "").lower()]
-        return {
-            "success": True,
-            "department": department,
-            "count": len(filtered),
-            "contacts": filtered
-        }
-    else:
-        return {
-            "success": True,
-            "count": len(contacts_db),
-            "contacts": contacts_db
-        }
 
 
 if __name__ == "__main__":
