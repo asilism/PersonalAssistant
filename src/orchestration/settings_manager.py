@@ -14,12 +14,14 @@ from pydantic import BaseModel
 
 class LLMSettings(BaseModel):
     """LLM Settings model"""
+    config_name: str  # Configuration name (e.g., "Claude Prod", "GPT Dev")
     provider: str  # anthropic, openai, openrouter
     api_key: str
     model: str
     base_url: Optional[str] = None
     max_retries: int = 3
     timeout: int = 30000  # milliseconds
+    is_active: bool = False  # Whether this configuration is currently active
 
 
 class MCPServerSettings(BaseModel):
@@ -89,15 +91,17 @@ class SettingsManager:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id TEXT NOT NULL,
                     tenant TEXT NOT NULL,
+                    config_name TEXT NOT NULL,
                     provider TEXT NOT NULL,
                     api_key_encrypted TEXT NOT NULL,
                     model TEXT NOT NULL,
                     base_url TEXT,
                     max_retries INTEGER DEFAULT 3,
                     timeout INTEGER DEFAULT 30000,
+                    is_active INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(user_id, tenant)
+                    UNIQUE(user_id, tenant, config_name)
                 )
             """)
 
@@ -122,9 +126,79 @@ class SettingsManager:
                 cursor.execute("ALTER TABLE llm_settings ADD COLUMN timeout INTEGER DEFAULT 30000")
                 migrations_performed.append("timeout")
 
+            if "config_name" not in columns:
+                print("⚠️  Migrating database: Adding config_name column to llm_settings table")
+                cursor.execute("ALTER TABLE llm_settings ADD COLUMN config_name TEXT DEFAULT 'Default'")
+                migrations_performed.append("config_name")
+
+            if "is_active" not in columns:
+                print("⚠️  Migrating database: Adding is_active column to llm_settings table")
+                cursor.execute("ALTER TABLE llm_settings ADD COLUMN is_active INTEGER DEFAULT 0")
+                migrations_performed.append("is_active")
+
+                # Set first existing record as active for each user/tenant
+                cursor.execute("""
+                    UPDATE llm_settings
+                    SET is_active = 1
+                    WHERE id IN (
+                        SELECT MIN(id)
+                        FROM llm_settings
+                        GROUP BY user_id, tenant
+                    )
+                """)
+
             if migrations_performed:
                 conn.commit()
                 print(f"✅ Database migration complete: Added columns {', '.join(migrations_performed)}")
+
+                # Handle UNIQUE constraint migration
+                if "config_name" in migrations_performed:
+                    print("⚠️  Migrating UNIQUE constraint from (user_id, tenant) to (user_id, tenant, config_name)")
+                    # SQLite doesn't support ALTER TABLE DROP CONSTRAINT, so we need to recreate the table
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='llm_settings_new'")
+                    if not cursor.fetchone():
+                        # Create new table with correct schema
+                        cursor.execute("""
+                            CREATE TABLE llm_settings_new (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                user_id TEXT NOT NULL,
+                                tenant TEXT NOT NULL,
+                                config_name TEXT NOT NULL,
+                                provider TEXT NOT NULL,
+                                api_key_encrypted TEXT NOT NULL,
+                                model TEXT NOT NULL,
+                                base_url TEXT,
+                                max_retries INTEGER DEFAULT 3,
+                                timeout INTEGER DEFAULT 30000,
+                                is_active INTEGER DEFAULT 0,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                UNIQUE(user_id, tenant, config_name)
+                            )
+                        """)
+
+                        # Copy data from old table
+                        cursor.execute("""
+                            INSERT INTO llm_settings_new
+                            (id, user_id, tenant, config_name, provider, api_key_encrypted, model,
+                             base_url, max_retries, timeout, is_active, created_at, updated_at)
+                            SELECT id, user_id, tenant,
+                                   COALESCE(config_name, 'Default'),
+                                   provider, api_key_encrypted, model,
+                                   base_url,
+                                   COALESCE(max_retries, 3),
+                                   COALESCE(timeout, 30000),
+                                   COALESCE(is_active, 0),
+                                   created_at, updated_at
+                            FROM llm_settings
+                        """)
+
+                        # Drop old table and rename new one
+                        cursor.execute("DROP TABLE llm_settings")
+                        cursor.execute("ALTER TABLE llm_settings_new RENAME TO llm_settings")
+
+                        conn.commit()
+                        print("✅ UNIQUE constraint migration complete")
 
             # Create index for faster lookups
             cursor.execute("""
@@ -212,12 +286,14 @@ class SettingsManager:
         self,
         user_id: str,
         tenant: str,
+        config_name: str,
         provider: str,
         api_key: str,
         model: str,
         base_url: Optional[str] = None,
         max_retries: int = 3,
-        timeout: int = 30000
+        timeout: int = 30000,
+        is_active: bool = False
     ) -> bool:
         """Save LLM settings for a user"""
         encrypted_key = self._encrypt_api_key(api_key)
@@ -225,61 +301,164 @@ class SettingsManager:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
+            # If setting this as active, deactivate all other configs for this user/tenant
+            if is_active:
+                cursor.execute("""
+                    UPDATE llm_settings
+                    SET is_active = 0
+                    WHERE user_id = ? AND tenant = ? AND config_name != ?
+                """, (user_id, tenant, config_name))
+
             # Upsert (insert or update)
             cursor.execute("""
-                INSERT INTO llm_settings (user_id, tenant, provider, api_key_encrypted, model, base_url, max_retries, timeout)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(user_id, tenant) DO UPDATE SET
+                INSERT INTO llm_settings (user_id, tenant, config_name, provider, api_key_encrypted, model, base_url, max_retries, timeout, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, tenant, config_name) DO UPDATE SET
                     provider = excluded.provider,
                     api_key_encrypted = excluded.api_key_encrypted,
                     model = excluded.model,
                     base_url = excluded.base_url,
                     max_retries = excluded.max_retries,
                     timeout = excluded.timeout,
+                    is_active = excluded.is_active,
                     updated_at = CURRENT_TIMESTAMP
-            """, (user_id, tenant, provider, encrypted_key, model, base_url, max_retries, timeout))
+            """, (user_id, tenant, config_name, provider, encrypted_key, model, base_url, max_retries, timeout, int(is_active)))
 
             conn.commit()
 
         return True
 
     def get_llm_settings(self, user_id: str, tenant: str) -> Optional[LLMSettings]:
-        """Get LLM settings for a user"""
+        """Get active LLM settings for a user (backward compatibility)"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT provider, api_key_encrypted, model, base_url, max_retries, timeout
+                SELECT config_name, provider, api_key_encrypted, model, base_url, max_retries, timeout, is_active
                 FROM llm_settings
-                WHERE user_id = ? AND tenant = ?
+                WHERE user_id = ? AND tenant = ? AND is_active = 1
             """, (user_id, tenant))
 
             row = cursor.fetchone()
 
             if row:
-                provider, encrypted_key, model, base_url, max_retries, timeout = row
+                config_name, provider, encrypted_key, model, base_url, max_retries, timeout, is_active = row
                 api_key = self._decrypt_api_key(encrypted_key)
 
                 return LLMSettings(
+                    config_name=config_name,
                     provider=provider,
                     api_key=api_key,
                     model=model,
                     base_url=base_url,
                     max_retries=max_retries or 3,
-                    timeout=timeout or 30000
+                    timeout=timeout or 30000,
+                    is_active=bool(is_active)
                 )
 
         return None
 
-    def delete_llm_settings(self, user_id: str, tenant: str) -> bool:
-        """Delete LLM settings for a user"""
+    def get_all_llm_settings(self, user_id: str, tenant: str) -> list[LLMSettings]:
+        """Get all LLM settings for a user"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT config_name, provider, api_key_encrypted, model, base_url, max_retries, timeout, is_active
+                FROM llm_settings
+                WHERE user_id = ? AND tenant = ?
+                ORDER BY is_active DESC, created_at ASC
+            """, (user_id, tenant))
+
+            settings_list = []
+            for row in cursor.fetchall():
+                config_name, provider, encrypted_key, model, base_url, max_retries, timeout, is_active = row
+                api_key = self._decrypt_api_key(encrypted_key)
+
+                settings_list.append(LLMSettings(
+                    config_name=config_name,
+                    provider=provider,
+                    api_key=api_key,
+                    model=model,
+                    base_url=base_url,
+                    max_retries=max_retries or 3,
+                    timeout=timeout or 30000,
+                    is_active=bool(is_active)
+                ))
+
+            return settings_list
+
+    def get_llm_settings_by_name(self, user_id: str, tenant: str, config_name: str) -> Optional[LLMSettings]:
+        """Get specific LLM settings by configuration name"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT config_name, provider, api_key_encrypted, model, base_url, max_retries, timeout, is_active
+                FROM llm_settings
+                WHERE user_id = ? AND tenant = ? AND config_name = ?
+            """, (user_id, tenant, config_name))
+
+            row = cursor.fetchone()
+
+            if row:
+                config_name, provider, encrypted_key, model, base_url, max_retries, timeout, is_active = row
+                api_key = self._decrypt_api_key(encrypted_key)
+
+                return LLMSettings(
+                    config_name=config_name,
+                    provider=provider,
+                    api_key=api_key,
+                    model=model,
+                    base_url=base_url,
+                    max_retries=max_retries or 3,
+                    timeout=timeout or 30000,
+                    is_active=bool(is_active)
+                )
+
+        return None
+
+    def set_active_llm_settings(self, user_id: str, tenant: str, config_name: str) -> bool:
+        """Set a specific configuration as active (deactivates all others)"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            # First, check if the config exists
+            cursor.execute("""
+                SELECT id FROM llm_settings
+                WHERE user_id = ? AND tenant = ? AND config_name = ?
+            """, (user_id, tenant, config_name))
+
+            if not cursor.fetchone():
+                return False
+
+            # Deactivate all configs for this user/tenant
+            cursor.execute("""
+                UPDATE llm_settings
+                SET is_active = 0
+                WHERE user_id = ? AND tenant = ?
+            """, (user_id, tenant))
+
+            # Activate the specified config
+            cursor.execute("""
+                UPDATE llm_settings
+                SET is_active = 1
+                WHERE user_id = ? AND tenant = ? AND config_name = ?
+            """, (user_id, tenant, config_name))
+
+            conn.commit()
+
+        return True
+
+    def delete_llm_settings(self, user_id: str, tenant: str, config_name: str) -> bool:
+        """Delete specific LLM settings by configuration name"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
             cursor.execute("""
                 DELETE FROM llm_settings
-                WHERE user_id = ? AND tenant = ?
-            """, (user_id, tenant))
+                WHERE user_id = ? AND tenant = ? AND config_name = ?
+            """, (user_id, tenant, config_name))
 
             deleted = cursor.rowcount > 0
             conn.commit()
@@ -287,33 +466,34 @@ class SettingsManager:
         return deleted
 
     def get_all_settings(self, user_id: str, tenant: str) -> Dict[str, Any]:
-        """Get all settings for a user (for UI display, with masked API key)"""
-        settings = self.get_llm_settings(user_id, tenant)
+        """Get all LLM settings for a user (for UI display, with masked API keys)"""
+        all_settings = self.get_all_llm_settings(user_id, tenant)
 
-        if settings:
-            # Mask API key for display (show only last 4 characters)
-            masked_key = "*" * (len(settings.api_key) - 4) + settings.api_key[-4:]
+        if all_settings:
+            configs = []
+            for settings in all_settings:
+                # Mask API key for display (show only last 4 characters)
+                masked_key = "*" * (len(settings.api_key) - 4) + settings.api_key[-4:]
+
+                configs.append({
+                    "config_name": settings.config_name,
+                    "provider": settings.provider,
+                    "api_key_masked": masked_key,
+                    "model": settings.model,
+                    "base_url": settings.base_url,
+                    "max_retries": settings.max_retries,
+                    "timeout": settings.timeout,
+                    "is_active": settings.is_active
+                })
 
             return {
-                "provider": settings.provider,
-                "api_key_masked": masked_key,
-                "api_key_set": True,
-                "model": settings.model,
-                "base_url": settings.base_url,
-                "max_retries": settings.max_retries,
-                "timeout": settings.timeout,
-                "has_settings": True
+                "has_settings": True,
+                "configs": configs
             }
 
         return {
-            "provider": "anthropic",
-            "api_key_masked": "",
-            "api_key_set": False,
-            "model": "claude-3-5-sonnet-20241022",
-            "base_url": None,
-            "max_retries": 3,
-            "timeout": 30000,
-            "has_settings": False
+            "has_settings": False,
+            "configs": []
         }
 
     def test_connection(

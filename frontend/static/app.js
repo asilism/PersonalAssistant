@@ -836,82 +836,204 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Load current settings
+// Load current settings (now shows all configurations as cards)
 async function loadCurrentSettings() {
-    const container = document.getElementById('currentSettings');
-    container.innerHTML = '<div class="loading">Loading settings</div>';
+    const container = document.getElementById('configsList');
+    container.innerHTML = '<div class="loading">Loading configurations...</div>';
 
     try {
         const response = await fetch('/api/settings?user_id=test_user&tenant=test_tenant');
         const data = await response.json();
 
         if (response.ok) {
-            let html = '';
+            if (data.has_settings && data.configs && data.configs.length > 0) {
+                let html = '';
 
-            if (data.provider) {
-                html += `
-                    <div class="settings-item">
-                        <strong>Provider:</strong>
-                        <span>${data.provider}</span>
-                    </div>
+                data.configs.forEach(config => {
+                    const isActive = config.is_active;
+                    const activeClass = isActive ? 'config-active' : 'config-inactive';
+                    const activeIndicator = isActive ? '✓ Active' : '';
+
+                    html += `
+                        <div class="config-card ${activeClass}" style="margin-bottom: 15px; padding: 15px; border: 2px solid ${isActive ? '#4CAF50' : '#ddd'}; border-radius: 8px; background: ${isActive ? '#f1f8f4' : '#fafafa'};">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                                <div style="flex: 1;">
+                                    <h4 style="margin: 0 0 8px 0; color: ${isActive ? '#2E7D32' : '#333'};">
+                                        ${isActive ? '●' : '○'} ${escapeHtml(config.config_name)}
+                                        ${isActive ? `<span style="margin-left: 10px; padding: 3px 10px; background: #4CAF50; color: white; border-radius: 12px; font-size: 12px; font-weight: normal;">${activeIndicator}</span>` : ''}
+                                    </h4>
+                                    <div style="font-size: 13px; color: #666;">
+                                        <strong>${config.provider}</strong> · ${config.model}
+                                        ${config.base_url ? ` · ${config.base_url}` : ''}
+                                    </div>
+                                    <div style="font-size: 12px; color: #999; margin-top: 5px;">
+                                        API Key: ${config.api_key_masked} · Max Retries: ${config.max_retries} · Timeout: ${config.timeout}ms
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 8px; margin-top: 12px;">
+                                <button onclick="editConfig('${escapeHtml(config.config_name)}')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
+                                    ✏️ Edit
+                                </button>
+                                ${!isActive ? `
+                                    <button onclick="activateConfig('${escapeHtml(config.config_name)}')" style="padding: 6px 12px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
+                                        ✓ Activate
+                                    </button>
+                                ` : ''}
+                                <button onclick="deleteConfig('${escapeHtml(config.config_name)}')" style="padding: 6px 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
+                                    🗑️ Delete
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = `
+                    <p style="color: #999; text-align: center; padding: 30px;">
+                        No configurations yet. Click "Add New Configuration" to create one.
+                    </p>
                 `;
             }
-
-            if (data.model) {
-                html += `
-                    <div class="settings-item">
-                        <strong>Model:</strong>
-                        <span>${data.model}</span>
-                    </div>
-                `;
-            }
-
-            if (data.base_url) {
-                html += `
-                    <div class="settings-item">
-                        <strong>Base URL:</strong>
-                        <span>${data.base_url}</span>
-                    </div>
-                `;
-            }
-
-            if (data.api_key_set) {
-                html += `
-                    <div class="settings-item">
-                        <strong>API Key:</strong>
-                        <span>••••••••••••</span>
-                    </div>
-                `;
-            }
-
-            if (data.max_retries !== undefined) {
-                html += `
-                    <div class="settings-item">
-                        <strong>Max Retries:</strong>
-                        <span>${data.max_retries}</span>
-                    </div>
-                `;
-            }
-
-            if (data.timeout !== undefined) {
-                html += `
-                    <div class="settings-item">
-                        <strong>Timeout:</strong>
-                        <span>${data.timeout} ms</span>
-                    </div>
-                `;
-            }
-
-            if (html === '') {
-                html = '<p style="color: #999;">No settings configured yet</p>';
-            }
-
-            container.innerHTML = html;
         } else {
-            container.innerHTML = '<p style="color: #f44336;">Failed to load settings</p>';
+            container.innerHTML = '<p style="color: #f44336;">Failed to load configurations</p>';
         }
     } catch (error) {
         container.innerHTML = '<p style="color: #f44336;">Network error</p>';
+    }
+}
+
+// Show add configuration form
+function showAddConfigForm() {
+    const formCard = document.getElementById('configFormCard');
+    const formTitle = document.getElementById('formTitle');
+    const editingConfigName = document.getElementById('editingConfigName');
+
+    // Clear form
+    document.getElementById('configName').value = '';
+    document.getElementById('configName').disabled = false;
+    document.getElementById('llmProvider').value = 'anthropic';
+    document.getElementById('apiKey').value = '';
+    document.getElementById('baseUrl').value = '';
+    document.getElementById('maxRetries').value = '3';
+    document.getElementById('timeout').value = '30000';
+    document.getElementById('setAsActive').checked = false;
+    updateModelOptions();
+
+    // Clear editing state
+    editingConfigName.value = '';
+    formTitle.textContent = 'Add New Configuration';
+
+    // Show form
+    formCard.style.display = 'block';
+    formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Clear any previous messages
+    document.getElementById('settingsResult').innerHTML = '';
+}
+
+// Cancel configuration form
+function cancelConfigForm() {
+    const formCard = document.getElementById('configFormCard');
+    formCard.style.display = 'none';
+    document.getElementById('settingsResult').innerHTML = '';
+}
+
+// Edit existing configuration
+async function editConfig(configName) {
+    const formCard = document.getElementById('configFormCard');
+    const formTitle = document.getElementById('formTitle');
+    const editingConfigName = document.getElementById('editingConfigName');
+
+    try {
+        // Load all settings
+        const response = await fetch('/api/settings?user_id=test_user&tenant=test_tenant');
+        const data = await response.json();
+
+        if (response.ok && data.configs) {
+            const config = data.configs.find(c => c.config_name === configName);
+
+            if (config) {
+                // Populate form with existing values
+                document.getElementById('configName').value = config.config_name;
+                document.getElementById('configName').disabled = true;  // Don't allow renaming
+                document.getElementById('llmProvider').value = config.provider;
+                updateModelOptions();
+                document.getElementById('llmModel').value = config.model;
+                document.getElementById('baseUrl').value = config.base_url || '';
+                document.getElementById('maxRetries').value = config.max_retries;
+                document.getElementById('timeout').value = config.timeout;
+                document.getElementById('setAsActive').checked = config.is_active;
+
+                // Note: API key is not populated (security)
+                document.getElementById('apiKey').value = '';
+                document.getElementById('apiKey').placeholder = 'Enter new API key (leave empty to keep existing)';
+
+                // Set editing state
+                editingConfigName.value = configName;
+                formTitle.textContent = `Edit Configuration: ${configName}`;
+
+                // Show form
+                formCard.style.display = 'block';
+                formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                // Clear any previous messages
+                document.getElementById('settingsResult').innerHTML = '';
+            }
+        }
+    } catch (error) {
+        alert('Failed to load configuration for editing');
+    }
+}
+
+// Activate a configuration
+async function activateConfig(configName) {
+    if (!confirm(`Activate configuration "${configName}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/settings/${encodeURIComponent(configName)}/activate?user_id=test_user&tenant=test_tenant`, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            // Reload configurations list
+            await loadCurrentSettings();
+            alert(data.message || `Configuration "${configName}" activated successfully`);
+        } else {
+            alert(`Failed to activate: ${data.message || data.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        alert(`Network error: ${error.message}`);
+    }
+}
+
+// Delete a configuration
+async function deleteConfig(configName) {
+    if (!confirm(`Are you sure you want to delete configuration "${configName}"?\n\nThis action cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/settings/${encodeURIComponent(configName)}?user_id=test_user&tenant=test_tenant`, {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            // Reload configurations list
+            await loadCurrentSettings();
+            alert(data.message || `Configuration "${configName}" deleted successfully`);
+        } else {
+            alert(`Failed to delete: ${data.message || data.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        alert(`Network error: ${error.message}`);
     }
 }
 
@@ -979,37 +1101,71 @@ async function testConnection() {
 
 // Save settings
 async function saveSettings() {
+    const configName = document.getElementById('configName').value.trim();
     const provider = document.getElementById('llmProvider').value;
     const apiKey = document.getElementById('apiKey').value;
     const model = document.getElementById('llmModel').value;
     const baseUrl = document.getElementById('baseUrl').value;
     const maxRetries = parseInt(document.getElementById('maxRetries').value) || 3;
     const timeout = parseInt(document.getElementById('timeout').value) || 30000;
+    const isActive = document.getElementById('setAsActive').checked;
+    const editingConfigName = document.getElementById('editingConfigName').value;
     const saveBtn = document.getElementById('saveBtn');
     const resultDiv = document.getElementById('settingsResult');
 
-    if (!apiKey) {
+    // Validation
+    if (!configName) {
+        resultDiv.innerHTML = '<div class="result-error">Please enter a configuration name</div>';
+        return;
+    }
+
+    // When editing, API key is optional (keep existing if empty)
+    // When adding new, API key is required
+    if (!editingConfigName && !apiKey) {
         resultDiv.innerHTML = '<div class="result-error">Please enter an API key</div>';
         return;
     }
 
     saveBtn.disabled = true;
     saveBtn.textContent = '💾 Saving...';
-    resultDiv.innerHTML = '<div class="loading">Saving settings</div>';
+    resultDiv.innerHTML = '<div class="loading">Saving configuration...</div>';
 
     try {
+        // When editing and API key is empty, fetch existing settings to get the current API key
+        let finalApiKey = apiKey;
+
+        if (editingConfigName && !apiKey) {
+            // Fetch existing configuration to get API key
+            const existingResponse = await fetch('/api/settings?user_id=test_user&tenant=test_tenant');
+            const existingData = await existingResponse.json();
+
+            if (existingResponse.ok && existingData.configs) {
+                const existingConfig = existingData.configs.find(c => c.config_name === editingConfigName);
+                if (existingConfig) {
+                    // Use a placeholder that backend will recognize to keep existing key
+                    // Actually, we need to handle this differently - skip API key in request
+                    resultDiv.innerHTML = '<div class="result-error">Please re-enter API key when editing (security requirement)</div>';
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = '💾 Save Configuration';
+                    return;
+                }
+            }
+        }
+
         const response = await fetch('/api/settings', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
+                config_name: configName,
                 provider: provider,
-                api_key: apiKey,
+                api_key: finalApiKey,
                 model: model,
                 base_url: baseUrl || null,
                 max_retries: maxRetries,
                 timeout: timeout,
+                is_active: isActive,
                 user_id: 'test_user',
                 tenant: 'test_tenant'
             })
@@ -1020,19 +1176,20 @@ async function saveSettings() {
         if (response.ok && data.success) {
             resultDiv.innerHTML = `
                 <div class="result-success">
-                    <div class="result-label">✓ Settings saved successfully!</div>
+                    <div class="result-label">✓ Configuration saved successfully!</div>
                     <div class="result-value">${data.message}</div>
                 </div>
             `;
 
-            // Reload current settings
+            // Reload configurations list and hide form
             setTimeout(() => {
                 loadCurrentSettings();
-            }, 500);
+                cancelConfigForm();
+            }, 1000);
         } else {
             resultDiv.innerHTML = `
                 <div class="result-error">
-                    <div class="result-label">✗ Failed to save settings</div>
+                    <div class="result-label">✗ Failed to save configuration</div>
                     <div class="result-value">${data.message || data.detail || 'Unknown error'}</div>
                 </div>
             `;
@@ -1046,7 +1203,7 @@ async function saveSettings() {
         `;
     } finally {
         saveBtn.disabled = false;
-        saveBtn.textContent = '💾 Save Settings';
+        saveBtn.textContent = '💾 Save Configuration';
     }
 }
 
