@@ -53,7 +53,8 @@ class OpenAIClient(LLMClient):
         response = self.client.chat.completions.create(
             model=self.model,
             max_tokens=max_tokens,
-            messages=messages
+            messages=messages,
+            response_format={"type": "json_object"}
         )
         return response.choices[0].message.content
 
@@ -75,7 +76,8 @@ class OpenRouterClient(LLMClient):
         response = self.client.chat.completions.create(
             model=self.model,
             max_tokens=max_tokens,
-            messages=messages
+            messages=messages,
+            response_format={"type": "json_object"}
         )
         return response.choices[0].message.content
 
