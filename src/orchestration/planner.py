@@ -35,6 +35,65 @@ if TYPE_CHECKING:
 class Planner:
     """Planner - Uses LLM to create execution plans"""
 
+    # Tool output schema metadata - maps tool names to their output structure
+    # This should ideally be loaded from tool definitions or a configuration file
+    TOOL_OUTPUT_SCHEMAS = {
+        "search_latest_news": {
+            "description": "Returns news articles",
+            "schema": {"success": "boolean", "articles": "array", "count": "number"},
+            "example": '{"success": true, "articles": [...], "count": 5}',
+            "key_fields": ["articles", "count"]
+        },
+        "write_report": {
+            "description": "Returns report metadata",
+            "schema": {"success": "boolean", "report_id": "string", "content": "string", "format": "string"},
+            "example": '{"success": true, "report_id": "...", "content": "...", "format": "markdown"}',
+            "key_fields": ["report_id", "content", "format"]
+        },
+        "list_events": {
+            "description": "Returns calendar events",
+            "schema": {"success": "boolean", "events": "array"},
+            "example": '{"success": true, "events": [...]}',
+            "key_fields": ["events"]
+        },
+        "create_event": {
+            "description": "Returns created event",
+            "schema": {"success": "boolean", "event": "object"},
+            "example": '{"success": true, "event": {...}}',
+            "key_fields": ["event"]
+        },
+        "send_email": {
+            "description": "Returns email status",
+            "schema": {"success": "boolean", "message_id": "string"},
+            "example": '{"success": true, "message_id": "..."}',
+            "key_fields": ["message_id"]
+        },
+        "add": {
+            "description": "Returns calculation result",
+            "schema": {"success": "boolean", "operation": "string", "result": "number"},
+            "example": '{"success": true, "operation": "add", "result": 150}',
+            "key_fields": ["result"]
+        },
+        "subtract": {
+            "description": "Returns calculation result",
+            "schema": {"success": "boolean", "operation": "string", "result": "number"},
+            "example": '{"success": true, "operation": "subtract", "result": 50}',
+            "key_fields": ["result"]
+        },
+        "multiply": {
+            "description": "Returns calculation result",
+            "schema": {"success": "boolean", "operation": "string", "result": "number"},
+            "example": '{"success": true, "operation": "multiply", "result": 200}',
+            "key_fields": ["result"]
+        },
+        "divide": {
+            "description": "Returns calculation result",
+            "schema": {"success": "boolean", "operation": "string", "result": "number"},
+            "example": '{"success": true, "operation": "divide", "result": 2.5}',
+            "key_fields": ["result"]
+        }
+    }
+
     def __init__(self, settings: OrchestrationSettings, tracker: Optional['TaskTracker'] = None):
         self.settings = settings
         self.tracker = tracker
@@ -1003,7 +1062,7 @@ Return ONLY the JSON, no other text."""
         return "\n".join(lines)
 
     def _format_tools_detailed(self) -> str:
-        """Format available tools in detailed JSON format for prompt"""
+        """Format available tools in detailed JSON format for prompt, including output schemas"""
         lines = []
         for tool in self.settings.available_tools:
             tool_dict = {
@@ -1012,6 +1071,16 @@ Return ONLY the JSON, no other text."""
             }
             if tool.input_schema:
                 tool_dict["input_schema"] = tool.input_schema
+
+            # Add output schema if available
+            if tool.name in self.TOOL_OUTPUT_SCHEMAS:
+                output_info = self.TOOL_OUTPUT_SCHEMAS[tool.name]
+                tool_dict["output_schema"] = {
+                    "description": output_info["description"],
+                    "example": output_info["example"],
+                    "key_fields": output_info["key_fields"]
+                }
+
             lines.append("    " + json.dumps(tool_dict, indent=4).replace("\n", "\n    "))
         return ",\n".join(lines)
 
@@ -1276,24 +1345,22 @@ For each step, specify:
 
 {self._get_placeholder_instructions(prompt_type="initial")}
 
-IMPORTANT - UNDERSTANDING TOOL OUTPUT FORMATS:
-When creating placeholders for tool outputs, you MUST understand the structure of each tool's response:
+CRITICAL - USING TOOL OUTPUT SCHEMAS:
+Each tool definition above includes an "output_schema" field showing:
+- Example output structure
+- Key fields you can reference in placeholders
 
-Common tool output patterns:
-- search_latest_news: Returns {{"success": true, "articles": [...], "count": N}}
-  * Use {{{{step_X.articles}}}} NOT {{{{step_X.news}}}}
-- write_report: Returns {{"success": true, "report_id": "...", "content": "...", "format": "..."}}
-- list_events: Returns {{"success": true, "events": [...]}}
-- create_event: Returns {{"success": true, "event": {{...}}}}
-- send_email: Returns {{"success": true, "message_id": "..."}}
-- calculator tools: Return {{"success": true, "operation": "...", "result": NUMBER}}
+When creating placeholders:
+1. Check the tool's "output_schema" -> "key_fields" for available field names
+2. Use the ACTUAL field names from the schema (e.g., if schema shows "articles", use {{{{step_X.articles}}}})
+3. Refer to the "example" output to understand the structure
+4. If a tool has no output_schema, use generic patterns like {{{{step_X.result}}}} or {{{{step_X}}}}
 
-CRITICAL RULES FOR PLACEHOLDERS:
-1. Check the tool description carefully to understand its output structure
-2. Most tools return objects with "success" and specific data fields
-3. Use the ACTUAL field names from the tool's output (e.g., "articles" not "news")
-4. If unsure about output structure, use generic patterns like {{{{step_X.result}}}} or {{{{step_X}}}}
-5. Array data is often in plural field names: "articles", "events", "items", etc.
+Example:
+- Tool: search_latest_news
+- Output schema: {{"key_fields": ["articles", "count"]}}
+- Correct placeholder: {{{{step_0.articles}}}}
+- Wrong placeholder: {{{{step_0.news}}}} ❌
 
 Return your plan as a JSON array of steps. Each step should have this format:
 {{
@@ -1400,20 +1467,21 @@ CORRECT RESPONSE:
 - Use the exact tool names from the list above  ← CORRECT!
 - Create steps that will accomplish the user's request  ← CORRECT!
 
-⚠️ IMPORTANT - TOOL OUTPUT FORMATS:
-When you need to reference previous step outputs, use the CORRECT field names:
+⚠️ IMPORTANT - CHECK TOOL OUTPUT SCHEMAS:
+Each tool definition includes "output_schema" showing available fields.
+When referencing outputs in placeholders:
+1. Check the tool's "output_schema" -> "key_fields"
+2. Use ACTUAL field names (e.g., if key_fields shows "articles", use "articles" NOT "news")
 
-Common patterns:
-- search_latest_news → {{"articles": [...], "count": N}} - Use "articles" NOT "news"
-- write_report → {{"report_id": "...", "content": "..."}}
-- list_events → {{"events": [...]}}
-- calculator tools → {{"result": NUMBER}}
+Example:
+- search_latest_news has key_fields: ["articles", "count"]
+- Use {{{{step_0.articles}}}} NOT {{{{step_0.news}}}}
 
 YOUR TASK:
 1. Read the user's request: "{state.request_text}"
 2. Find the appropriate tool(s) from the list above
 3. Create a JSON array of steps to execute those tools
-4. When referencing outputs, use ACTUAL field names (e.g., "articles" not "news")
+4. When referencing outputs, check output_schema for correct field names
 5. Return ONLY the JSON array
 
 NOW: Create your execution plan as a JSON array.
