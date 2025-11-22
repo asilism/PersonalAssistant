@@ -1540,6 +1540,33 @@ DECISION OPTIONS:
 4. If unsure, default to "final" type with appropriate message
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+🚨 CRITICAL - ALWAYS INCLUDE ACTUAL DATA IN FINAL RESPONSES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+When returning "final" type, you MUST include the ACTUAL step output data in payload.data!
+
+❌ WRONG - Generic success message without data:
+{{{{
+  "type": "final",
+  "payload": {{{{
+    "message": "Task completed successfully"  ← No actual data!
+  }}}}
+}}}}
+
+✅ CORRECT - Include actual results in data field:
+{{{{
+  "type": "final",
+  "payload": {{{{
+    "message": "Found 1 critical issue",
+    "data": {{{{
+      "issues": [...actual issue objects from step output...]
+    }}}}
+  }}}}
+}}}}
+
+RULE: The user needs to SEE the actual results (issues, events, calculation results, etc.)
+Copy the relevant data from the step outputs into payload.data!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 CORRECT RESPONSE EXAMPLES:
 
 Example 1 - Task completed (multiplication was performed):
@@ -1552,7 +1579,43 @@ Example 1 - Task completed (multiplication was performed):
   }}}}
 }}}}
 
-Example 2 - Need additional steps (email needs to be sent):
+Example 2 - Task completed (Jira issues found):
+{{{{
+  "type": "final",
+  "reason": "User asked for critical Jira issues. The search_issues tool found 1 critical issue.",
+  "payload": {{{{
+    "message": "Critical 이슈 1건을 찾았습니다.",
+    "data": {{{{
+      "count": 1,
+      "issues": [
+        {{{{
+          "key": "PROJ-6",
+          "summary": "Fix memory leak in background worker",
+          "priority": "Critical",
+          "status": "Open"
+        }}}}
+      ]
+    }}}}
+  }}}}
+}}}}
+
+Example 3 - Task completed (calendar events listed):
+{{{{
+  "type": "final",
+  "reason": "User asked for this week's events. The list_events tool returned 3 events.",
+  "payload": {{{{
+    "message": "이번 주 일정 3건을 찾았습니다.",
+    "data": {{{{
+      "events": [
+        {{{{"id": "evt_1", "title": "Team Meeting", "start": "2025-11-22T10:00:00"}}}},
+        {{{{"id": "evt_2", "title": "Project Review", "start": "2025-11-23T14:00:00"}}}},
+        {{{{"id": "evt_3", "title": "Client Call", "start": "2025-11-24T15:00:00"}}}}
+      ]
+    }}}}
+  }}}}
+}}}}
+
+Example 4 - Need additional steps (email needs to be sent):
 {{{{
   "type": "nextSteps",
   "reason": "Contact was found, but email hasn't been sent yet",
@@ -1675,6 +1738,18 @@ If need more steps:
   }}
 }}
 
+⚠️ CRITICAL - INCLUDE ACTUAL DATA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+When type="final", you MUST copy the actual step output data into payload.data!
+Users need to SEE the actual results (issues, events, numbers, etc.)
+
+❌ WRONG:
+{{ "type": "final", "payload": {{ "message": "Success" }} }}  ← No data!
+
+✅ CORRECT:
+{{ "type": "final", "payload": {{ "message": "Found issues", "data": {{...actual results...}} }} }}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 ⚠️ EXAMPLES OF CORRECT RESPONSES:
 
 Example 1 - Multiplication task completed:
@@ -1687,7 +1762,37 @@ Example 1 - Multiplication task completed:
   }}
 }}
 
-Example 2 - Need to do more work:
+Example 2 - Jira issues found:
+{{
+  "type": "final",
+  "reason": "Found 1 critical Jira issue",
+  "payload": {{
+    "message": "Critical 이슈 1건 발견",
+    "data": {{
+      "count": 1,
+      "issues": [
+        {{ "key": "PROJ-6", "summary": "Fix memory leak", "priority": "Critical" }}
+      ]
+    }}
+  }}
+}}
+
+Example 3 - Events listed:
+{{
+  "type": "final",
+  "reason": "Found 3 events this week",
+  "payload": {{
+    "message": "이번 주 일정 3건",
+    "data": {{
+      "events": [
+        {{ "id": "evt_1", "title": "Meeting" }},
+        {{ "id": "evt_2", "title": "Review" }}
+      ]
+    }}
+  }}
+}}
+
+Example 4 - Need to do more work:
 {{
   "type": "nextSteps",
   "reason": "User asked to multiply numbers but no tool was executed yet",
