@@ -115,7 +115,7 @@ def create_event(
     start_time: str,
     end_time: str,
     description: str = "",
-    attendees: list[str] = None,
+    attendees: Optional[list[str]] = None,
     location: str = ""
 ) -> dict:
     """Create a new calendar event
