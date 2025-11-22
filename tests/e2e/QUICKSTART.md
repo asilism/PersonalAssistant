@@ -49,7 +49,8 @@ python tests/e2e/test_frontend_questions.py \
 ## 📊 결과 확인
 
 테스트 완료 후 자동으로 생성되는 파일:
-- `test_results_YYYYMMDD_HHMMSS.json`
+- `test_results_YYYYMMDD_HHMMSS.json` - 전체 결과
+- `failures_YYYYMMDD_HHMMSS.json` - 실패한 케이스만 (있을 경우)
 
 결과 요약:
 ```
@@ -57,7 +58,45 @@ python tests/e2e/test_frontend_questions.py \
 ✓ 성공: 12
 ✗ 실패: 3
 성공률: 80.0%
+
+전체 결과 저장됨: test_results_20251122_130000.json
+실패 케이스 저장됨: failures_20251122_130000.json
+👉 이 파일을 Claude에게 제공하여 문제를 수정하세요!
 ```
+
+## 🔄 실패한 케이스 수정하기
+
+실패한 케이스가 있다면:
+
+```bash
+# 1. failures 파일 확인
+cat failures_20251122_130000.json
+
+# 2. Claude에게 제공
+# Claude Code에서 다음과 같이 요청:
+```
+
+**Claude에게:**
+```
+/home/user/PersonalAssistant/failures_20251122_130000.json
+
+이 파일을 읽고 실패한 케이스들을 분석해서 자동으로 수정해줘.
+```
+
+Claude가 자동으로:
+1. 실패 원인 분석
+2. 관련 코드 수정
+3. Git 커밋
+4. 재테스트 안내
+
+다시 테스트 실행:
+```bash
+./tests/e2e/run_full_test.sh
+```
+
+**100% 성공률까지 반복!** 🎯
+
+상세한 워크플로우: [WORKFLOW.md](./WORKFLOW.md)
 
 ## 🔧 문제 해결
 

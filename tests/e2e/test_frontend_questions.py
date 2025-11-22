@@ -352,6 +352,7 @@ class QuestionTester:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_file = f"test_results_{timestamp}.json"
 
+        # 전체 결과 저장
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump({
                 "timestamp": timestamp,
@@ -363,7 +364,25 @@ class QuestionTester:
                 "results": self.results
             }, f, ensure_ascii=False, indent=2)
 
-        print(f"{Colors.OKGREEN}결과 저장됨: {output_file}{Colors.ENDC}")
+        print(f"{Colors.OKGREEN}전체 결과 저장됨: {output_file}{Colors.ENDC}")
+
+        # 실패한 케이스만 별도 저장
+        failed_results = [r for r in self.results if not r["success"]]
+        if failed_results:
+            failures_file = f"failures_{timestamp}.json"
+
+            with open(failures_file, 'w', encoding='utf-8') as f:
+                json.dump({
+                    "timestamp": timestamp,
+                    "model": self.model,
+                    "provider": self.provider,
+                    "total_failures": len(failed_results),
+                    "instructions": "이 파일을 Claude에게 제공하여 문제를 분석하고 수정하세요.",
+                    "failures": failed_results
+                }, f, ensure_ascii=False, indent=2)
+
+            print(f"{Colors.WARNING}실패 케이스 저장됨: {failures_file}{Colors.ENDC}")
+            print(f"{Colors.WARNING}👉 이 파일을 Claude에게 제공하여 문제를 수정하세요!{Colors.ENDC}")
 
 
 def main():

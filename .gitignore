@@ -59,3 +59,4 @@ logs/
 htmlcov/
 test_results*.csv
 test_results*.json
+failures_*.json
