@@ -2,6 +2,23 @@
 
 프론트엔드 15개 질문을 gpt-oss-20b로 자동 테스트하는 가장 빠른 방법입니다.
 
+## ⚙️ 사전 준비 (최초 1회)
+
+**`.env.validator` 파일을 프로젝트 루트에 생성하세요:**
+
+상세 가이드: [SETUP.md](./SETUP.md)
+
+**빠른 설정:**
+```cmd
+# Windows (프로젝트 루트에서)
+echo CLAUDE_API_KEY=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 > .env.validator
+echo CLAUDE_MODEL=claude-sonnet-4-5-20250929 >> .env.validator
+```
+
+⚠️ 이 파일이 없으면 규칙 기반 검증만 사용됩니다 (정확도 낮음).
+
+---
+
 ## ⚡ 원클릭 실행
 
 ### 🪟 Windows

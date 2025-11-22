@@ -184,7 +184,9 @@ def main():
 
     # 서버 시작 대기
     print("\nWaiting for servers to start...")
-    time.sleep(10)
+    wait_time = 15 if is_windows() else 10
+    print(f"Waiting {wait_time} seconds...")
+    time.sleep(wait_time)
 
     print("\n" + "=" * 50)
     print("All servers started!")

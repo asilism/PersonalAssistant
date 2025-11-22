@@ -67,8 +67,8 @@ echo   RPA Agent started
 
 REM 서버 시작 대기
 echo.
-echo Waiting for servers to start...
-timeout /t 10 >nul
+echo Waiting for servers to start (15 seconds)...
+timeout /t 15 >nul
 
 echo.
 echo ==================================
