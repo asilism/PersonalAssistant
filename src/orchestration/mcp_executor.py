@@ -313,18 +313,49 @@ class MCPExecutor:
             # Call the tool
             result = await client.call_tool(tool_name, tool_input)
 
-            # Parse result
+            # Debug logging
+            print(f"[MCPExecutor] Raw result type: {type(result)}")
+            print(f"[MCPExecutor] Raw result: {result}")
+
+            # Parse result based on type
+            # FastMCP can return results in various formats depending on the tool
+
+            # Case 1: Result is already a dict (direct return from tool)
+            if isinstance(result, dict):
+                print(f"[MCPExecutor] Result is dict, returning as-is")
+                return result
+
+            # Case 2: Result is a list of content items (MCP protocol format)
             if isinstance(result, list) and len(result) > 0:
                 # Get the first content item
                 first_content = result[0]
+                print(f"[MCPExecutor] First content type: {type(first_content)}")
+                print(f"[MCPExecutor] First content: {first_content}")
+
+                # Case 2a: Content has 'text' attribute (TextContent object)
                 if hasattr(first_content, 'text'):
+                    print(f"[MCPExecutor] First content.text: {first_content.text}")
                     try:
-                        return json.loads(first_content.text)
-                    except json.JSONDecodeError:
+                        parsed = json.loads(first_content.text)
+                        print(f"[MCPExecutor] Successfully parsed JSON: {parsed}")
+                        return parsed
+                    except json.JSONDecodeError as e:
+                        print(f"[MCPExecutor] JSON parsing failed: {e}")
                         return {"success": True, "result": first_content.text}
+
+                # Case 2b: Content is a dict
                 elif isinstance(first_content, dict):
+                    print(f"[MCPExecutor] First content is dict, returning as-is")
                     return first_content
 
+            # Case 3: Result is primitive (str, int, float, bool)
+            if isinstance(result, (str, int, float, bool)):
+                print(f"[MCPExecutor] Result is primitive type, wrapping in dict")
+                return {"success": True, "result": result}
+
+            # Fallback: Unknown format
+            print(f"[MCPExecutor] WARNING: Unknown result format, using fallback")
+            print(f"[MCPExecutor] Result type: {type(result)}, value: {result}")
             return {"success": True, "result": "completed"}
 
     async def cleanup(self):
