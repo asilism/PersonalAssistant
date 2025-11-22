@@ -22,7 +22,7 @@ class TaskDispatcher:
     def __init__(self, tracker: TaskTracker, executor: MCPExecutor, llm_client: Optional['LLMClient'] = None):
         self.tracker = tracker
         self.executor = executor
-        self.resolver = PlaceholderResolver(llm_client=llm_client)
+        self.resolver = PlaceholderResolver()
         self.event_emitter = get_event_emitter()
 
     async def invoke(self, state: State) -> State:
