@@ -124,44 +124,7 @@ class Planner:
                                 # Not valid JSON, continue checking other values
                                 continue
 
-            # Check if this is a tool list request
-            if isinstance(response_data, dict) and response_data.get("type") == "tool_list_request":
-                print(f"[Planner] Detected tool list request")
-                tools_info = response_data.get("tools", [])
-
-                # Format tools information for user
-                tools_message = "Here are the tools I have access to:\n\n"
-                for i, tool in enumerate(self.settings.available_tools, 1):
-                    tools_message += f"{i}. **{tool.name}**: {tool.description}\n"
-                    if tool.input_schema and tool.input_schema.get('properties'):
-                        tools_message += "   Parameters:\n"
-                        properties = tool.input_schema['properties']
-                        required = tool.input_schema.get('required', [])
-                        for prop_name, prop_details in properties.items():
-                            req_marker = " (required)" if prop_name in required else " (optional)"
-                            prop_desc = prop_details.get('description', prop_details.get('type', ''))
-                            tools_message += f"   - {prop_name}{req_marker}: {prop_desc}\n"
-                    tools_message += "\n"
-
-                # Return as final response
-                state.type = StateType.FINAL
-                state.final_payload = {
-                    "message": tools_message,
-                    "data": {
-                        "tool_count": len(self.settings.available_tools),
-                        "tools": [
-                            {
-                                "name": tool.name,
-                                "description": tool.description,
-                                "input_schema": tool.input_schema
-                            }
-                            for tool in self.settings.available_tools
-                        ]
-                    }
-                }
-                return state
-
-            # Otherwise, treat as execution plan
+            # Treat as execution plan
             steps_data = response_data if isinstance(response_data, list) else response_data.get("steps", [])
             print(f"[Planner] Successfully parsed {len(steps_data)} steps")
 
@@ -1242,9 +1205,6 @@ Examples:
   ❌ BAD: "I can help you send an email. Please provide..."
   ✅ GOOD: Create plan: Step 0: lookup_contact("John"), Step 1: send_email(...)
 
-• User: "What tools do you have?"
-  ✅ CORRECT: Use the tool_list_request response format (this is the ONLY exception)
-
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 IMPORTANT CONTEXT:
@@ -1262,15 +1222,7 @@ Context:
 
 CRITICAL: You MUST use ONLY the exact tool names listed above. DO NOT create variations or guess tool names.
 
-IMPORTANT: If the user is asking about what tools you have, what you can do, or requesting a list of available capabilities, you should provide the list of available tools instead of creating an execution plan.
-
-For tool listing requests, return a JSON response in this format:
-{{
-  "type": "tool_list_request",
-  "tools": [...]
-}}
-
-Otherwise, create a step-by-step execution plan to fulfill the user's request.
+Create a step-by-step execution plan to fulfill the user's request.
 For each step, specify:
 1. tool_name: which tool to use
 2. input: parameters for the tool
@@ -1304,7 +1256,7 @@ Return your plan as a JSON array of steps. Each step should have this format:
   "dependencies": []
 }}
 
-Return ONLY the JSON (either tool list or execution plan), no other text.
+Return ONLY the JSON execution plan, no other text.
 """
 
     def _get_openrouter_initial_plan_prompt(self, state: State) -> str:
