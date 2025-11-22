@@ -1072,8 +1072,12 @@ Return ONLY the JSON, no other text."""
             if tool.input_schema:
                 tool_dict["input_schema"] = tool.input_schema
 
-            # Add output schema if available
-            if tool.name in self.TOOL_OUTPUT_SCHEMAS:
+            # Add output schema - prioritize from MCP tool definition
+            if tool.output_schema:
+                # Use output schema from MCP tool (parsed from docstring)
+                tool_dict["output_schema"] = tool.output_schema
+            elif tool.name in self.TOOL_OUTPUT_SCHEMAS:
+                # Fallback to hardcoded schema if MCP tool doesn't provide one
                 output_info = self.TOOL_OUTPUT_SCHEMAS[tool.name]
                 tool_dict["output_schema"] = {
                     "description": output_info["description"],

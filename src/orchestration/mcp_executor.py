@@ -91,10 +91,14 @@ class MCPExecutor:
 
                     tools = []
                     for tool in tools_result:
+                        # Parse output schema from description
+                        output_schema = self._parse_output_schema_from_description(tool.description or "")
+
                         tool_def = ToolDefinition(
                             name=tool.name,
                             description=tool.description or "",
-                            input_schema=tool.inputSchema
+                            input_schema=tool.inputSchema,
+                            output_schema=output_schema
                         )
                         tools.append(tool_def)
                         self._available_tools[tool.name] = tool_def
@@ -357,6 +361,61 @@ class MCPExecutor:
             print(f"[MCPExecutor] WARNING: Unknown result format, using fallback")
             print(f"[MCPExecutor] Result type: {type(result)}, value: {result}")
             return {"success": True, "result": "completed"}
+
+    def _parse_output_schema_from_description(self, description: str) -> Optional[Dict[str, Any]]:
+        """
+        Parse output schema information from tool description/docstring
+
+        Extracts:
+        - Key Output Fields section
+        - Example Output section
+        - Returns section structure
+
+        Args:
+            description: Tool description/docstring
+
+        Returns:
+            Output schema dict or None if not found
+        """
+        import re
+
+        if not description:
+            return None
+
+        schema = {}
+
+        # Extract "Key Output Fields" section
+        key_fields_match = re.search(
+            r'Key Output Fields:\s*\n((?:\s*-\s*.+\n?)+)',
+            description,
+            re.IGNORECASE | re.MULTILINE
+        )
+        if key_fields_match:
+            fields_text = key_fields_match.group(1)
+            # Parse field names (format: "- field_name: description")
+            field_names = re.findall(r'-\s+(\w+):', fields_text)
+            schema['key_fields'] = field_names
+
+        # Extract "Example Output" section
+        example_match = re.search(
+            r'Example Output:\s*\n\s*\{([^}]+)\}',
+            description,
+            re.IGNORECASE | re.DOTALL
+        )
+        if example_match:
+            example_text = '{' + example_match.group(1) + '}'
+            schema['example'] = example_text.strip()
+
+        # Extract Returns section structure
+        returns_match = re.search(
+            r'Returns:\s*\n\s*\w+:\s*\{([^}]+)\}',
+            description,
+            re.IGNORECASE | re.DOTALL
+        )
+        if returns_match:
+            schema['description'] = "Returns structured output"
+
+        return schema if schema else None
 
     async def cleanup(self):
         """Cleanup connections"""
