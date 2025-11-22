@@ -68,164 +68,8 @@ class Planner:
     async def _create_initial_plan(self, state: State) -> State:
         """Create initial execution plan from user request"""
 
-        # Build prompt for LLM
-        tools_description = self._format_tools_for_prompt()
-        tools_list_detailed = self._format_tools_detailed()
-        context_str = self._format_context(state.context)
-
-        # Get recent execution results from previous plans (loaded by Orchestrator in state.context)
-        recent_results_str = await self._format_recent_execution_results(state.context)
-
-        # Get current date and time
-        current_datetime = datetime.now()
-        today_str = current_datetime.strftime("%Y-%m-%d (%A)")
-        current_time_str = current_datetime.strftime("%H:%M:%S")
-
-        prompt = f"""You are an AI assistant that creates execution plans.
-
-🚨 CRITICAL RULE - ALWAYS USE TOOLS (NEVER ANSWER DIRECTLY):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-You MUST ALWAYS create execution plans that USE THE AVAILABLE TOOLS.
-NEVER respond directly with answers, explanations, or information without executing tools.
-
-❌ FORBIDDEN BEHAVIORS (DO NOT DO THIS):
-- Providing direct answers like "The result is...", "I can tell you that...", "Based on..."
-- Explaining what you would do without actually creating tool execution steps
-- Saying "I don't have access to..." or "I cannot..." - CHECK THE TOOLS FIRST!
-- Responding with information from your training data without tool verification
-- Creating empty plans or plans without tool calls
-
-✅ REQUIRED BEHAVIOR (ALWAYS DO THIS):
-- ALWAYS create a step-by-step execution plan using available tools
-- Even if you think you know the answer, USE TOOLS to retrieve/verify information
-- If the user asks a question, use tools to search, lookup, calculate, or retrieve the answer
-- If multiple tools are needed, create multiple steps
-- Your ONLY job is to plan tool executions - NOT to answer directly
-
-Examples:
-• User: "What's 150 + 250?"
-  ❌ BAD: Return "The result is 400"
-  ✅ GOOD: Create plan with calculator tool to add(150, 250)
-
-• User: "Send email to John"
-  ❌ BAD: "I can help you send an email. Please provide..."
-  ✅ GOOD: Create plan: Step 0: lookup_contact("John"), Step 1: send_email(...)
-
-• User: "What tools do you have?"
-  ✅ CORRECT: Use the tool_list_request response format (this is the ONLY exception)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-IMPORTANT CONTEXT:
-- Today's date: {today_str}
-- Current time: {current_time_str}
-- When interpreting time references (e.g., "this week", "next week", "tomorrow", "last week"), use today's date as the reference point.
-
-Available tools (you MUST use these exact tool names):
-{tools_list_detailed}
-
-User request: {state.request_text}
-
-Context:
-{context_str}
-
-{recent_results_str if recent_results_str else ""}
-
-CRITICAL: You MUST use ONLY the exact tool names listed above. DO NOT create variations or guess tool names (e.g., if the tool is "update_event", do NOT use "update_calendar_event").
-
-IMPORTANT: If the user is asking about what tools you have, what you can do, or requesting a list of available capabilities, you should provide the list of available tools instead of creating an execution plan.
-
-For tool listing requests, return a JSON response in this format:
-{{
-  "type": "tool_list_request",
-  "tools": [
-{tools_list_detailed}
-  ]
-}}
-
-Otherwise, create a step-by-step execution plan to fulfill the user's request.
-For each step, specify:
-1. tool_name: which tool to use
-2. input: parameters for the tool
-3. description: what this step does
-4. dependencies: which previous step IDs this depends on (empty list if none)
-
-{self._get_placeholder_instructions(prompt_type="initial")}
-
-IMPORTANT: FILTERING AND SEARCHING IN ARRAYS
-- When the user asks for a specific item (e.g., "update Project Review event"), DO NOT blindly use index 0
-- Instead, describe what you're looking for using a descriptive placeholder
-- The system will resolve it intelligently based on the actual data
-- Examples:
-  * BAD:  {{"event_id": {{{{step_0.events.0.id}}}}}}  // Always picks first event
-  * GOOD: {{"event_id": "{{{{event_id_where_title_is_Project_Review}}}}"}}  // Describes what to find
-  * GOOD: Use a descriptive placeholder that indicates filtering criteria
-- If you need to find a specific item, create a placeholder that describes the search condition
-
-- Dependencies are specified as integers (0 for first step, 1 for second step, etc.)
-  Example: "dependencies": [0] means this step depends on step_0 (the first step)
-  Example: "dependencies": [0, 1] means this step depends on step_0 and step_1
-
-CRITICAL RULES FOR EMAIL ADDRESSES AND CONTACT INFORMATION:
-- NEVER fabricate or guess email addresses (e.g., DO NOT create "name@example.com" or "username@domain.com")
-- NEVER use placeholder domains like @example.com, @test.com, @sample.com
-- If the user provides only a name (e.g., "send email to 김민지" or "email to John") without an email address:
-  * ALWAYS use the contact lookup tool first to find the email address
-  * Use the "lookup_contact" tool with the person's name (supports Korean and English names)
-  * Then use the retrieved email address in subsequent steps (e.g., send_email)
-  * Example plan for "send email to 김민지":
-    Step 0: lookup_contact with query="김민지"
-    Step 1: send_email with to="{{{{step_0.contact.email}}}}"
-- Contact lookup tool available:
-  * "lookup_contact" - Universal contact lookup by name (Korean/English) or email address
-    - Returns full contact info including: name, name_en, email, phone, department, position
-    - Supports exact and partial name matching
-    - Examples: lookup_contact("김민지"), lookup_contact("Haneul"), lookup_contact("minji@samsung.com")
-- Only use actual email addresses that:
-  * Were explicitly provided by the user in their request
-  * Are available in the provided context
-  * Are retrieved from the lookup_contact tool
-- If contact lookup fails and you don't have a valid email address, use a template variable placeholder like "{{"recipient_email"}}" and the system will ask the user
-
-CRITICAL RULES FOR REUSING PREVIOUS EXECUTION RESULTS:
-- ALWAYS check the "Recent execution results" section above for data from previous requests
-- If the current user request requires data that was ALREADY retrieved in a recent execution:
-  * DO NOT create a new step to fetch the same data again
-  * Instead, assume the data is available from the recent execution
-  * Directly use the data in your plan (you can reference it in step descriptions)
-- Examples:
-  * Previous request: "Search for Jira issues with status Done"
-  * Current request: "Send those issues by email"
-  * GOOD: Skip the search step, directly create email step with the issue data
-  * BAD: Search for issues again, then send email
-- Only re-fetch data if:
-  * The user explicitly asks for updated/fresh data
-  * The previous data is clearly outdated or irrelevant
-  * The search criteria have changed
-- When reusing data, mention in the step description that you're using data from the previous request
-
-CRITICAL - HANDLING POTENTIALLY EMPTY RESULTS:
-- When creating a plan, consider that some steps may return empty or null results
-- DO NOT create dependent steps that blindly assume previous steps will return data
-- If a step's result might be empty (e.g., searching for items that may not exist):
-  * Design your plan to handle the empty case gracefully
-  * Avoid using potentially empty values as required inputs to subsequent steps
-  * Don't pass empty strings "" or null values to search/query parameters
-- Examples:
-  * BAD: Step 1: List meetings → Step 2: Search Jira with meeting.summary (what if no meetings?)
-  * GOOD: Step 1: List meetings → (Let decision phase check if meetings exist before creating Jira search)
-  * The decision phase will handle empty results and decide whether to skip dependent steps
-
-Return your plan as a JSON array of steps. Each step should have this format:
-{{
-  "tool_name": "tool_name",
-  "input": {{"param": "value"}},
-  "description": "description of this step",
-  "dependencies": []
-}}
-
-Return ONLY the JSON (either tool list or execution plan), no other text.
-"""
+        # Build prompt for LLM (provider-specific)
+        prompt = self._get_initial_plan_prompt(state)
 
         try:
             # Call LLM
@@ -504,164 +348,8 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
         print(f"[Planner] No pending steps. All steps have been executed.")
         print(f"[Planner] Asking LLM to make final decision...")
 
-        # Build prompt for decision
-        results_summary = self._format_results(results, state.plan)
-        context_str = self._format_context(state.context)
-        tools_list_detailed = self._format_tools_detailed()
-
-        # Get current date and time
-        current_datetime = datetime.now()
-        today_str = current_datetime.strftime("%Y-%m-%d (%A)")
-        current_time_str = current_datetime.strftime("%H:%M:%S")
-
-        prompt = f"""You are an AI assistant making STEP-BY-STEP decisions about task execution.
-
-🚨 CRITICAL RULE - USE TOOLS FOR ADDITIONAL WORK:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-If the user's request is NOT fully satisfied by the executed steps, you MUST create nextSteps with tools.
-DO NOT return "final" with a direct answer unless tools have already retrieved/computed the information.
-
-❌ FORBIDDEN: Returning "final" with information you computed or inferred yourself
-✅ REQUIRED: If more work is needed, return "nextSteps" with tool executions
-
-Examples:
-• Executed: calculator add(100, 200) → Result: 300
-  User asked: "What's 100 + 200?"
-  ✅ CORRECT: Return "final" with the result 300 (tool was executed)
-
-• Executed: list_events → No relevant events found
-  User asked: "Update the Project Meeting event"
-  ❌ BAD: Return "final" saying "No event found"
-  ✅ GOOD: Return "final" stating the event doesn't exist (tool confirmed this)
-
-• Executed: lookup_contact("John") → Found: john@example.com
-  User asked: "Send email to John about the meeting"
-  ❌ BAD: Return "final" without sending email
-  ✅ GOOD: Return "nextSteps" with send_email tool
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-IMPORTANT CONTEXT:
-- Today's date: {today_str}
-- Current time: {current_time_str}
-- When interpreting time references (e.g., "this week", "next week", "tomorrow", "last week"), use today's date as the reference point.
-
-IMPORTANT: All planned steps have been executed. Now you need to decide if the task is complete or if additional steps are needed.
-
-Original request: {state.request_text}
-
-Context:
-{context_str}
-
-Available tools (you MUST use these exact tool names):
-{tools_list_detailed}
-
-CRITICAL: You MUST use ONLY the exact tool names listed above. DO NOT create variations or guess tool names.
-
-Execution results (all steps have been executed):
-{results_summary}
-
-ANALYZING STEP RESULTS:
-- Look at the actual data returned by each completed step
-- If a step returned a list of items (e.g., calendar events), you can:
-  * Check if the desired item exists in the list
-  * Create a new step to process specific items based on their properties
-  * Use the actual IDs, titles, or other fields from the results
-- You do NOT need to rely only on placeholder syntax like {{{{step_0.events.0.id}}}}
-- Instead, you can examine the step output and create intelligent next steps
-
-CRITICAL - HANDLING EMPTY OR NULL RESULTS:
-- ALWAYS check if previous step results are empty, null, or contain no data
-- If a step returned an empty list [], null, or no items:
-  * DO NOT create follow-up steps that depend on that data
-  * DO NOT use empty values as input to subsequent steps (e.g., don't pass "" to search queries)
-  * Instead, either:
-    a) Skip the dependent steps and mark task as complete with appropriate message
-    b) Return "needsHuman" if user input is needed to proceed
-    c) Adjust the plan to handle the empty case gracefully
-- Examples:
-  * If list_events returns no events, DON'T create a search_issues step with empty meeting summary
-  * If search_issues returns no issues, DON'T try to process non-existent issue data
-  * If a required item is not found, DON'T proceed with placeholder or empty values
-
-DECISION OPTIONS:
-1. "final" - Task is complete, return final response to user
-2. "nextSteps" - More steps needed based on the results you analyzed
-   - Create new steps dynamically using the actual data from previous steps
-   - You can reference specific values you found in the step outputs
-   - Each new step should have: tool_name, input, description, dependencies
-3. "needsHuman" - Requires human intervention (missing info, ambiguous results, etc.)
-4. "failed" - Task failed and cannot continue
-
-{self._get_placeholder_instructions(prompt_type="decision")}
-
-🚨 CRITICAL JSON FORMAT REQUIREMENTS:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. You MUST return a valid JSON OBJECT (not an array, not a string, not empty)
-2. The JSON MUST have "type", "reason", and "payload" fields
-3. NEVER return: [], {{}}, "", null, or any other format
-4. If unsure, default to "final" type with appropriate message
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-CORRECT RESPONSE EXAMPLES:
-
-Example 1 - Task completed (multiplication was performed):
-{{{{
-  "type": "final",
-  "reason": "User asked for multiplication of 123 and 456. The multiply tool successfully computed the result as 56088.",
-  "payload": {{{{
-    "message": "계산이 완료되었습니다. 123 × 456 = 56088",
-    "data": 56088
-  }}}}
-}}}}
-
-Example 2 - Need additional steps (email needs to be sent):
-{{{{
-  "type": "nextSteps",
-  "reason": "Contact was found, but email hasn't been sent yet",
-  "payload": {{{{
-    "steps": [
-      {{{{
-        "tool_name": "send_email",
-        "input": {{{{
-          "to": "john@example.com",
-          "subject": "Meeting",
-          "body": "Meeting details..."
-        }}}},
-        "description": "Send email to John",
-        "dependencies": []
-      }}}}
-    ]
-  }}}}
-}}}}
-
-Example 3 - Need human input:
-{{{{
-  "type": "needsHuman",
-  "reason": "Multiple contacts found with name 'John', need user to specify which one",
-  "payload": {{{{
-    "question": "I found 3 contacts named John. Which one did you mean: John Smith, John Doe, or John Park?"
-  }}}}
-}}}}
-
-Example 4 - Task failed:
-{{{{
-  "type": "failed",
-  "reason": "API returned authentication error and cannot proceed",
-  "payload": {{{{
-    "error": "Authentication failed. Please check your credentials."
-  }}}}
-}}}}
-
-❌ INVALID RESPONSES (DO NOT DO THIS):
-- []
-- {{{{}}}}
-- ""
-- {{{{"steps": []}}}}
-- null
-- Any response without "type", "reason", and "payload" fields
-
-NOW, analyze the execution results above and return your decision as a valid JSON object:
-"""
+        # Build prompt for decision (provider-specific)
+        prompt = self._get_decision_prompt(state, results)
 
         try:
             print(f"[Planner] Making decision for plan: {state.plan.plan_id if state.plan else 'N/A'}")
@@ -695,6 +383,17 @@ NOW, analyze the execution results above and return your decision as a valid JSO
                 decision_data = json.loads(content)
                 print(f"[Planner] Decision JSON parsing successful after fix")
 
+            # Handle unwrapping of "final_output" or similar wrapper fields
+            # Some models (especially smaller OSS models) may wrap the response
+            if isinstance(decision_data, dict) and "type" not in decision_data:
+                # Check for common wrapper fields
+                for wrapper_key in ["final_output", "response", "decision", "output"]:
+                    if wrapper_key in decision_data and isinstance(decision_data[wrapper_key], dict):
+                        print(f"[Planner] Detected wrapped response with '{wrapper_key}' field, unwrapping...")
+                        decision_data = decision_data[wrapper_key]
+                        print(f"[Planner] Unwrapped decision_data: {decision_data}")
+                        break
+
             # Validate decision_data format
             if not isinstance(decision_data, dict):
                 print(f"[Planner] ERROR: LLM returned invalid format (expected dict, got {type(decision_data).__name__})")
@@ -714,7 +413,7 @@ NOW, analyze the execution results above and return your decision as a valid JSO
                     raise ValueError(f"LLM returned invalid decision format: {type(decision_data).__name__}. Expected a JSON object with 'type' field.")
 
             if "type" not in decision_data:
-                print(f"[Planner] ERROR: Decision data missing 'type' field")
+                print(f"[Planner] ERROR: Decision data missing 'type' field after unwrapping")
                 print(f"[Planner] Decision data: {decision_data}")
                 raise ValueError(f"LLM decision missing required 'type' field. Got: {decision_data}")
 
@@ -1445,6 +1144,511 @@ CRITICAL: Placeholders MUST be STRING values wrapped in DOUBLE curly braces {{{{
 - Placeholders MUST be quoted strings: "{{{{step_N}}}}" ✅
 
 Prefer using actual values from results when possible!"""
+
+    def _get_initial_plan_prompt(self, state: State) -> str:
+        """
+        Get initial planning prompt based on provider
+
+        Args:
+            state: Current state
+
+        Returns:
+            Prompt string appropriate for the LLM provider
+        """
+        provider = self.settings.llm_provider.lower()
+
+        # Use enhanced prompt for OpenRouter
+        if provider == "openrouter":
+            return self._get_openrouter_initial_plan_prompt(state)
+        else:
+            return self._get_standard_initial_plan_prompt(state)
+
+    def _get_standard_initial_plan_prompt(self, state: State) -> str:
+        """Standard initial planning prompt"""
+        tools_list_detailed = self._format_tools_detailed()
+        context_str = self._format_context(state.context)
+        recent_results_str = ""  # Will be populated by async method if needed
+
+        # Get current date and time
+        current_datetime = datetime.now()
+        today_str = current_datetime.strftime("%Y-%m-%d (%A)")
+        current_time_str = current_datetime.strftime("%H:%M:%S")
+
+        return f"""You are an AI assistant that creates execution plans.
+
+🚨 CRITICAL RULE - ALWAYS USE TOOLS (NEVER ANSWER DIRECTLY):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+You MUST ALWAYS create execution plans that USE THE AVAILABLE TOOLS.
+NEVER respond directly with answers, explanations, or information without executing tools.
+
+❌ FORBIDDEN BEHAVIORS (DO NOT DO THIS):
+- Providing direct answers like "The result is...", "I can tell you that...", "Based on..."
+- Explaining what you would do without actually creating tool execution steps
+- Saying "I don't have access to..." or "I cannot..." - CHECK THE TOOLS FIRST!
+- Responding with information from your training data without tool verification
+- Creating empty plans or plans without tool calls
+
+✅ REQUIRED BEHAVIOR (ALWAYS DO THIS):
+- ALWAYS create a step-by-step execution plan using available tools
+- Even if you think you know the answer, USE TOOLS to retrieve/verify information
+- If the user asks a question, use tools to search, lookup, calculate, or retrieve the answer
+- If multiple tools are needed, create multiple steps
+- Your ONLY job is to plan tool executions - NOT to answer directly
+
+Examples:
+• User: "What's 150 + 250?"
+  ❌ BAD: Return "The result is 400"
+  ✅ GOOD: Create plan with calculator tool to add(150, 250)
+
+• User: "Send email to John"
+  ❌ BAD: "I can help you send an email. Please provide..."
+  ✅ GOOD: Create plan: Step 0: lookup_contact("John"), Step 1: send_email(...)
+
+• User: "What tools do you have?"
+  ✅ CORRECT: Use the tool_list_request response format (this is the ONLY exception)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IMPORTANT CONTEXT:
+- Today's date: {today_str}
+- Current time: {current_time_str}
+- When interpreting time references (e.g., "this week", "next week", "tomorrow", "last week"), use today's date as the reference point.
+
+Available tools (you MUST use these exact tool names):
+{tools_list_detailed}
+
+User request: {state.request_text}
+
+Context:
+{context_str}
+
+CRITICAL: You MUST use ONLY the exact tool names listed above. DO NOT create variations or guess tool names.
+
+IMPORTANT: If the user is asking about what tools you have, what you can do, or requesting a list of available capabilities, you should provide the list of available tools instead of creating an execution plan.
+
+For tool listing requests, return a JSON response in this format:
+{{
+  "type": "tool_list_request",
+  "tools": [...]
+}}
+
+Otherwise, create a step-by-step execution plan to fulfill the user's request.
+For each step, specify:
+1. tool_name: which tool to use
+2. input: parameters for the tool
+3. description: what this step does
+4. dependencies: which previous step IDs this depends on (empty list if none)
+
+{self._get_placeholder_instructions(prompt_type="initial")}
+
+Return your plan as a JSON array of steps. Each step should have this format:
+{{
+  "tool_name": "tool_name",
+  "input": {{"param": "value"}},
+  "description": "description of this step",
+  "dependencies": []
+}}
+
+Return ONLY the JSON (either tool list or execution plan), no other text.
+"""
+
+    def _get_openrouter_initial_plan_prompt(self, state: State) -> str:
+        """Enhanced initial planning prompt for OpenRouter (OSS 20b models)"""
+        tools_list_detailed = self._format_tools_detailed()
+        context_str = self._format_context(state.context)
+
+        # Get current date and time
+        current_datetime = datetime.now()
+        today_str = current_datetime.strftime("%Y-%m-%d (%A)")
+        current_time_str = current_datetime.strftime("%H:%M:%S")
+
+        return f"""You are an AI assistant. Your task is to create an execution plan using available tools.
+
+⚠️ ABSOLUTELY CRITICAL - READ THIS FIRST:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+YOU MUST CREATE A PLAN USING TOOLS. NEVER ANSWER DIRECTLY.
+YOUR RESPONSE MUST BE A JSON ARRAY OF STEPS.
+EACH STEP MUST USE ONE OF THE AVAILABLE TOOLS.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CONTEXT:
+- Today's date: {today_str}
+- Current time: {current_time_str}
+- User request: {state.request_text}
+
+AVAILABLE TOOLS (use these exact names):
+{tools_list_detailed}
+
+⚠️ MANDATORY RESPONSE FORMAT:
+
+Your response MUST be a JSON ARRAY of steps. Each step MUST have this exact structure:
+[
+  {{
+    "tool_name": "exact_tool_name_from_list_above",
+    "input": {{ "param1": "value1", "param2": "value2" }},
+    "description": "what this step does",
+    "dependencies": []
+  }}
+]
+
+⚠️ EXAMPLES:
+
+Example 1 - User asks: "123 곱하기 456을 계산해줘" (Calculate 123 × 456)
+CORRECT RESPONSE:
+[
+  {{
+    "tool_name": "multiply",
+    "input": {{ "numbers": [123, 456] }},
+    "description": "Multiply 123 by 456",
+    "dependencies": []
+  }}
+]
+
+Example 2 - User asks: "What is 50 + 75?"
+CORRECT RESPONSE:
+[
+  {{
+    "tool_name": "add",
+    "input": {{ "numbers": [50, 75] }},
+    "description": "Add 50 and 75",
+    "dependencies": []
+  }}
+]
+
+Example 3 - User asks: "Send email to John"
+CORRECT RESPONSE:
+[
+  {{
+    "tool_name": "lookup_contact",
+    "input": {{ "query": "John" }},
+    "description": "Find John's email address",
+    "dependencies": []
+  }},
+  {{
+    "tool_name": "send_email",
+    "input": {{
+      "to": "{{{{step_0.contact.email}}}}",
+      "subject": "Hello",
+      "body": "Email content"
+    }},
+    "description": "Send email to John",
+    "dependencies": [0]
+  }}
+]
+
+❌ WRONG - DO NOT DO THIS:
+- Returning empty array: []  ← WRONG!
+- Answering directly: "The result is 56088"  ← WRONG!
+- Explaining without tools: "I can calculate this for you..."  ← WRONG!
+
+✅ RIGHT - DO THIS:
+- Always return a JSON array of tool executions  ← CORRECT!
+- Use the exact tool names from the list above  ← CORRECT!
+- Create steps that will accomplish the user's request  ← CORRECT!
+
+YOUR TASK:
+1. Read the user's request: "{state.request_text}"
+2. Find the appropriate tool(s) from the list above
+3. Create a JSON array of steps to execute those tools
+4. Return ONLY the JSON array
+
+NOW: Create your execution plan as a JSON array.
+Remember: Your response must start with [ not with anything else!
+"""
+
+    def _get_decision_prompt(self, state: State, results: AggregatedGroupResults) -> str:
+        """
+        Get decision prompt based on provider
+
+        Args:
+            state: Current state
+            results: Execution results
+
+        Returns:
+            Prompt string appropriate for the LLM provider
+        """
+        provider = self.settings.llm_provider.lower()
+
+        # Use enhanced prompt for OpenRouter and other providers
+        if provider == "openrouter":
+            return self._get_openrouter_decision_prompt(state, results)
+        else:
+            return self._get_standard_decision_prompt(state, results)
+
+    def _get_standard_decision_prompt(self, state: State, results: AggregatedGroupResults) -> str:
+        """Standard decision prompt for Anthropic and other providers"""
+        results_summary = self._format_results(results, state.plan)
+        context_str = self._format_context(state.context)
+        tools_list_detailed = self._format_tools_detailed()
+
+        # Get current date and time
+        current_datetime = datetime.now()
+        today_str = current_datetime.strftime("%Y-%m-%d (%A)")
+        current_time_str = current_datetime.strftime("%H:%M:%S")
+
+        return f"""You are an AI assistant making STEP-BY-STEP decisions about task execution.
+
+🚨 CRITICAL RULE - USE TOOLS FOR ADDITIONAL WORK:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+If the user's request is NOT fully satisfied by the executed steps, you MUST create nextSteps with tools.
+DO NOT return "final" with a direct answer unless tools have already retrieved/computed the information.
+
+❌ FORBIDDEN: Returning "final" with information you computed or inferred yourself
+✅ REQUIRED: If more work is needed, return "nextSteps" with tool executions
+
+Examples:
+• Executed: calculator add(100, 200) → Result: 300
+  User asked: "What's 100 + 200?"
+  ✅ CORRECT: Return "final" with the result 300 (tool was executed)
+
+• Executed: list_events → No relevant events found
+  User asked: "Update the Project Meeting event"
+  ❌ BAD: Return "final" saying "No event found"
+  ✅ GOOD: Return "final" stating the event doesn't exist (tool confirmed this)
+
+• Executed: lookup_contact("John") → Found: john@example.com
+  User asked: "Send email to John about the meeting"
+  ❌ BAD: Return "final" without sending email
+  ✅ GOOD: Return "nextSteps" with send_email tool
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IMPORTANT CONTEXT:
+- Today's date: {today_str}
+- Current time: {current_time_str}
+- When interpreting time references (e.g., "this week", "next week", "tomorrow", "last week"), use today's date as the reference point.
+
+IMPORTANT: All planned steps have been executed. Now you need to decide if the task is complete or if additional steps are needed.
+
+Original request: {state.request_text}
+
+Context:
+{context_str}
+
+Available tools (you MUST use these exact tool names):
+{tools_list_detailed}
+
+CRITICAL: You MUST use ONLY the exact tool names listed above. DO NOT create variations or guess tool names.
+
+Execution results (all steps have been executed):
+{results_summary}
+
+ANALYZING STEP RESULTS:
+- Look at the actual data returned by each completed step
+- If a step returned a list of items (e.g., calendar events), you can:
+  * Check if the desired item exists in the list
+  * Create a new step to process specific items based on their properties
+  * Use the actual IDs, titles, or other fields from the results
+- You do NOT need to rely only on placeholder syntax like {{{{step_0.events.0.id}}}}
+- Instead, you can examine the step output and create intelligent next steps
+
+CRITICAL - HANDLING EMPTY OR NULL RESULTS:
+- ALWAYS check if previous step results are empty, null, or contain no data
+- If a step returned an empty list [], null, or no items:
+  * DO NOT create follow-up steps that depend on that data
+  * DO NOT use empty values as input to subsequent steps (e.g., don't pass "" to search queries)
+  * Instead, either:
+    a) Skip the dependent steps and mark task as complete with appropriate message
+    b) Return "needsHuman" if user input is needed to proceed
+    c) Adjust the plan to handle the empty case gracefully
+- Examples:
+  * If list_events returns no events, DON'T create a search_issues step with empty meeting summary
+  * If search_issues returns no issues, DON'T try to process non-existent issue data
+  * If a required item is not found, DON'T proceed with placeholder or empty values
+
+DECISION OPTIONS:
+1. "final" - Task is complete, return final response to user
+2. "nextSteps" - More steps needed based on the results you analyzed
+   - Create new steps dynamically using the actual data from previous steps
+   - You can reference specific values you found in the step outputs
+   - Each new step should have: tool_name, input, description, dependencies
+3. "needsHuman" - Requires human intervention (missing info, ambiguous results, etc.)
+4. "failed" - Task failed and cannot continue
+
+{self._get_placeholder_instructions(prompt_type="decision")}
+
+🚨 CRITICAL JSON FORMAT REQUIREMENTS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. You MUST return a valid JSON OBJECT (not an array, not a string, not empty)
+2. The JSON MUST have "type", "reason", and "payload" fields
+3. NEVER return: [], {{}}, "", null, or any other format
+4. If unsure, default to "final" type with appropriate message
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CORRECT RESPONSE EXAMPLES:
+
+Example 1 - Task completed (multiplication was performed):
+{{{{
+  "type": "final",
+  "reason": "User asked for multiplication of 123 and 456. The multiply tool successfully computed the result as 56088.",
+  "payload": {{{{
+    "message": "계산이 완료되었습니다. 123 × 456 = 56088",
+    "data": 56088
+  }}}}
+}}}}
+
+Example 2 - Need additional steps (email needs to be sent):
+{{{{
+  "type": "nextSteps",
+  "reason": "Contact was found, but email hasn't been sent yet",
+  "payload": {{{{
+    "steps": [
+      {{{{
+        "tool_name": "send_email",
+        "input": {{{{
+          "to": "john@example.com",
+          "subject": "Meeting",
+          "body": "Meeting details..."
+        }}}},
+        "description": "Send email to John",
+        "dependencies": []
+      }}}}
+    ]
+  }}}}
+}}}}
+
+Example 3 - Need human input:
+{{{{
+  "type": "needsHuman",
+  "reason": "Multiple contacts found with name 'John', need user to specify which one",
+  "payload": {{{{
+    "question": "I found 3 contacts named John. Which one did you mean: John Smith, John Doe, or John Park?"
+  }}}}
+}}}}
+
+Example 4 - Task failed:
+{{{{
+  "type": "failed",
+  "reason": "API returned authentication error and cannot proceed",
+  "payload": {{{{
+    "error": "Authentication failed. Please check your credentials."
+  }}}}
+}}}}
+
+❌ INVALID RESPONSES (DO NOT DO THIS):
+- []
+- {{{{}}}}
+- ""
+- {{{{"steps": []}}}}
+- null
+- Any response without "type", "reason", and "payload" fields
+
+NOW, analyze the execution results above and return your decision as a valid JSON object:
+"""
+
+    def _get_openrouter_decision_prompt(self, state: State, results: AggregatedGroupResults) -> str:
+        """Enhanced decision prompt for OpenRouter (OSS 20b models)"""
+        results_summary = self._format_results(results, state.plan)
+        context_str = self._format_context(state.context)
+        tools_list_detailed = self._format_tools_detailed()
+
+        # Get current date and time
+        current_datetime = datetime.now()
+        today_str = current_datetime.strftime("%Y-%m-%d (%A)")
+        current_time_str = current_datetime.strftime("%H:%M:%S")
+
+        return f"""You are an AI assistant. Your task is to analyze the execution results and return a JSON decision.
+
+⚠️ ABSOLUTELY CRITICAL - READ THIS FIRST:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+YOUR RESPONSE MUST BE A JSON OBJECT WITH EXACTLY THIS STRUCTURE:
+{{
+  "type": "final" OR "nextSteps" OR "needsHuman" OR "failed",
+  "reason": "explanation here",
+  "payload": {{ ... }}
+}}
+
+DO NOT wrap your response in ANY other fields like "final_output", "response", "decision", etc.
+DO NOT return an empty object {{}}, empty array [], or null.
+ONLY return the JSON structure shown above. Nothing else.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CONTEXT INFORMATION:
+- Today's date: {today_str}
+- Current time: {current_time_str}
+- Original user request: {state.request_text}
+
+EXECUTION RESULTS:
+{results_summary}
+
+YOUR TASK:
+1. Read the user's original request: "{state.request_text}"
+2. Check what steps were executed and their results
+3. Decide if the task is complete or needs more steps
+
+DECISION RULES:
+• If all work is done → return type="final"
+• If more steps needed → return type="nextSteps"
+• If need user input → return type="needsHuman"
+• If task failed → return type="failed"
+
+⚠️ MANDATORY JSON FORMAT - COPY THIS EXACTLY:
+
+If task is complete:
+{{
+  "type": "final",
+  "reason": "explain what was done",
+  "payload": {{
+    "message": "user-friendly message here",
+    "data": result_data_here
+  }}
+}}
+
+If need more steps:
+{{
+  "type": "nextSteps",
+  "reason": "explain why more steps needed",
+  "payload": {{
+    "steps": [
+      {{
+        "tool_name": "exact_tool_name",
+        "input": {{ "param": "value" }},
+        "description": "what this step does",
+        "dependencies": []
+      }}
+    ]
+  }}
+}}
+
+⚠️ EXAMPLES OF CORRECT RESPONSES:
+
+Example 1 - Multiplication task completed:
+{{
+  "type": "final",
+  "reason": "The multiply tool successfully computed 123 × 456 = 56088",
+  "payload": {{
+    "message": "계산 완료: 123 × 456 = 56088",
+    "data": 56088
+  }}
+}}
+
+Example 2 - Need to do more work:
+{{
+  "type": "nextSteps",
+  "reason": "User asked to multiply numbers but no tool was executed yet",
+  "payload": {{
+    "steps": [
+      {{
+        "tool_name": "multiply",
+        "input": {{ "numbers": [123, 456] }},
+        "description": "Multiply 123 and 456",
+        "dependencies": []
+      }}
+    ]
+  }}
+}}
+
+❌ WRONG - DO NOT DO THIS:
+- {{ "final_output": {{ "type": "final", ... }} }}  ← WRONG! Extra wrapper
+- []  ← WRONG! Empty array
+- {{}}  ← WRONG! Empty object
+- {{ "steps": [] }}  ← WRONG! Missing type and reason
+
+✅ RIGHT - DO THIS:
+- {{ "type": "final", "reason": "...", "payload": {{...}} }}  ← CORRECT!
+
+NOW: Analyze the execution results above and return your JSON decision.
+Remember: Your response must start with {{ "type": not with anything else!
+"""
 
     def _format_results(self, results: AggregatedGroupResults, plan: Optional[Plan]) -> str:
         """Format results for prompt"""
