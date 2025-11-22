@@ -40,11 +40,11 @@
                             <span class="toggle-icon" id="simple-examples-icon">▼</span>
                         </div>
                         <div class="chat-examples" id="simple-examples" style="display: flex;">
-                            <button class="example-btn" onclick="setExample('123 곱하기 456을 계산해줘')" title="Calculator Agent">🔢 Calculator</button>
-                            <button class="example-btn" onclick="setExample('jiho@samsung.com에게 \"See you at 2 PM\"이라는 내용으로 이메일 보내줘')" title="Mail Agent">📧 Mail</button>
-                            <button class="example-btn" onclick="setExample('내일 오전 10시부터 11시까지 \"Team Meeting\" 일정 만들어줘')" title="Calendar Agent">📅 Calendar</button>
-                            <button class="example-btn" onclick="setExample('\"Implement user authentication\"라는 제목으로 Jira 이슈 만들어줘')" title="Jira Agent">🎫 Jira</button>
-                            <button class="example-btn" onclick="setExample('김민지의 이메일 주소를 찾아줘')" title="Contact Lookup">👤 Contact</button>
+                            <button class="example-btn" onclick='setExample("123 곱하기 456을 계산해줘")' title="Calculator Agent">🔢 Calculator</button>
+                            <button class="example-btn" onclick='setExample("jiho@samsung.com에게 \"See you at 2 PM\"이라는 내용으로 이메일 보내줘")' title="Mail Agent">📧 Mail</button>
+                            <button class="example-btn" onclick='setExample("내일 오전 10시부터 11시까지 \"Team Meeting\" 일정 만들어줘")' title="Calendar Agent">📅 Calendar</button>
+                            <button class="example-btn" onclick='setExample("\"Implement user authentication\"라는 제목으로 Jira 이슈 만들어줘")' title="Jira Agent">🎫 Jira</button>
+                            <button class="example-btn" onclick='setExample("김민지의 이메일 주소를 찾아줘")' title="Contact Lookup">👤 Contact</button>
                         </div>
                     </div>
 
@@ -55,11 +55,11 @@
                             <span class="toggle-icon" id="multi-examples-icon">▼</span>
                         </div>
                         <div class="chat-examples" id="multi-examples" style="display: flex;">
-                            <button class="example-btn" onclick="setExample('(150 + 250) / 2를 계산하고, 결과를 jiho@samsung.com에게 이메일로 보내줘')" title="Calculator + Mail" style="background: linear-gradient(135deg, #43cea2 0%, #185a9d 100%); color: white;">🔢📧 계산 + 이메일</button>
-                            <button class="example-btn" onclick="setExample('김민지에게 \"Meeting reminder for tomorrow\"라는 이메일 보내줘')" title="Contact + Mail" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white;">👤📧 연락처 + 이메일</button>
-                            <button class="example-btn" onclick="setExample('내일 오전 10시부터 11시까지 \"Sprint Planning\" 일정을 만들고, 김민지에게 안건을 이메일로 보내줘')" title="Calendar + Contact + Mail" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">📅👤📧 일정 + 연락처 + 이메일</button>
-                            <button class="example-btn" onclick="setExample('\"Fix login bug\"라는 Jira 이슈를 만들고, haneul@samsung.com에게 알림 이메일 보내줘')" title="Jira + Mail" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">🎫📧 Jira + 이메일</button>
-                            <button class="example-btn" onclick="setExample('\"Code Review\" 일정을 11월 21일 오후 3시에 만들고, \"Prepare code review materials\"라는 Jira 이슈도 생성해줘')" title="Calendar + Jira" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">📅🎫 일정 + Jira</button>
+                            <button class="example-btn" onclick='setExample("(150 + 250) / 2를 계산하고, 결과를 jiho@samsung.com에게 이메일로 보내줘")' title="Calculator + Mail" style="background: linear-gradient(135deg, #43cea2 0%, #185a9d 100%); color: white;">🔢📧 계산 + 이메일</button>
+                            <button class="example-btn" onclick='setExample("김민지에게 \"Meeting reminder for tomorrow\"라는 이메일 보내줘")' title="Contact + Mail" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white;">👤📧 연락처 + 이메일</button>
+                            <button class="example-btn" onclick='setExample("내일 오전 10시부터 11시까지 \"Sprint Planning\" 일정을 만들고, 김민지에게 안건을 이메일로 보내줘")' title="Calendar + Contact + Mail" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">📅👤📧 일정 + 연락처 + 이메일</button>
+                            <button class="example-btn" onclick='setExample("\"Fix login bug\"라는 Jira 이슈를 만들고, haneul@samsung.com에게 알림 이메일 보내줘")' title="Jira + Mail" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">🎫📧 Jira + 이메일</button>
+                            <button class="example-btn" onclick='setExample("\"Code Review\" 일정을 11월 21일 오후 3시에 만들고, \"Prepare code review materials\"라는 Jira 이슈도 생성해줘")' title="Calendar + Jira" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">📅🎫 일정 + Jira</button>
                         </div>
                     </div>
 
@@ -70,11 +70,11 @@
                             <span class="toggle-icon" id="rpa-examples-icon">▼</span>
                         </div>
                         <div class="chat-examples" id="rpa-examples" style="display: flex;">
-                            <button class="example-btn" onclick="setExample('\"AI\"에 관한 최신 뉴스를 검색하고, 리포트를 작성해줘')" title="RPA: News + Report" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;">📰📄 뉴스 리포트</button>
-                            <button class="example-btn" onclick="setExample('\"Samsung\" 뉴스를 검색하고, 리포트를 작성한 다음, 김민지에게 이메일로 보내줘')" title="RPA: News + Report + Mail" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #333;">📰📄📧 뉴스 + 리포트 + 이메일</button>
-                            <button class="example-btn" onclick="setExample('\"Product Launch Dinner\" 행사에 minji@samsung.com, haneul@samsung.com, jisu@samsung.com의 참석 여부를 수집하고, 요약을 soobin@samsung.com에게 보내줘')" title="RPA: Attendance Collection" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: #333;">👥📊 출석 수집</button>
-                            <button class="example-btn" onclick="setExample('\"TO DO\" 상태의 모든 Jira 이슈를 검색하고, 요약 리포트를 작성한 다음, haneul@samsung.com에게 이메일로 보내줘')" title="RPA + Jira + Mail" style="background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); color: #333;">🤖🎫📧 RPA + Jira + 이메일</button>
-                            <button class="example-btn" onclick="setExample('\"Samsung\" 뉴스를 검색하고, 리포트를 작성한 다음, \"News Summary\" Jira 이슈를 만들고, 김민지에게 이메일 보내줘')" title="Complex: RPA + Jira + Contact + Mail" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: #333;">🤖📰🎫📧 복합 RPA</button>
+                            <button class="example-btn" onclick='setExample("\"AI\"에 관한 최신 뉴스를 검색하고, 리포트를 작성해줘")' title="RPA: News + Report" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;">📰📄 뉴스 리포트</button>
+                            <button class="example-btn" onclick='setExample("\"Samsung\" 뉴스를 검색하고, 리포트를 작성한 다음, 김민지에게 이메일로 보내줘")' title="RPA: News + Report + Mail" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #333;">📰📄📧 뉴스 + 리포트 + 이메일</button>
+                            <button class="example-btn" onclick='setExample("\"Product Launch Dinner\" 행사에 minji@samsung.com, haneul@samsung.com, jisu@samsung.com의 참석 여부를 수집하고, 요약을 soobin@samsung.com에게 보내줘")' title="RPA: Attendance Collection" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: #333;">👥📊 출석 수집</button>
+                            <button class="example-btn" onclick='setExample("\"TO DO\" 상태의 모든 Jira 이슈를 검색하고, 요약 리포트를 작성한 다음, haneul@samsung.com에게 이메일로 보내줘")' title="RPA + Jira + Mail" style="background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); color: #333;">🤖🎫📧 RPA + Jira + 이메일</button>
+                            <button class="example-btn" onclick='setExample("\"Samsung\" 뉴스를 검색하고, 리포트를 작성한 다음, \"News Summary\" Jira 이슈를 만들고, 김민지에게 이메일 보내줘")' title="Complex: RPA + Jira + Contact + Mail" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: #333;">🤖📰🎫📧 복합 RPA</button>
                         </div>
                     </div>
 
