@@ -1,0 +1,155 @@
+{
+  "questions": [
+    {
+      "id": 1,
+      "category": "single_agent",
+      "question": "123 곱하기 456을 계산해줘",
+      "expected_tools": ["calculator"],
+      "success_criteria": {
+        "type": "calculation",
+        "expected_result": "56088"
+      }
+    },
+    {
+      "id": 2,
+      "category": "single_agent",
+      "question": "jiho@samsung.com에게 \"See you at 2 PM\"이라는 내용으로 이메일 보내줘",
+      "expected_tools": ["mail"],
+      "success_criteria": {
+        "type": "email",
+        "keywords": ["email", "sent", "jiho@samsung.com"]
+      }
+    },
+    {
+      "id": 3,
+      "category": "single_agent",
+      "question": "내일 오전 10시부터 11시까지 \"Team Meeting\" 일정 만들어줘",
+      "expected_tools": ["calendar"],
+      "success_criteria": {
+        "type": "calendar",
+        "keywords": ["calendar", "event", "created", "Team Meeting"]
+      }
+    },
+    {
+      "id": 4,
+      "category": "single_agent",
+      "question": "\"Implement user authentication\"라는 제목으로 Jira 이슈 만들어줘",
+      "expected_tools": ["jira"],
+      "success_criteria": {
+        "type": "jira",
+        "keywords": ["jira", "issue", "created", "Implement user authentication"]
+      }
+    },
+    {
+      "id": 5,
+      "category": "single_agent",
+      "question": "김민지의 이메일 주소를 찾아줘",
+      "expected_tools": ["contact"],
+      "success_criteria": {
+        "type": "contact",
+        "keywords": ["minji", "email", "@"]
+      }
+    },
+    {
+      "id": 6,
+      "category": "multi_agent",
+      "question": "(150 + 250) / 2를 계산하고, 결과를 jiho@samsung.com에게 이메일로 보내줘",
+      "expected_tools": ["calculator", "mail"],
+      "success_criteria": {
+        "type": "multi",
+        "expected_result": "200",
+        "keywords": ["email", "sent", "jiho@samsung.com"]
+      }
+    },
+    {
+      "id": 7,
+      "category": "multi_agent",
+      "question": "김민지에게 \"Meeting reminder for tomorrow\"라는 이메일 보내줘",
+      "expected_tools": ["contact", "mail"],
+      "success_criteria": {
+        "type": "multi",
+        "keywords": ["email", "sent", "minji", "Meeting reminder"]
+      }
+    },
+    {
+      "id": 8,
+      "category": "multi_agent",
+      "question": "내일 오전 10시부터 11시까지 \"Sprint Planning\" 일정을 만들고, 김민지에게 안건을 이메일로 보내줘",
+      "expected_tools": ["calendar", "contact", "mail"],
+      "success_criteria": {
+        "type": "multi",
+        "keywords": ["calendar", "event", "email", "sent", "Sprint Planning"]
+      }
+    },
+    {
+      "id": 9,
+      "category": "multi_agent",
+      "question": "\"Fix login bug\"라는 Jira 이슈를 만들고, haneul@samsung.com에게 알림 이메일 보내줘",
+      "expected_tools": ["jira", "mail"],
+      "success_criteria": {
+        "type": "multi",
+        "keywords": ["jira", "issue", "email", "sent", "Fix login bug"]
+      }
+    },
+    {
+      "id": 10,
+      "category": "multi_agent",
+      "question": "\"Code Review\" 일정을 11월 21일 오후 3시에 만들고, \"Prepare code review materials\"라는 Jira 이슈도 생성해줘",
+      "expected_tools": ["calendar", "jira"],
+      "success_criteria": {
+        "type": "multi",
+        "keywords": ["calendar", "event", "jira", "issue", "Code Review", "Prepare code review materials"]
+      }
+    },
+    {
+      "id": 11,
+      "category": "rpa",
+      "question": "\"AI\"에 관한 최신 뉴스를 검색하고, 리포트를 작성해줘",
+      "expected_tools": ["rpa", "web_search"],
+      "success_criteria": {
+        "type": "rpa",
+        "keywords": ["news", "report", "AI"]
+      }
+    },
+    {
+      "id": 12,
+      "category": "rpa",
+      "question": "\"Samsung\" 뉴스를 검색하고, 리포트를 작성한 다음, 김민지에게 이메일로 보내줘",
+      "expected_tools": ["rpa", "web_search", "mail"],
+      "success_criteria": {
+        "type": "rpa",
+        "keywords": ["news", "report", "Samsung", "email", "sent"]
+      }
+    },
+    {
+      "id": 13,
+      "category": "rpa",
+      "question": "\"Product Launch Dinner\" 행사에 minji@samsung.com, haneul@samsung.com, jisu@samsung.com의 참석 여부를 수집하고, 요약을 soobin@samsung.com에게 보내줘",
+      "expected_tools": ["rpa", "mail"],
+      "success_criteria": {
+        "type": "rpa",
+        "keywords": ["attendance", "summary", "email", "sent"]
+      }
+    },
+    {
+      "id": 14,
+      "category": "rpa",
+      "question": "\"TO DO\" 상태의 모든 Jira 이슈를 검색하고, 요약 리포트를 작성한 다음, haneul@samsung.com에게 이메일로 보내줘",
+      "expected_tools": ["rpa", "jira", "mail"],
+      "success_criteria": {
+        "type": "rpa",
+        "keywords": ["jira", "TO DO", "report", "email", "sent"]
+      }
+    },
+    {
+      "id": 15,
+      "category": "rpa",
+      "question": "\"Samsung\" 뉴스를 검색하고, 리포트를 작성한 다음, \"News Summary\" Jira 이슈를 만들고, 김민지에게 이메일 보내줘",
+      "expected_tools": ["rpa", "web_search", "jira", "mail"],
+      "success_criteria": {
+        "type": "rpa",
+        "keywords": ["news", "report", "jira", "issue", "News Summary", "email"]
+      }
+    }
+  ]
+}
