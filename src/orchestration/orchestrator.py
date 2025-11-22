@@ -120,6 +120,7 @@ class Orchestrator:
             self._route_after_plan,
             {
                 "dispatch": "dispatch",
+                "finalize": "finalize",
                 "error_handler": "error_handler"
             }
         )
