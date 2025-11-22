@@ -96,7 +96,7 @@ class Orchestrator:
                 self.user_id, self.tenant, mcp_tools=mcp_tools
             )
             self.planner = Planner(self.settings, self.tracker)
-            self.dispatcher = TaskDispatcher(self.tracker, self.mcp_executor)
+            self.dispatcher = TaskDispatcher(self.tracker, self.mcp_executor, llm_client=self.planner.llm_client)
 
     def _build_graph(self) -> StateGraph:
         """Build the LangGraph state machine"""

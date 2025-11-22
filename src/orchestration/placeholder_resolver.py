@@ -4,8 +4,13 @@ Placeholder Resolver - Resolves placeholders in step inputs using previous step 
 
 import ast
 import re
-from typing import Any, Dict, List, Optional
+import json
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from .types import Step, StepResult
+
+# Forward declaration to avoid circular import
+if TYPE_CHECKING:
+    from .llm_client import LLMClient
 
 
 class PlaceholderResolver:
@@ -15,8 +20,9 @@ class PlaceholderResolver:
     # Pattern matches: {{...}}, ${...}, or {...}
     PLACEHOLDER_PATTERN = re.compile(r'(\{\{([^}]+)\}\}|\$\{([^}]+)\}|\{([^}]+)\})')
 
-    def __init__(self):
+    def __init__(self, llm_client: Optional['LLMClient'] = None):
         self._step_outputs: Dict[str, Any] = {}
+        self._llm_client = llm_client
 
     def register_step_result(self, step_id: str, output: Any) -> None:
         """
@@ -168,6 +174,25 @@ class PlaceholderResolver:
                 else:
                     available_keys = list(value.keys()) if isinstance(value, dict) else []
                     print(f"[PlaceholderResolver] ERROR: Field '{part}' not found in dict at '{current_path}'. Available keys: {available_keys}")
+
+                    # Try LLM-based field matching if LLM client is available
+                    # Note: LLM matching is async and would require refactoring the entire call chain
+                    # For now, use simple heuristic matching as fallback
+                    if self._llm_client:
+                        print(f"[PlaceholderResolver] Attempting heuristic field matching...")
+                        matched_field = self._try_heuristic_field_matching(
+                            missing_field=part,
+                            available_keys=available_keys
+                        )
+                        if matched_field:
+                            print(f"[PlaceholderResolver] Matched '{part}' -> '{matched_field}'")
+                            # Re-try with matched field
+                            value = value[matched_field]
+                            current_path += f".{matched_field}"
+                            print(f"[PlaceholderResolver]   [{i}/{len(parts)-1}] {current_path} = {type(value).__name__}" +
+                                  (f" (length {len(value)})" if isinstance(value, (list, dict)) else ""))
+                            continue
+
                     return None
             elif isinstance(value, list):
                 # Support array indexing like events.0
@@ -404,3 +429,182 @@ class PlaceholderResolver:
         """Clear all registered step outputs"""
         self._step_outputs.clear()
         print("[PlaceholderResolver] Cleared all step outputs")
+
+    def _try_heuristic_field_matching(
+        self,
+        missing_field: str,
+        available_keys: List[str]
+    ) -> Optional[str]:
+        """
+        Try to find a matching field using simple heuristics
+
+        Args:
+            missing_field: The field that was not found
+            available_keys: List of available keys in the dict
+
+        Returns:
+            Matched field name or None
+        """
+        if not available_keys:
+            return None
+
+        # Semantic mappings (common patterns)
+        semantic_mappings = {
+            "news": ["articles", "items", "posts", "entries"],
+            "articles": ["news", "items", "posts", "entries"],
+            "result": ["output", "data", "value", "response"],
+            "output": ["result", "data", "value", "response"],
+            "data": ["result", "output", "value", "items"],
+            "items": ["data", "entries", "results", "list"],
+        }
+
+        # Check direct semantic mapping
+        if missing_field in semantic_mappings:
+            candidates = semantic_mappings[missing_field]
+            for candidate in candidates:
+                if candidate in available_keys:
+                    print(f"[PlaceholderResolver] Semantic match: '{missing_field}' -> '{candidate}'")
+                    return candidate
+
+        # Check for partial string matches (case-insensitive)
+        missing_lower = missing_field.lower()
+        for key in available_keys:
+            key_lower = key.lower()
+            # Check if one is substring of the other
+            if missing_lower in key_lower or key_lower in missing_lower:
+                print(f"[PlaceholderResolver] Substring match: '{missing_field}' -> '{key}'")
+                return key
+
+        # No match found
+        return None
+
+    async def _try_llm_field_matching(
+        self,
+        original_placeholder: str,
+        current_data: dict,
+        missing_field: str,
+        current_path: str
+    ) -> Optional[str]:
+        """
+        Use LLM to find alternative field names when exact match fails
+
+        Args:
+            original_placeholder: The original placeholder that failed (e.g., "step_0.news")
+            current_data: The current dict where the field was not found
+            missing_field: The field name that was not found (e.g., "news")
+            current_path: The current path in the data structure (e.g., "step_0")
+
+        Returns:
+            Suggested alternative path or None if no match found
+        """
+        if not self._llm_client:
+            return None
+
+        try:
+            # Prepare data preview (limit size for LLM)
+            data_preview = self._format_data_preview(current_data, max_depth=3)
+
+            prompt = f"""You are helping resolve a placeholder field mismatch.
+
+SITUATION:
+- User tried to access field: "{missing_field}"
+- Current path: "{current_path}"
+- Original placeholder: "{original_placeholder}"
+- But field "{missing_field}" does not exist in the data
+
+AVAILABLE DATA STRUCTURE:
+{data_preview}
+
+YOUR TASK:
+1. Check if there's a field in the available data that the user likely meant
+2. Consider semantic similarity (e.g., "news" vs "articles", "result" vs "output")
+3. If you find a matching field, return the complete corrected path
+
+Return ONLY valid JSON in this format:
+{{
+  "found": true or false,
+  "suggested_path": "step_X.correct_field_name" or null,
+  "reasoning": "brief explanation"
+}}
+
+IMPORTANT:
+- Only suggest a field if you're confident it matches the user's intent
+- The suggested_path should be the COMPLETE path from the step_id
+- Return found=false if no suitable alternative exists
+
+Examples:
+- If user wants "step_0.news" but data has "articles", suggest "step_0.articles"
+- If user wants "step_1.result" but data has "output", suggest "step_1.output"
+- If no semantic match exists, return found=false
+
+Return ONLY the JSON, no other text."""
+
+            # Call LLM asynchronously
+            content = await self._llm_client.generate(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=512
+            )
+
+            # Parse response
+            content = content.strip()
+
+            # Extract JSON from markdown if present
+            if content.startswith("```"):
+                content = content.split("```")[1]
+                if content.startswith("json"):
+                    content = content[4:]
+                content = content.strip()
+
+            data = json.loads(content)
+
+            if data.get("found") and data.get("suggested_path"):
+                reasoning = data.get("reasoning", "No reasoning provided")
+                print(f"[PlaceholderResolver] LLM field matching result:")
+                print(f"[PlaceholderResolver]   Reasoning: {reasoning}")
+                print(f"[PlaceholderResolver]   Suggested path: {data['suggested_path']}")
+                return data["suggested_path"]
+            else:
+                print(f"[PlaceholderResolver] LLM could not find alternative field")
+                return None
+
+        except Exception as e:
+            print(f"[PlaceholderResolver] Error during LLM field matching: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def _format_data_preview(self, data: Any, max_depth: int = 3, current_depth: int = 0) -> str:
+        """
+        Format data structure for LLM preview
+
+        Args:
+            data: Data to format
+            max_depth: Maximum depth to traverse
+            current_depth: Current recursion depth
+
+        Returns:
+            Formatted string representation
+        """
+        if current_depth >= max_depth:
+            return f"<nested data, depth limit reached>"
+
+        if isinstance(data, dict):
+            lines = ["{"]
+            for key, value in list(data.items())[:20]:  # Limit to first 20 keys
+                value_preview = self._format_data_preview(value, max_depth, current_depth + 1)
+                lines.append(f'  "{key}": {value_preview},')
+            if len(data) > 20:
+                lines.append(f"  ... ({len(data) - 20} more keys)")
+            lines.append("}")
+            return "\n".join(lines)
+        elif isinstance(data, list):
+            if len(data) == 0:
+                return "[]"
+            preview = self._format_data_preview(data[0], max_depth, current_depth + 1)
+            if len(data) > 1:
+                return f"[{preview}, ... ({len(data)} items total)]"
+            return f"[{preview}]"
+        elif isinstance(data, str):
+            return f'"{data[:100]}"' if len(data) > 100 else f'"{data}"'
+        else:
+            return str(data)

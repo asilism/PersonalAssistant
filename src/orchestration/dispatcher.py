@@ -3,7 +3,7 @@ TaskDispatcher - Dispatches tasks for execution
 """
 
 import asyncio
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from .types import State, StateType, PlanState, PlanUpdate
 from .mcp_executor import MCPExecutor
@@ -11,14 +11,18 @@ from .tracker import TaskTracker
 from .placeholder_resolver import PlaceholderResolver
 from .event_emitter import get_event_emitter
 
+# Forward declaration to avoid circular import
+if TYPE_CHECKING:
+    from .llm_client import LLMClient
+
 
 class TaskDispatcher:
     """TaskDispatcher - Executes plan steps using MCP"""
 
-    def __init__(self, tracker: TaskTracker, executor: MCPExecutor):
+    def __init__(self, tracker: TaskTracker, executor: MCPExecutor, llm_client: Optional['LLMClient'] = None):
         self.tracker = tracker
         self.executor = executor
-        self.resolver = PlaceholderResolver()
+        self.resolver = PlaceholderResolver(llm_client=llm_client)
         self.event_emitter = get_event_emitter()
 
     async def invoke(self, state: State) -> State:

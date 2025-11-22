@@ -1276,6 +1276,25 @@ For each step, specify:
 
 {self._get_placeholder_instructions(prompt_type="initial")}
 
+IMPORTANT - UNDERSTANDING TOOL OUTPUT FORMATS:
+When creating placeholders for tool outputs, you MUST understand the structure of each tool's response:
+
+Common tool output patterns:
+- search_latest_news: Returns {{"success": true, "articles": [...], "count": N}}
+  * Use {{{{step_X.articles}}}} NOT {{{{step_X.news}}}}
+- write_report: Returns {{"success": true, "report_id": "...", "content": "...", "format": "..."}}
+- list_events: Returns {{"success": true, "events": [...]}}
+- create_event: Returns {{"success": true, "event": {{...}}}}
+- send_email: Returns {{"success": true, "message_id": "..."}}
+- calculator tools: Return {{"success": true, "operation": "...", "result": NUMBER}}
+
+CRITICAL RULES FOR PLACEHOLDERS:
+1. Check the tool description carefully to understand its output structure
+2. Most tools return objects with "success" and specific data fields
+3. Use the ACTUAL field names from the tool's output (e.g., "articles" not "news")
+4. If unsure about output structure, use generic patterns like {{{{step_X.result}}}} or {{{{step_X}}}}
+5. Array data is often in plural field names: "articles", "events", "items", etc.
+
 Return your plan as a JSON array of steps. Each step should have this format:
 {{
   "tool_name": "tool_name",
@@ -1381,11 +1400,21 @@ CORRECT RESPONSE:
 - Use the exact tool names from the list above  ← CORRECT!
 - Create steps that will accomplish the user's request  ← CORRECT!
 
+⚠️ IMPORTANT - TOOL OUTPUT FORMATS:
+When you need to reference previous step outputs, use the CORRECT field names:
+
+Common patterns:
+- search_latest_news → {{"articles": [...], "count": N}} - Use "articles" NOT "news"
+- write_report → {{"report_id": "...", "content": "..."}}
+- list_events → {{"events": [...]}}
+- calculator tools → {{"result": NUMBER}}
+
 YOUR TASK:
 1. Read the user's request: "{state.request_text}"
 2. Find the appropriate tool(s) from the list above
 3. Create a JSON array of steps to execute those tools
-4. Return ONLY the JSON array
+4. When referencing outputs, use ACTUAL field names (e.g., "articles" not "news")
+5. Return ONLY the JSON array
 
 NOW: Create your execution plan as a JSON array.
 Remember: Your response must start with [ not with anything else!
