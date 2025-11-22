@@ -35,65 +35,6 @@ if TYPE_CHECKING:
 class Planner:
     """Planner - Uses LLM to create execution plans"""
 
-    # Tool output schema metadata - maps tool names to their output structure
-    # This should ideally be loaded from tool definitions or a configuration file
-    TOOL_OUTPUT_SCHEMAS = {
-        "search_latest_news": {
-            "description": "Returns news articles",
-            "schema": {"success": "boolean", "articles": "array", "count": "number"},
-            "example": '{"success": true, "articles": [...], "count": 5}',
-            "key_fields": ["articles", "count"]
-        },
-        "write_report": {
-            "description": "Returns report metadata",
-            "schema": {"success": "boolean", "report_id": "string", "content": "string", "format": "string"},
-            "example": '{"success": true, "report_id": "...", "content": "...", "format": "markdown"}',
-            "key_fields": ["report_id", "content", "format"]
-        },
-        "list_events": {
-            "description": "Returns calendar events",
-            "schema": {"success": "boolean", "events": "array"},
-            "example": '{"success": true, "events": [...]}',
-            "key_fields": ["events"]
-        },
-        "create_event": {
-            "description": "Returns created event",
-            "schema": {"success": "boolean", "event": "object"},
-            "example": '{"success": true, "event": {...}}',
-            "key_fields": ["event"]
-        },
-        "send_email": {
-            "description": "Returns email status",
-            "schema": {"success": "boolean", "message_id": "string"},
-            "example": '{"success": true, "message_id": "..."}',
-            "key_fields": ["message_id"]
-        },
-        "add": {
-            "description": "Returns calculation result",
-            "schema": {"success": "boolean", "operation": "string", "result": "number"},
-            "example": '{"success": true, "operation": "add", "result": 150}',
-            "key_fields": ["result"]
-        },
-        "subtract": {
-            "description": "Returns calculation result",
-            "schema": {"success": "boolean", "operation": "string", "result": "number"},
-            "example": '{"success": true, "operation": "subtract", "result": 50}',
-            "key_fields": ["result"]
-        },
-        "multiply": {
-            "description": "Returns calculation result",
-            "schema": {"success": "boolean", "operation": "string", "result": "number"},
-            "example": '{"success": true, "operation": "multiply", "result": 200}',
-            "key_fields": ["result"]
-        },
-        "divide": {
-            "description": "Returns calculation result",
-            "schema": {"success": "boolean", "operation": "string", "result": "number"},
-            "example": '{"success": true, "operation": "divide", "result": 2.5}',
-            "key_fields": ["result"]
-        }
-    }
-
     def __init__(self, settings: OrchestrationSettings, tracker: Optional['TaskTracker'] = None):
         self.settings = settings
         self.tracker = tracker
@@ -1062,7 +1003,7 @@ Return ONLY the JSON, no other text."""
         return "\n".join(lines)
 
     def _format_tools_detailed(self) -> str:
-        """Format available tools in detailed JSON format for prompt, including output schemas"""
+        """Format available tools in detailed JSON format for prompt, including FastMCP outputSchema"""
         lines = []
         for tool in self.settings.available_tools:
             tool_dict = {
@@ -1071,20 +1012,9 @@ Return ONLY the JSON, no other text."""
             }
             if tool.input_schema:
                 tool_dict["input_schema"] = tool.input_schema
-
-            # Add output schema - prioritize from MCP tool definition
+            # Include outputSchema from FastMCP if available
             if tool.output_schema:
-                # Use output schema from MCP tool (parsed from docstring)
                 tool_dict["output_schema"] = tool.output_schema
-            elif tool.name in self.TOOL_OUTPUT_SCHEMAS:
-                # Fallback to hardcoded schema if MCP tool doesn't provide one
-                output_info = self.TOOL_OUTPUT_SCHEMAS[tool.name]
-                tool_dict["output_schema"] = {
-                    "description": output_info["description"],
-                    "example": output_info["example"],
-                    "key_fields": output_info["key_fields"]
-                }
-
             lines.append("    " + json.dumps(tool_dict, indent=4).replace("\n", "\n    "))
         return ",\n".join(lines)
 
