@@ -33,33 +33,48 @@
                         </div>
                     </div>
 
-                    <!-- Simple Query Examples -->
+                    <!-- Simple Query Examples (Single Agent) -->
                     <div class="example-category" style="margin-top: 10px; padding: 10px; background: #f0f7ff; border-radius: 8px; border-left: 4px solid #4CAF50;">
                         <div class="category-header" onclick="toggleCategory('simple-examples')" style="font-size: 13px; font-weight: 600; color: #2E7D32; margin-bottom: 8px; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;">
-                            <span>✨ 단순 질문 예제</span>
+                            <span>✨ 단일 Agent 예제 (Single Agent)</span>
                             <span class="toggle-icon" id="simple-examples-icon">▼</span>
                         </div>
                         <div class="chat-examples" id="simple-examples" style="display: flex;">
-                            <button class="example-btn" onclick="setExample('Send an email to john@example.com about the meeting tomorrow')" title="Send an email to john@example.com about the meeting tomorrow">📧 Send Email</button>
-                            <button class="example-btn" onclick="setExample('Create a calendar event for team meeting on Friday at 2 PM')" title="Create a calendar event for team meeting on Friday at 2 PM">📅 Create Event</button>
-                            <button class="example-btn" onclick="setExample('Search for issues assigned to me in Jira')" title="Search for issues assigned to me in Jira">🎫 Search Jira</button>
-                            <button class="example-btn" onclick="setExample('Calculate 25 * 8 + 150')" title="Calculate 25 * 8 + 150">🔢 Calculate</button>
-                            <button class="example-btn" onclick="setExample('Search for latest AI news and write a brief report')" title="Search for latest AI news and write a brief report">📰 RPA: News Report</button>
+                            <button class="example-btn" onclick="setExample('123 곱하기 456을 계산해줘')" title="Calculator Agent">🔢 Calculator</button>
+                            <button class="example-btn" onclick="setExample('jiho@samsung.com에게 \"See you at 2 PM\"이라는 내용으로 이메일 보내줘')" title="Mail Agent">📧 Mail</button>
+                            <button class="example-btn" onclick="setExample('내일 오전 10시부터 11시까지 \"Team Meeting\" 일정 만들어줘')" title="Calendar Agent">📅 Calendar</button>
+                            <button class="example-btn" onclick="setExample('\"Implement user authentication\"라는 제목으로 Jira 이슈 만들어줘')" title="Jira Agent">🎫 Jira</button>
+                            <button class="example-btn" onclick="setExample('김민지의 이메일 주소를 찾아줘')" title="Contact Lookup">👤 Contact</button>
                         </div>
                     </div>
 
-                    <!-- Complex Multi-Tool Examples -->
-                    <div class="example-category" style="margin-top: 10px; padding: 10px; background: #f0f7ff; border-radius: 8px; border-left: 4px solid #2196F3;">
-                        <div class="category-header" onclick="toggleCategory('complex-examples')" style="font-size: 13px; font-weight: 600; color: #1976D2; margin-bottom: 8px; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;">
-                            <span>🔧 복합 질문 예제</span>
-                            <span class="toggle-icon" id="complex-examples-icon">▼</span>
+                    <!-- Multi-Agent Examples -->
+                    <div class="example-category" style="margin-top: 10px; padding: 10px; background: #fff8e1; border-radius: 8px; border-left: 4px solid #FF9800;">
+                        <div class="category-header" onclick="toggleCategory('multi-examples')" style="font-size: 13px; font-weight: 600; color: #E65100; margin-bottom: 8px; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;">
+                            <span>🔗 복수 Agent 예제 (Multi Agent)</span>
+                            <span class="toggle-icon" id="multi-examples-icon">▼</span>
                         </div>
-                        <div class="chat-examples" id="complex-examples" style="display: flex;">
-                            <button class="example-btn" onclick="setExample('Project Review의 일정의 end date를 11월 30일로 변경해줘. 그리고 참석자들에게 일정이 변경되었다고 메일로 알려줘')" title="Project Review의 일정의 end date를 11월 30일로 변경해줘. 그리고 참석자들에게 일정이 변경되었다고 메일로 알려줘" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">📅✉️ 일정 변경 + 이메일 알림</button>
-                            <button class="example-btn" onclick="setExample('이번 주 월요일부터 금요일까지 모든 회의 일정을 조회하고, 각 회의별로 Jira에서 관련된 이슈들을 찾아서 회의 준비 자료를 이메일로 보내줘')" title="이번 주 월요일부터 금요일까지 모든 회의 일정을 조회하고, 각 회의별로 Jira에서 관련된 이슈들을 찾아서 회의 준비 자료를 이메일로 보내줘" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">📅🎫✉️ 주간 회의 준비</button>
-                            <button class="example-btn" onclick="setExample('내일 오전 10시에 일정이 비어있는지 확인하고, 비어있으면 Team Sync 미팅을 추가한 다음 팀원들에게 초대 메일을 발송해줘')" title="내일 오전 10시에 일정이 비어있는지 확인하고, 비어있으면 Team Sync 미팅을 추가한 다음 팀원들에게 초대 메일을 발송해줘" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">🔍📅✉️ 일정 확인 + 미팅 생성</button>
-                            <button class="example-btn" onclick="setExample('다음 주 전체 캘린더를 확인해서 3시간 이상 연속된 회의가 있는지 찾고, 있다면 일정 조정이 필요하다고 관련 참석자들에게 이메일을 보내줘')" title="다음 주 전체 캘린더를 확인해서 3시간 이상 연속된 회의가 있는지 찾고, 있다면 일정 조정이 필요하다고 관련 참석자들에게 이메일을 보내줘" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white;">📊📅✉️ 일정 충돌 감지</button>
-                            <button class="example-btn" onclick="setExample('지난주에 완료된 Jira 이슈들(status=Done)을 조회하고, 각 이슈의 제목, 담당자, 완료일을 포함한 요약 보고서를 sungjun87.lee@samsung.com에게 이메일로 전송해줘')" title="지난주에 완료된 Jira 이슈들(status=Done)을 조회하고, 각 이슈의 제목, 담당자, 완료일을 포함한 요약 보고서를 sungjun87.lee@samsung.com에게 이메일로 전송해줘" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: white;">🎫📄✉️ 주간 보고서 자동화</button>
+                        <div class="chat-examples" id="multi-examples" style="display: flex;">
+                            <button class="example-btn" onclick="setExample('(150 + 250) / 2를 계산하고, 결과를 jiho@samsung.com에게 이메일로 보내줘')" title="Calculator + Mail" style="background: linear-gradient(135deg, #43cea2 0%, #185a9d 100%); color: white;">🔢📧 계산 + 이메일</button>
+                            <button class="example-btn" onclick="setExample('김민지에게 \"Meeting reminder for tomorrow\"라는 이메일 보내줘')" title="Contact + Mail" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white;">👤📧 연락처 + 이메일</button>
+                            <button class="example-btn" onclick="setExample('내일 오전 10시부터 11시까지 \"Sprint Planning\" 일정을 만들고, 김민지에게 안건을 이메일로 보내줘')" title="Calendar + Contact + Mail" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">📅👤📧 일정 + 연락처 + 이메일</button>
+                            <button class="example-btn" onclick="setExample('\"Fix login bug\"라는 Jira 이슈를 만들고, haneul@samsung.com에게 알림 이메일 보내줘')" title="Jira + Mail" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">🎫📧 Jira + 이메일</button>
+                            <button class="example-btn" onclick="setExample('\"Code Review\" 일정을 11월 21일 오후 3시에 만들고, \"Prepare code review materials\"라는 Jira 이슈도 생성해줘')" title="Calendar + Jira" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">📅🎫 일정 + Jira</button>
+                        </div>
+                    </div>
+
+                    <!-- RPA Examples -->
+                    <div class="example-category" style="margin-top: 10px; padding: 10px; background: #f3e5f5; border-radius: 8px; border-left: 4px solid #9C27B0;">
+                        <div class="category-header" onclick="toggleCategory('rpa-examples')" style="font-size: 13px; font-weight: 600; color: #6A1B9A; margin-bottom: 8px; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;">
+                            <span>🤖 RPA 포함 예제 (With RPA)</span>
+                            <span class="toggle-icon" id="rpa-examples-icon">▼</span>
+                        </div>
+                        <div class="chat-examples" id="rpa-examples" style="display: flex;">
+                            <button class="example-btn" onclick="setExample('\"AI\"에 관한 최신 뉴스를 검색하고, 리포트를 작성해줘')" title="RPA: News + Report" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;">📰📄 뉴스 리포트</button>
+                            <button class="example-btn" onclick="setExample('\"Samsung\" 뉴스를 검색하고, 리포트를 작성한 다음, 김민지에게 이메일로 보내줘')" title="RPA: News + Report + Mail" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #333;">📰📄📧 뉴스 + 리포트 + 이메일</button>
+                            <button class="example-btn" onclick="setExample('\"Product Launch Dinner\" 행사에 minji@samsung.com, haneul@samsung.com, jisu@samsung.com의 참석 여부를 수집하고, 요약을 soobin@samsung.com에게 보내줘')" title="RPA: Attendance Collection" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: #333;">👥📊 출석 수집</button>
+                            <button class="example-btn" onclick="setExample('\"TO DO\" 상태의 모든 Jira 이슈를 검색하고, 요약 리포트를 작성한 다음, haneul@samsung.com에게 이메일로 보내줘')" title="RPA + Jira + Mail" style="background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); color: #333;">🤖🎫📧 RPA + Jira + 이메일</button>
+                            <button class="example-btn" onclick="setExample('\"Samsung\" 뉴스를 검색하고, 리포트를 작성한 다음, \"News Summary\" Jira 이슈를 만들고, 김민지에게 이메일 보내줘')" title="Complex: RPA + Jira + Contact + Mail" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: #333;">🤖📰🎫📧 복합 RPA</button>
                         </div>
                     </div>
 
