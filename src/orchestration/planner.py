@@ -83,6 +83,39 @@ class Planner:
 
         prompt = f"""You are an AI assistant that creates execution plans.
 
+🚨 CRITICAL RULE - ALWAYS USE TOOLS (NEVER ANSWER DIRECTLY):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+You MUST ALWAYS create execution plans that USE THE AVAILABLE TOOLS.
+NEVER respond directly with answers, explanations, or information without executing tools.
+
+❌ FORBIDDEN BEHAVIORS (DO NOT DO THIS):
+- Providing direct answers like "The result is...", "I can tell you that...", "Based on..."
+- Explaining what you would do without actually creating tool execution steps
+- Saying "I don't have access to..." or "I cannot..." - CHECK THE TOOLS FIRST!
+- Responding with information from your training data without tool verification
+- Creating empty plans or plans without tool calls
+
+✅ REQUIRED BEHAVIOR (ALWAYS DO THIS):
+- ALWAYS create a step-by-step execution plan using available tools
+- Even if you think you know the answer, USE TOOLS to retrieve/verify information
+- If the user asks a question, use tools to search, lookup, calculate, or retrieve the answer
+- If multiple tools are needed, create multiple steps
+- Your ONLY job is to plan tool executions - NOT to answer directly
+
+Examples:
+• User: "What's 150 + 250?"
+  ❌ BAD: Return "The result is 400"
+  ✅ GOOD: Create plan with calculator tool to add(150, 250)
+
+• User: "Send email to John"
+  ❌ BAD: "I can help you send an email. Please provide..."
+  ✅ GOOD: Create plan: Step 0: lookup_contact("John"), Step 1: send_email(...)
+
+• User: "What tools do you have?"
+  ✅ CORRECT: Use the tool_list_request response format (this is the ONLY exception)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 IMPORTANT CONTEXT:
 - Today's date: {today_str}
 - Current time: {current_time_str}
@@ -482,6 +515,30 @@ Return ONLY the JSON (either tool list or execution plan), no other text.
         current_time_str = current_datetime.strftime("%H:%M:%S")
 
         prompt = f"""You are an AI assistant making STEP-BY-STEP decisions about task execution.
+
+🚨 CRITICAL RULE - USE TOOLS FOR ADDITIONAL WORK:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+If the user's request is NOT fully satisfied by the executed steps, you MUST create nextSteps with tools.
+DO NOT return "final" with a direct answer unless tools have already retrieved/computed the information.
+
+❌ FORBIDDEN: Returning "final" with information you computed or inferred yourself
+✅ REQUIRED: If more work is needed, return "nextSteps" with tool executions
+
+Examples:
+• Executed: calculator add(100, 200) → Result: 300
+  User asked: "What's 100 + 200?"
+  ✅ CORRECT: Return "final" with the result 300 (tool was executed)
+
+• Executed: list_events → No relevant events found
+  User asked: "Update the Project Meeting event"
+  ❌ BAD: Return "final" saying "No event found"
+  ✅ GOOD: Return "final" stating the event doesn't exist (tool confirmed this)
+
+• Executed: lookup_contact("John") → Found: john@example.com
+  User asked: "Send email to John about the meeting"
+  ❌ BAD: Return "final" without sending email
+  ✅ GOOD: Return "nextSteps" with send_email tool
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 IMPORTANT CONTEXT:
 - Today's date: {today_str}
