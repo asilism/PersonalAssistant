@@ -315,7 +315,7 @@ class Orchestrator:
 
     async def _error_node(self, state: OrchestrationState) -> OrchestrationState:
         """Error node"""
-        error_msg = state.get('error', 'Unknown error')
+        error_msg = state.get('error') or 'Unknown error occurred'
         print(f"[Orchestrator] === Error Node ===")
         print(f"[Orchestrator] ERROR: {error_msg}")
         print(f"[Orchestrator] State at error:")
@@ -323,6 +323,8 @@ class Orchestrator:
         print(f"[Orchestrator]   - Request: {state.get('request_text', '')[:100]}")
         print(f"[Orchestrator]   - Plan ID: {state.get('plan', {}).get('plan_id') if state.get('plan') else 'N/A'}")
 
+        # Ensure error message is always set in state
+        state["error"] = error_msg
         state["type"] = StateType.ERROR.value
         return state
 
@@ -332,9 +334,14 @@ class Orchestrator:
 
         if state_type == StateType.DISPATCH.value:
             return "dispatch"
+        elif state_type == StateType.FINAL.value:
+            return "finalize"
         elif state_type == StateType.ERROR.value:
             return "error_handler"
         else:
+            # Unknown state type - set error and route to error_handler
+            if not state.get("error"):
+                state["error"] = f"Unexpected state type after planning: {state_type}"
             return "error_handler"
 
     def _route_after_dispatch(self, state: OrchestrationState) -> str:
@@ -346,6 +353,9 @@ class Orchestrator:
         elif state_type == StateType.ERROR.value:
             return "error_handler"
         else:
+            # Unknown state type - set error and route to error_handler
+            if not state.get("error"):
+                state["error"] = f"Unexpected state type after dispatch: {state_type}"
             return "error_handler"
 
     def _route_after_decide(self, state: OrchestrationState) -> str:
@@ -363,6 +373,9 @@ class Orchestrator:
             print(f"[Orchestrator] Routing HUMAN_IN_THE_LOOP to finalize")
             return "finalize"
         else:
+            # Unknown state type - set error and route to error_handler
+            if not state.get("error"):
+                state["error"] = f"Unexpected state type after decision: {state_type}"
             return "error_handler"
 
     def _to_pydantic_state(self, state: OrchestrationState) -> State:
@@ -645,7 +658,7 @@ class Orchestrator:
                     "plan_id": final_state.get("plan", {}).get("plan_id") if final_state.get("plan") else None
                 }
             elif final_state.get("type") == StateType.ERROR.value:
-                error_message = final_state.get("error", "Unknown error")
+                error_message = final_state.get("error") or "Unknown error occurred"
 
                 # Save error message to chat history
                 await self.tracker.save_assistant_message(

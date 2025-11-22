@@ -265,9 +265,9 @@ class ExecutionEventEmitter:
         event = ExecutionEvent(
             event_type=ExecutionEventType.EXECUTION_ERROR,
             trace_id=trace_id,
-            message=f"Execution error: {error}",
+            message=f"Execution error: {error or 'Unknown error occurred'}",
             data={
-                "error": error,
+                "error": error or "Unknown error occurred",
                 "error_type": error_type
             }
         )
