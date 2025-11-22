@@ -5,45 +5,21 @@ Provides mathematical calculation tools
 """
 
 import math
-from typing import TypedDict
 from fastmcp import FastMCP
-
-
-# Output schema types
-class CalculationOutput(TypedDict):
-    success: bool
-    operation: str
-    result: float
-
 
 # Create FastMCP server
 mcp = FastMCP("calculator-agent")
 
 
 @mcp.tool()
-def add(numbers: list[float]) -> CalculationOutput:
+def add(numbers: list[float]) -> dict:
     """Add two or more numbers
 
     Args:
         numbers: Numbers to add
 
     Returns:
-        CalculationOutput: {
-            "success": bool,
-            "operation": str,
-            "result": float
-        }
-
-    Example Output:
-        {
-            "success": true,
-            "operation": "addition",
-            "result": 150.5
-        }
-
-    Key Output Fields:
-        - result: The sum of all numbers
-        - operation: Type of calculation performed
+        Result of the addition operation
     """
     if not numbers:
         return {
@@ -61,21 +37,14 @@ def add(numbers: list[float]) -> CalculationOutput:
 
 
 @mcp.tool()
-def subtract(numbers: list[float]) -> CalculationOutput:
+def subtract(numbers: list[float]) -> dict:
     """Subtract numbers (first - second - third...)
 
     Args:
         numbers: Numbers to subtract
 
     Returns:
-        CalculationOutput: {"success": bool, "operation": str, "result": float}
-
-    Example Output:
-        {"success": true, "operation": "subtraction", "result": 50.0}
-
-    Key Output Fields:
-        - result: The result of subtraction
-        - operation: Type of calculation performed
+        Result of the subtraction operation
     """
     if not numbers:
         return {
@@ -96,21 +65,14 @@ def subtract(numbers: list[float]) -> CalculationOutput:
 
 
 @mcp.tool()
-def multiply(numbers: list[float]) -> CalculationOutput:
+def multiply(numbers: list[float]) -> dict:
     """Multiply two or more numbers
 
     Args:
         numbers: Numbers to multiply
 
     Returns:
-        CalculationOutput: {"success": bool, "operation": str, "result": float}
-
-    Example Output:
-        {"success": true, "operation": "multiplication", "result": 200.0}
-
-    Key Output Fields:
-        - result: The product of all numbers
-        - operation: Type of calculation performed
+        Result of the multiplication operation
     """
     if not numbers:
         return {
@@ -131,21 +93,14 @@ def multiply(numbers: list[float]) -> CalculationOutput:
 
 
 @mcp.tool()
-def divide(numbers: list[float]) -> CalculationOutput:
+def divide(numbers: list[float]) -> dict:
     """Divide numbers (first / second / third...)
 
     Args:
         numbers: Numbers to divide
 
     Returns:
-        CalculationOutput: {"success": bool, "operation": str, "result": float}
-
-    Example Output:
-        {"success": true, "operation": "division", "result": 2.5}
-
-    Key Output Fields:
-        - result: The result of division
-        - operation: Type of calculation performed
+        Result of the division operation
     """
     if not numbers:
         return {
@@ -172,7 +127,7 @@ def divide(numbers: list[float]) -> CalculationOutput:
 
 
 @mcp.tool()
-def power(base: float, exponent: float) -> CalculationOutput:
+def power(base: float, exponent: float) -> dict:
     """Raise a number to a power
 
     Args:
@@ -180,14 +135,7 @@ def power(base: float, exponent: float) -> CalculationOutput:
         exponent: Exponent
 
     Returns:
-        CalculationOutput: {"success": bool, "operation": str, "result": float}
-
-    Example Output:
-        {"success": true, "operation": "power", "result": 8.0}
-
-    Key Output Fields:
-        - result: base^exponent
-        - operation: Type of calculation performed
+        Result of the power operation
     """
     result = math.pow(base, exponent)
     return {

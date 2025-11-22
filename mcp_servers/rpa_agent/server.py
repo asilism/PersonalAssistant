@@ -5,30 +5,8 @@ Provides RPA automation tools: news search, report writing, attendance collectio
 """
 
 from datetime import datetime
-from typing import Optional, TypedDict
+from typing import Optional
 from fastmcp import FastMCP
-
-
-# Output schema types
-class NewsSearchOutput(TypedDict):
-    success: bool
-    topic: str
-    count: int
-    articles: list[dict]
-
-
-class ReportOutput(TypedDict):
-    success: bool
-    report_id: str
-    content: str
-    format: str
-
-
-class AttendanceOutput(TypedDict):
-    success: bool
-    event_name: str
-    message: str
-
 
 # Create FastMCP server
 mcp = FastMCP("rpa-agent")
@@ -152,7 +130,7 @@ attendance_db = {}
 
 
 @mcp.tool()
-def search_latest_news(topic: str, limit: int = 5) -> NewsSearchOutput:
+def search_latest_news(topic: str, limit: int = 5) -> dict:
     """Search for the latest news articles on a topic
 
     Args:
@@ -160,33 +138,7 @@ def search_latest_news(topic: str, limit: int = 5) -> NewsSearchOutput:
         limit: Maximum number of articles to return
 
     Returns:
-        NewsSearchOutput: {
-            "success": bool,
-            "topic": str,
-            "count": int,
-            "articles": [
-                {
-                    "title": str,
-                    "source": str,
-                    "date": str,
-                    "summary": str,
-                    "url": str
-                },
-                ...
-            ]
-        }
-
-    Example Output:
-        {
-            "success": true,
-            "topic": "AI",
-            "count": 5,
-            "articles": [...]
-        }
-
-    Key Output Fields:
-        - articles: List of news article objects
-        - count: Number of articles returned
+        List of news articles
     """
     topic_lower = topic.lower()
 
@@ -217,7 +169,7 @@ def write_report(
     sections: list[dict],
     author: str = "System",
     format: str = "markdown"
-) -> ReportOutput:
+) -> dict:
     """Generate a formatted report based on provided data
 
     Args:
@@ -227,25 +179,7 @@ def write_report(
         format: Output format (markdown, html, text)
 
     Returns:
-        ReportOutput: {
-            "success": bool,
-            "report_id": str,
-            "content": str,
-            "format": str
-        }
-
-    Example Output:
-        {
-            "success": true,
-            "report_id": "report_1",
-            "content": "# Report Title\\n\\n...",
-            "format": "markdown"
-        }
-
-    Key Output Fields:
-        - report_id: Unique identifier for the report
-        - content: Full formatted report content
-        - format: Report format (markdown, html, text)
+        The generated report
     """
     # Generate report
     report_id = f"report_{len(reports_db) + 1}"
