@@ -77,7 +77,13 @@ class OpenRouterClient(LLMClient):
             model=self.model,
             max_tokens=max_tokens,
             messages=messages,
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
+            extra_body={
+                "provider": {
+                    "order": ["DeepInfra"],
+                    "quantizations": ["fp4"]
+                }
+            }
         )
         return response.choices[0].message.content
 
