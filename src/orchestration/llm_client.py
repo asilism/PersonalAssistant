@@ -73,11 +73,15 @@ class OpenRouterClient(LLMClient):
 
     async def generate(self, messages: List[Dict[str, str]], max_tokens: int = 4096) -> str:
         """Generate response using OpenRouter API"""
+        # Note: response_format is intentionally NOT used for OpenRouter
+        # Many OSS models (especially smaller ones) don't handle json_object mode well
+        # and produce malformed responses with wrapper fields like:
+        # {"assistant to=commentary code": "[actual json]"}
+        # Instead, we rely on clear prompting to get proper JSON responses
         response = self.client.chat.completions.create(
             model=self.model,
             max_tokens=max_tokens,
             messages=messages,
-            response_format={"type": "json_object"},
             extra_body={
                 "provider": {
                     "order": ["DeepInfra"],
