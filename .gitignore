@@ -27,6 +27,7 @@ env/
 
 # Environment variables
 .env
+.env.validator
 
 # Database and encryption
 data/
