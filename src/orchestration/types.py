@@ -39,6 +39,7 @@ class ToolDefinition(BaseModel):
     name: str
     description: str
     input_schema: dict[str, Any]
+    output_schema: Optional[dict[str, Any]] = None  # FastMCP outputSchema
 
 
 class OrchestrationSettings(BaseModel):

@@ -91,10 +91,14 @@ class MCPExecutor:
 
                     tools = []
                     for tool in tools_result:
+                        # Get outputSchema from FastMCP if available
+                        output_schema = getattr(tool, 'outputSchema', None)
+
                         tool_def = ToolDefinition(
                             name=tool.name,
                             description=tool.description or "",
-                            input_schema=tool.inputSchema
+                            input_schema=tool.inputSchema,
+                            output_schema=output_schema
                         )
                         tools.append(tool_def)
                         self._available_tools[tool.name] = tool_def

@@ -4,6 +4,7 @@ Placeholder Resolver - Resolves placeholders in step inputs using previous step 
 
 import ast
 import re
+import json
 from typing import Any, Dict, List, Optional
 from .types import Step, StepResult
 

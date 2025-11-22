@@ -1003,7 +1003,7 @@ Return ONLY the JSON, no other text."""
         return "\n".join(lines)
 
     def _format_tools_detailed(self) -> str:
-        """Format available tools in detailed JSON format for prompt"""
+        """Format available tools in detailed JSON format for prompt, including FastMCP outputSchema"""
         lines = []
         for tool in self.settings.available_tools:
             tool_dict = {
@@ -1012,6 +1012,9 @@ Return ONLY the JSON, no other text."""
             }
             if tool.input_schema:
                 tool_dict["input_schema"] = tool.input_schema
+            # Include outputSchema from FastMCP if available
+            if tool.output_schema:
+                tool_dict["output_schema"] = tool.output_schema
             lines.append("    " + json.dumps(tool_dict, indent=4).replace("\n", "\n    "))
         return ",\n".join(lines)
 
@@ -1276,6 +1279,23 @@ For each step, specify:
 
 {self._get_placeholder_instructions(prompt_type="initial")}
 
+CRITICAL - USING TOOL OUTPUT SCHEMAS:
+Each tool definition above includes an "output_schema" field showing:
+- Example output structure
+- Key fields you can reference in placeholders
+
+When creating placeholders:
+1. Check the tool's "output_schema" -> "key_fields" for available field names
+2. Use the ACTUAL field names from the schema (e.g., if schema shows "articles", use {{{{step_X.articles}}}})
+3. Refer to the "example" output to understand the structure
+4. If a tool has no output_schema, use generic patterns like {{{{step_X.result}}}} or {{{{step_X}}}}
+
+Example:
+- Tool: search_latest_news
+- Output schema: {{"key_fields": ["articles", "count"]}}
+- Correct placeholder: {{{{step_0.articles}}}}
+- Wrong placeholder: {{{{step_0.news}}}} ❌
+
 Return your plan as a JSON array of steps. Each step should have this format:
 {{
   "tool_name": "tool_name",
@@ -1381,11 +1401,22 @@ CORRECT RESPONSE:
 - Use the exact tool names from the list above  ← CORRECT!
 - Create steps that will accomplish the user's request  ← CORRECT!
 
+⚠️ IMPORTANT - CHECK TOOL OUTPUT SCHEMAS:
+Each tool definition includes "output_schema" showing available fields.
+When referencing outputs in placeholders:
+1. Check the tool's "output_schema" -> "key_fields"
+2. Use ACTUAL field names (e.g., if key_fields shows "articles", use "articles" NOT "news")
+
+Example:
+- search_latest_news has key_fields: ["articles", "count"]
+- Use {{{{step_0.articles}}}} NOT {{{{step_0.news}}}}
+
 YOUR TASK:
 1. Read the user's request: "{state.request_text}"
 2. Find the appropriate tool(s) from the list above
 3. Create a JSON array of steps to execute those tools
-4. Return ONLY the JSON array
+4. When referencing outputs, check output_schema for correct field names
+5. Return ONLY the JSON array
 
 NOW: Create your execution plan as a JSON array.
 Remember: Your response must start with [ not with anything else!
