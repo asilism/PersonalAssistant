@@ -27,6 +27,7 @@ env/
 
 # Environment variables
 .env
+.env.validator
 
 # Database and encryption
 data/
@@ -59,3 +60,4 @@ logs/
 htmlcov/
 test_results*.csv
 test_results*.json
+failures_*.json
