@@ -647,6 +647,30 @@ Return ONLY the JSON, no other text.
                 print(f"[Planner] After placeholder fix: {content[:500]}...")
                 decision_data = json.loads(content)
                 print(f"[Planner] Decision JSON parsing successful after fix")
+
+            # Validate decision_data format
+            if not isinstance(decision_data, dict):
+                print(f"[Planner] ERROR: LLM returned invalid format (expected dict, got {type(decision_data).__name__})")
+                print(f"[Planner] Raw content: {content}")
+                # Default to final decision with the result if all steps completed successfully
+                if results and all(r.get("status") == "success" for r in results):
+                    print(f"[Planner] Defaulting to 'final' decision since all steps succeeded")
+                    decision_data = {
+                        "type": "final",
+                        "reason": "All steps completed successfully (auto-recovered from LLM format error)",
+                        "payload": {
+                            "message": "Task completed successfully",
+                            "data": results[-1].get("output") if results else None
+                        }
+                    }
+                else:
+                    raise ValueError(f"LLM returned invalid decision format: {type(decision_data).__name__}. Expected a JSON object with 'type' field.")
+
+            if "type" not in decision_data:
+                print(f"[Planner] ERROR: Decision data missing 'type' field")
+                print(f"[Planner] Decision data: {decision_data}")
+                raise ValueError(f"LLM decision missing required 'type' field. Got: {decision_data}")
+
             decision_type = decision_data["type"]
             print(f"[Planner] Decision type: {decision_type}")
 
