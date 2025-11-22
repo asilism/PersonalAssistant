@@ -49,7 +49,7 @@ class QuestionTester:
             # .env.validator 파일 로드
             env_file = Path(__file__).parent.parent.parent / ".env.validator"
             if env_file.exists():
-                with open(env_file, 'r') as f:
+                with open(env_file, 'r', encoding='utf-8') as f:
                     for line in f:
                         line = line.strip()
                         if line and not line.startswith('#'):

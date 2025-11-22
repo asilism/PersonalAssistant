@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-크로스 플랫폼 서버 시작 스크립트
+크로스 플랫폼 서버 시작 스크립트 (헬스체크 포함)
 Windows, Linux, macOS 모두 지원
 """
 
@@ -9,6 +9,7 @@ import sys
 import time
 import subprocess
 import platform
+import requests
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -112,6 +113,37 @@ def start_server(name, cwd, pythonpath, command, log_file):
 
     print(f"  {name} started")
 
+def check_server(url, name, max_retries=30, delay=1):
+    """서버가 준비될 때까지 헬스체크"""
+    print(f"Checking {name}...")
+
+    for i in range(max_retries):
+        try:
+            response = requests.get(url, timeout=1)
+            if response.status_code in [200, 404, 405]:  # 200 OK, 404/405도 서버 응답이므로 OK
+                print(f"  ✓ {name} is ready")
+                return True
+        except requests.exceptions.RequestException:
+            pass
+
+        if i > 0 and i % 5 == 0:
+            print(f"  Still waiting for {name}... ({i}/{max_retries})")
+
+        time.sleep(delay)
+
+    print(f"  ✗ {name} failed to start (timeout)")
+
+    # 로그 출력
+    log_file = LOG_DIR / f"{name.lower().replace(' ', '_')}.log"
+    if log_file.exists():
+        print(f"\n  Last 20 lines of {log_file}:")
+        with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+            lines = f.readlines()
+            for line in lines[-20:]:
+                print(f"    {line.rstrip()}")
+
+    return False
+
 def main():
     print("=" * 50)
     print("Starting all servers...")
@@ -182,25 +214,59 @@ def main():
         log_file="rpa_agent.log"
     )
 
-    # 서버 시작 대기
-    print("\nWaiting for servers to start...")
-    wait_time = 15 if is_windows() else 10
-    print(f"Waiting {wait_time} seconds...")
-    time.sleep(wait_time)
+    # 헬스체크 - 서버가 실제로 준비될 때까지 대기
+    print("\n" + "=" * 50)
+    print("Health checking servers...")
+    print("=" * 50)
+
+    all_ready = True
+
+    # API 서버 체크 (가장 중요)
+    if not check_server("http://localhost:8000/api/health", "API Server", max_retries=30):
+        all_ready = False
+
+    # MCP 에이전트 체크
+    if not check_server("http://localhost:8003/mcp", "Calculator Agent", max_retries=15):
+        all_ready = False
+
+    if not check_server("http://localhost:8001/mcp", "Mail Agent", max_retries=15):
+        all_ready = False
+
+    if not check_server("http://localhost:8002/mcp", "Calendar Agent", max_retries=15):
+        all_ready = False
+
+    if not check_server("http://localhost:8004/mcp", "Jira Agent", max_retries=15):
+        all_ready = False
+
+    if not check_server("http://localhost:8005/mcp", "RPA Agent", max_retries=15):
+        all_ready = False
 
     print("\n" + "=" * 50)
-    print("All servers started!")
-    print("=" * 50)
-    print(f"\nLogs are available in: {LOG_DIR}")
-    print("\nTo run tests:")
-    print(f"  cd {PROJECT_ROOT}")
-    print("  python tests/e2e/test_frontend_questions.py")
-    print("\nTo stop all servers:")
-    if is_windows():
-        print("  python tests/e2e/stop_servers.py")
+    if all_ready:
+        print("✓ All servers are ready!")
+        print("=" * 50)
+        print(f"\nLogs are available in: {LOG_DIR}")
+        print("\nTo run tests:")
+        print(f"  cd {PROJECT_ROOT}")
+        print("  python tests/e2e/test_frontend_questions.py")
+        print("\nTo stop all servers:")
+        if is_windows():
+            print("  python tests/e2e/stop_servers.py")
+        else:
+            print("  ./tests/e2e/stop_all_servers.sh")
+        print()
+        return 0
     else:
-        print("  ./tests/e2e/stop_all_servers.sh")
-    print()
+        print("✗ Some servers failed to start!")
+        print("=" * 50)
+        print("\nPlease check the logs in:")
+        print(f"  {LOG_DIR}")
+        print("\nCommon issues:")
+        print("  - Port already in use (kill existing processes)")
+        print("  - Missing dependencies (pip install -r requirements.txt)")
+        print("  - Python path issues")
+        print()
+        return 1
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

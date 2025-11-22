@@ -12,13 +12,26 @@ LLM 기반 검증을 사용하려면 Claude API 키가 필요합니다.
 
 #### 🪟 Windows
 
-```cmd
+**PowerShell (추천 - UTF-8 인코딩 보장):**
+```powershell
 cd C:\Develop\PersonalAssistant
 
-REM .env.validator 파일 생성
-echo CLAUDE_API_KEY=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 > .env.validator
-echo CLAUDE_MODEL=claude-sonnet-4-5-20250929 >> .env.validator
+# UTF-8로 파일 생성
+@"
+CLAUDE_API_KEY=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
+CLAUDE_MODEL=claude-sonnet-4-5-20250929
+"@ | Out-File -FilePath ".env.validator" -Encoding UTF8 -NoNewline
 ```
+
+**또는 메모장 사용:**
+1. 메모장 열기
+2. 다음 내용 입력:
+   ```
+   CLAUDE_API_KEY=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
+   CLAUDE_MODEL=claude-sonnet-4-5-20250929
+   ```
+3. `C:\Develop\PersonalAssistant\.env.validator`로 저장
+4. **중요**: 인코딩을 **UTF-8**로 선택
 
 #### 🐧 Linux / 🍎 macOS
 
