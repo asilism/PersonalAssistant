@@ -124,6 +124,22 @@ class Planner:
                                 # Not valid JSON, continue checking other values
                                 continue
 
+            # Check if this is a direct response (no tools needed)
+            if isinstance(response_data, dict) and response_data.get("type") == "direct_response":
+                print(f"[Planner] Detected direct response (no tools needed)")
+                message = response_data.get("message", "")
+
+                # Return as final response
+                state.type = StateType.FINAL
+                state.final_payload = {
+                    "message": message,
+                    "data": {
+                        "response_type": "direct",
+                        "original_request": state.request_text
+                    }
+                }
+                return state
+
             # Treat as execution plan
             steps_data = response_data if isinstance(response_data, list) else response_data.get("steps", [])
             print(f"[Planner] Successfully parsed {len(steps_data)} steps")
@@ -1177,33 +1193,41 @@ Prefer using actual values from results when possible!"""
 
         return f"""You are an AI assistant that creates execution plans.
 
-🚨 CRITICAL RULE - ALWAYS USE TOOLS (NEVER ANSWER DIRECTLY):
+🚨 CRITICAL RULE - TOOL USAGE DECISION:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-You MUST ALWAYS create execution plans that USE THE AVAILABLE TOOLS.
-NEVER respond directly with answers, explanations, or information without executing tools.
+You must decide whether to use tools or respond directly based on the user's request.
 
-❌ FORBIDDEN BEHAVIORS (DO NOT DO THIS):
-- Providing direct answers like "The result is...", "I can tell you that...", "Based on..."
-- Explaining what you would do without actually creating tool execution steps
-- Saying "I don't have access to..." or "I cannot..." - CHECK THE TOOLS FIRST!
-- Responding with information from your training data without tool verification
-- Creating empty plans or plans without tool calls
+✅ USE TOOLS (create execution plan) when:
+- The request requires taking actions (send email, create calendar event, search data, etc.)
+- You need to retrieve external information (emails, contacts, news, weather, etc.)
+- Calculations or data processing is needed
+- Any operation that requires one of the available tools
 
-✅ REQUIRED BEHAVIOR (ALWAYS DO THIS):
-- ALWAYS create a step-by-step execution plan using available tools
-- Even if you think you know the answer, USE TOOLS to retrieve/verify information
-- If the user asks a question, use tools to search, lookup, calculate, or retrieve the answer
-- If multiple tools are needed, create multiple steps
-- Your ONLY job is to plan tool executions - NOT to answer directly
+✅ RESPOND DIRECTLY (use direct_response) when:
+- Meta questions about yourself (e.g., "What LLM are you?", "What can you do?", "Who made you?")
+- General knowledge questions that don't require tool execution
+- Conversational queries that don't need external data
+- Questions about capabilities or limitations
+- No suitable tool exists for the request
+
+❌ FORBIDDEN BEHAVIORS:
+- Do NOT use inappropriate tools just to force tool usage
+- Do NOT create execution plans when direct response is more appropriate
+- Do NOT respond directly when tools are clearly needed
+- Do NOT guess or make up tool names
 
 Examples:
 • User: "What's 150 + 250?"
-  ❌ BAD: Return "The result is 400"
   ✅ GOOD: Create plan with calculator tool to add(150, 250)
 
 • User: "Send email to John"
-  ❌ BAD: "I can help you send an email. Please provide..."
   ✅ GOOD: Create plan: Step 0: lookup_contact("John"), Step 1: send_email(...)
+
+• User: "What LLM model are you?"
+  ✅ GOOD: {{"type": "direct_response", "message": "I am Claude 3.5 Sonnet..."}}
+
+• User: "What tools do you have access to?"
+  ✅ GOOD: {{"type": "direct_response", "message": "I have access to email tools, calendar management..."}}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1222,12 +1246,21 @@ Context:
 
 CRITICAL: You MUST use ONLY the exact tool names listed above. DO NOT create variations or guess tool names.
 
-Create a step-by-step execution plan to fulfill the user's request.
-For each step, specify:
+RESPONSE FORMAT - Choose ONE of the following:
+
+OPTION 1: If tools are needed, create a step-by-step execution plan.
+Return a JSON array of steps. Each step should specify:
 1. tool_name: which tool to use
 2. input: parameters for the tool
 3. description: what this step does
 4. dependencies: which previous step IDs this depends on (empty list if none)
+
+OPTION 2: If NO tools are needed (meta questions, general knowledge, etc.), return a direct response.
+Return a JSON object with this format:
+{{
+  "type": "direct_response",
+  "message": "Your direct answer to the user's question"
+}}
 
 {self._get_placeholder_instructions(prompt_type="initial")}
 
@@ -1248,15 +1281,25 @@ Example:
 - Correct placeholder: {{{{step_0.articles}}}}
 - Wrong placeholder: {{{{step_0.news}}}} ❌
 
-Return your plan as a JSON array of steps. Each step should have this format:
+FORMAT EXAMPLES:
+
+For execution plan (array of steps):
+[
+  {{
+    "tool_name": "tool_name",
+    "input": {{"param": "value"}},
+    "description": "description of this step",
+    "dependencies": []
+  }}
+]
+
+For direct response (object with type and message):
 {{
-  "tool_name": "tool_name",
-  "input": {{"param": "value"}},
-  "description": "description of this step",
-  "dependencies": []
+  "type": "direct_response",
+  "message": "Your answer here"
 }}
 
-Return ONLY the JSON execution plan, no other text.
+Return ONLY the JSON (either execution plan array OR direct response object), no other text.
 """
 
     def _get_openrouter_initial_plan_prompt(self, state: State) -> str:
@@ -1269,13 +1312,22 @@ Return ONLY the JSON execution plan, no other text.
         today_str = current_datetime.strftime("%Y-%m-%d (%A)")
         current_time_str = current_datetime.strftime("%H:%M:%S")
 
-        return f"""You are an AI assistant. Your task is to create an execution plan using available tools.
+        return f"""You are an AI assistant. Your task is to decide whether to create an execution plan using tools or respond directly.
 
-⚠️ ABSOLUTELY CRITICAL - READ THIS FIRST:
+⚠️ ABSOLUTELY CRITICAL - TOOL USAGE DECISION:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-YOU MUST CREATE A PLAN USING TOOLS. NEVER ANSWER DIRECTLY.
-YOUR RESPONSE MUST BE A JSON ARRAY OF STEPS.
-EACH STEP MUST USE ONE OF THE AVAILABLE TOOLS.
+DECIDE BASED ON THE USER'S REQUEST:
+
+✅ USE TOOLS (create execution plan) when:
+- Actions needed: send email, create calendar event, search data, etc.
+- External information needed: emails, contacts, news, weather, etc.
+- Calculations or data processing required
+
+✅ RESPOND DIRECTLY when:
+- Meta questions about yourself (e.g., "What LLM are you?", "What can you do?")
+- General knowledge questions without tool requirements
+- No suitable tool exists for the request
+- DO NOT force inappropriate tool usage!
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CONTEXT:
@@ -1286,9 +1338,9 @@ CONTEXT:
 AVAILABLE TOOLS (use these exact names):
 {tools_list_detailed}
 
-⚠️ MANDATORY RESPONSE FORMAT:
+⚠️ MANDATORY RESPONSE FORMAT - Choose ONE:
 
-Your response MUST be a JSON ARRAY of steps. Each step MUST have this exact structure:
+OPTION 1: If tools are needed, return a JSON ARRAY of steps:
 [
   {{
     "tool_name": "exact_tool_name_from_list_above",
@@ -1297,6 +1349,12 @@ Your response MUST be a JSON ARRAY of steps. Each step MUST have this exact stru
     "dependencies": []
   }}
 ]
+
+OPTION 2: If NO tools are needed, return a direct response JSON OBJECT:
+{{
+  "type": "direct_response",
+  "message": "Your direct answer here"
+}}
 
 ⚠️ EXAMPLES:
 
@@ -1343,15 +1401,22 @@ CORRECT RESPONSE:
   }}
 ]
 
+Example 4 - User asks: "너는 무슨 LLM이니?" (What LLM are you?)
+CORRECT RESPONSE:
+{{
+  "type": "direct_response",
+  "message": "저는 Claude 3.5 Sonnet 모델입니다. Anthropic이 개발한 대화형 AI 어시스턴트입니다."
+}}
+
 ❌ WRONG - DO NOT DO THIS:
 - Returning empty array: []  ← WRONG!
-- Answering directly: "The result is 56088"  ← WRONG!
-- Explaining without tools: "I can calculate this for you..."  ← WRONG!
+- Using inappropriate tools to force tool usage  ← WRONG!
+- Responding with text instead of JSON  ← WRONG!
 
 ✅ RIGHT - DO THIS:
-- Always return a JSON array of tool executions  ← CORRECT!
+- Return JSON array when tools are needed  ← CORRECT!
+- Return direct_response object when no tools are needed  ← CORRECT!
 - Use the exact tool names from the list above  ← CORRECT!
-- Create steps that will accomplish the user's request  ← CORRECT!
 
 ⚠️ IMPORTANT - CHECK TOOL OUTPUT SCHEMAS:
 Each tool definition includes "output_schema" showing available fields.
@@ -1365,13 +1430,14 @@ Example:
 
 YOUR TASK:
 1. Read the user's request: "{state.request_text}"
-2. Find the appropriate tool(s) from the list above
-3. Create a JSON array of steps to execute those tools
-4. When referencing outputs, check output_schema for correct field names
-5. Return ONLY the JSON array
+2. Decide: Does this require tools or can you respond directly?
+3. If tools needed: Create a JSON array of steps
+4. If no tools needed: Create a direct_response object
+5. When referencing outputs, check output_schema for correct field names
+6. Return ONLY the JSON (array or object)
 
-NOW: Create your execution plan as a JSON array.
-Remember: Your response must start with [ not with anything else!
+NOW: Create your response.
+Remember: Start with [ for tool execution plans, or {{ for direct responses!
 """
 
     def _get_decision_prompt(self, state: State, results: AggregatedGroupResults) -> str:
