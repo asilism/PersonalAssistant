@@ -948,18 +948,53 @@ YOUR TASK:
 3. Search through arrays intelligently based on the description and user's original intent
 4. Return the resolved input for {next_step.step_id}
 
-CRITICAL INSTRUCTIONS FOR ARRAY PLACEHOLDERS:
-- When you see {{{{step_X.array.0.field}}}}, DO NOT always pick index 0
-- Instead, analyze the step description and previous context to find the RIGHT item
-- Example: If step description is "Update Project Review event" and step_0 returned:
-  * events: [{{"id": "event_1", "title": "Team Meeting"}}, {{"id": "event_2", "title": "Project Review"}}]
-  * The placeholder {{{{step_0.events.0.id}}}} should resolve to "event_2" (not "event_1")
-  * Because the description mentions "Project Review"
+CRITICAL INSTRUCTIONS FOR PLACEHOLDER RESOLUTION:
+
+1. HOW TO EXTRACT VALUES FROM STEP OUTPUT:
+   - Placeholder format: {{{{step_N.field_name}}}} or {{{{step_N}}}}
+   - Navigate through the output structure to find the field
+   - Example: If step_0 output is {{"success": true, "result": 200}}
+     * {{{{step_0.result}}}} should resolve to 200 (the NUMBER, not the string "200")
+     * {{{{step_0}}}} should resolve to the entire output object
+
+2. TYPE PRESERVATION:
+   - CRITICAL: Preserve the original data type of extracted values!
+   - If the field contains a number (int or float), return it as a NUMBER, not a string
+   - If the field contains a string, return it as a string
+   - If the field contains an array or object, return it as-is
+   - Example CORRECT resolutions:
+     * {{{{step_0.result}}}} where result=200 → 200 (number, not "200")
+     * {{{{step_0.result}}}} where result="completed" → "completed" (string)
+     * {{{{step_0.count}}}} where count=5 → 5 (number, not "5")
+
+3. ARRAY PLACEHOLDERS:
+   - When you see {{{{step_X.array.0.field}}}}, DO NOT always pick index 0
+   - Instead, analyze the step description and previous context to find the RIGHT item
+   - Example: If step description is "Update Project Review event" and step_0 returned:
+     * events: [{{"id": "event_1", "title": "Team Meeting"}}, {{"id": "event_2", "title": "Project Review"}}]
+     * The placeholder {{{{step_0.events.0.id}}}} should resolve to "event_2" (not "event_1")
+     * Because the description mentions "Project Review"
+
+4. RESOLUTION EXAMPLES:
+   Example 1 - Simple field extraction:
+   - Step output: {{"success": true, "operation": "multiply", "result": 200}}
+   - Placeholder: {{{{step_0.result}}}}
+   - Resolved value: 200 (number)
+
+   Example 2 - Nested field:
+   - Step output: {{"success": true, "event": {{"id": "evt_123", "title": "Meeting"}}}}
+   - Placeholder: {{{{step_0.event.id}}}}
+   - Resolved value: "evt_123" (string)
+
+   Example 3 - Multiple placeholders:
+   - Input with placeholders: {{"numbers": ["{{{{step_0.result}}}}", 150]}}
+   - Step_0 output: {{"success": true, "result": 200}}
+   - Resolved input: {{"numbers": [200, 150]}}  ← 200 is a NUMBER, not "200"
 
 IMPORTANT:
 - If a placeholder describes a filter or search (e.g., "event where title='X'"), find the matching item
 - Use the step description as a guide for which item to select from arrays
-- Extract the exact field value requested (e.g., if placeholder asks for "id", return just the id)
+- Extract the exact field value requested with its ORIGINAL DATA TYPE
 - Preserve all non-placeholder values as-is
 - If you cannot resolve a placeholder, keep it as-is and explain in reasoning
 
@@ -967,7 +1002,7 @@ Return ONLY valid JSON in this format:
 {{
   "resolved_input": {{
     // The complete input dict with all placeholders resolved
-    // Example: {{"event_id": "event_2", "updates": {{"end": "2024-03-20T16:00:00"}}}}
+    // REMEMBER: Preserve data types (numbers as numbers, strings as strings)
   }},
   "reasoning": "Brief explanation of how you resolved the placeholders"
 }}
