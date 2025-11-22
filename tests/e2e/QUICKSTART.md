@@ -4,6 +4,18 @@
 
 ## ⚡ 원클릭 실행
 
+### 🪟 Windows
+
+```cmd
+cd C:\path\to\PersonalAssistant
+
+REM API 키 설정 후 실행
+set OPENROUTER_API_KEY=sk-or-v1-YOUR-API-KEY
+tests\e2e\run_full_test.bat
+```
+
+### 🐧 Linux / 🍎 macOS
+
 ```bash
 cd /home/user/PersonalAssistant
 
@@ -12,15 +24,38 @@ export OPENROUTER_API_KEY="sk-or-v1-YOUR-API-KEY"
 ./tests/e2e/run_full_test.sh
 ```
 
+### 🐍 Python (크로스 플랫폼)
+
+```bash
+# Windows/Linux/macOS 모두 동일
+set OPENROUTER_API_KEY=your-key  # Windows
+export OPENROUTER_API_KEY=your-key  # Linux/Mac
+
+python tests/e2e/start_servers.py
+python tests/e2e/test_frontend_questions.py
+python tests/e2e/stop_servers.py
+```
+
 끝! 🎉
 
 ## 📝 단계별 설명
 
 ### 방법 1️⃣: 올인원 스크립트 (추천)
 
+#### 🪟 Windows
+```cmd
+REM 1. API 키 환경변수 설정
+set OPENROUTER_API_KEY=sk-or-v1-YOUR-API-KEY
+
+REM 2. 테스트 실행 (서버 시작/테스트/서버 중지 자동)
+cd C:\path\to\PersonalAssistant
+tests\e2e\run_full_test.bat
+```
+
+#### 🐧 Linux / 🍎 macOS
 ```bash
 # 1. API 키 환경변수 설정
-export OPENROUTER_API_KEY="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"
+export OPENROUTER_API_KEY="sk-or-v1-YOUR-API-KEY"
 
 # 2. 테스트 실행 (서버 시작/테스트/서버 중지 자동)
 cd /home/user/PersonalAssistant
@@ -29,21 +64,57 @@ cd /home/user/PersonalAssistant
 
 ### 방법 2️⃣: 수동 실행
 
-#### 1단계: 서버 시작
+#### 🪟 Windows
+
+##### 1단계: 서버 시작
+```cmd
+cd C:\path\to\PersonalAssistant
+tests\e2e\start_all_servers.bat
+```
+
+##### 2단계: 테스트 실행
+```cmd
+python tests\e2e\test_frontend_questions.py --api-key "sk-or-v1-YOUR-API-KEY"
+```
+
+##### 3단계: 서버 중지
+```cmd
+tests\e2e\stop_all_servers.bat
+```
+
+#### 🐧 Linux / 🍎 macOS
+
+##### 1단계: 서버 시작
 ```bash
 cd /home/user/PersonalAssistant
 ./tests/e2e/start_all_servers.sh
 ```
 
-#### 2단계: 테스트 실행
+##### 2단계: 테스트 실행
 ```bash
-python tests/e2e/test_frontend_questions.py \
-  --api-key "sk-or-v1-YOUR-API-KEY"
+python tests/e2e/test_frontend_questions.py --api-key "sk-or-v1-YOUR-API-KEY"
 ```
 
-#### 3단계: 서버 중지
+##### 3단계: 서버 중지
 ```bash
 ./tests/e2e/stop_all_servers.sh
+```
+
+#### 🐍 Python (모든 플랫폼)
+
+##### 1단계: 서버 시작
+```bash
+python tests/e2e/start_servers.py
+```
+
+##### 2단계: 테스트 실행
+```bash
+python tests/e2e/test_frontend_questions.py --api-key "your-key"
+```
+
+##### 3단계: 서버 중지
+```bash
+python tests/e2e/stop_servers.py
 ```
 
 ## 📊 결과 확인
