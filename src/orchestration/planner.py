@@ -105,6 +105,25 @@ class Planner:
                 response_data = json.loads(content)
                 print(f"[Planner] JSON parsing successful after fix")
 
+            # Handle case where LLM wraps JSON in a string value (OpenRouter OSS models only)
+            # Example: {"assistant to=commentary code": "[{...}]"}
+            # Only apply this for OpenRouter to avoid affecting well-functioning providers
+            if self.settings.llm_provider.lower() == "openrouter":
+                if isinstance(response_data, dict) and not response_data.get("type"):
+                    # Check if any value is a JSON string that we should parse
+                    for key, value in response_data.items():
+                        if isinstance(value, str) and (value.strip().startswith('[') or value.strip().startswith('{')):
+                            try:
+                                # Try to parse the string value as JSON
+                                parsed_value = json.loads(value)
+                                print(f"[Planner] [OpenRouter] Detected JSON-in-string: key='{key}', unwrapping...")
+                                response_data = parsed_value
+                                print(f"[Planner] [OpenRouter] Unwrapped response_data type: {type(response_data).__name__}")
+                                break
+                            except json.JSONDecodeError:
+                                # Not valid JSON, continue checking other values
+                                continue
+
             # Check if this is a tool list request
             if isinstance(response_data, dict) and response_data.get("type") == "tool_list_request":
                 print(f"[Planner] Detected tool list request")
@@ -383,16 +402,32 @@ class Planner:
                 decision_data = json.loads(content)
                 print(f"[Planner] Decision JSON parsing successful after fix")
 
-            # Handle unwrapping of "final_output" or similar wrapper fields
-            # Some models (especially smaller OSS models) may wrap the response
-            if isinstance(decision_data, dict) and "type" not in decision_data:
-                # Check for common wrapper fields
-                for wrapper_key in ["final_output", "response", "decision", "output"]:
-                    if wrapper_key in decision_data and isinstance(decision_data[wrapper_key], dict):
-                        print(f"[Planner] Detected wrapped response with '{wrapper_key}' field, unwrapping...")
-                        decision_data = decision_data[wrapper_key]
-                        print(f"[Planner] Unwrapped decision_data: {decision_data}")
-                        break
+            # Handle unwrapping of malformed responses (OpenRouter OSS models only)
+            # Some OSS models may wrap the response or put JSON in strings
+            # Only apply this for OpenRouter to avoid affecting well-functioning providers
+            if self.settings.llm_provider.lower() == "openrouter":
+                if isinstance(decision_data, dict) and "type" not in decision_data:
+                    # First check if JSON is wrapped in a string value
+                    # Example: {"commentary to=assistant...": "Answer."}
+                    for key, value in decision_data.items():
+                        if isinstance(value, str) and (value.strip().startswith('{') or value.strip().startswith('[')):
+                            try:
+                                parsed_value = json.loads(value)
+                                print(f"[Planner] [OpenRouter] Detected JSON-in-string: key='{key}', unwrapping...")
+                                decision_data = parsed_value
+                                print(f"[Planner] [OpenRouter] Unwrapped decision_data type: {type(decision_data).__name__}")
+                                break
+                            except json.JSONDecodeError:
+                                continue
+
+                    # Then check for common wrapper fields
+                    if isinstance(decision_data, dict) and "type" not in decision_data:
+                        for wrapper_key in ["final_output", "response", "decision", "output"]:
+                            if wrapper_key in decision_data and isinstance(decision_data[wrapper_key], dict):
+                                print(f"[Planner] [OpenRouter] Detected wrapped response with '{wrapper_key}' field, unwrapping...")
+                                decision_data = decision_data[wrapper_key]
+                                print(f"[Planner] [OpenRouter] Unwrapped decision_data: {decision_data}")
+                                break
 
             # Validate decision_data format
             if not isinstance(decision_data, dict):
