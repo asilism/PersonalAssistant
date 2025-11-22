@@ -91,8 +91,12 @@ class MCPExecutor:
 
                     tools = []
                     for tool in tools_result:
-                        # Parse output schema from description
-                        output_schema = self._parse_output_schema_from_description(tool.description or "")
+                        # Check if tool already has outputSchema (future FastMCP support)
+                        if hasattr(tool, 'outputSchema') and tool.outputSchema:
+                            output_schema = tool.outputSchema
+                        else:
+                            # Fallback: Parse output schema from description
+                            output_schema = self._parse_output_schema_from_description(tool.description or "")
 
                         tool_def = ToolDefinition(
                             name=tool.name,
