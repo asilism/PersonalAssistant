@@ -594,26 +594,73 @@ DECISION OPTIONS:
 
 {self._get_placeholder_instructions(prompt_type="decision")}
 
-Return your decision as JSON:
-{{
-  "type": "final|nextSteps|needsHuman|failed",
-  "reason": "explanation of your analysis and decision",
-  "payload": {{
-    // For "final": {{"message": "success message to user", "data": <optional result data>}}
-    // For "nextSteps": {{"steps": [
-    //   {{
-    //     "tool_name": "tool_name",
-    //     "input": {{"param": "value or {{{{placeholder}}}}"}},
-    //     "description": "what this step does",
-    //     "dependencies": [0, 1]  // indices of steps this depends on
-    //   }}
-    // ]}}
-    // For "needsHuman": {{"question": "what to ask the user"}}
-    // For "failed": {{"error": "error description"}}
-  }}
-}}
+🚨 CRITICAL JSON FORMAT REQUIREMENTS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. You MUST return a valid JSON OBJECT (not an array, not a string, not empty)
+2. The JSON MUST have "type", "reason", and "payload" fields
+3. NEVER return: [], {{}}, "", null, or any other format
+4. If unsure, default to "final" type with appropriate message
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Return ONLY the JSON, no other text.
+CORRECT RESPONSE EXAMPLES:
+
+Example 1 - Task completed (multiplication was performed):
+{{{{
+  "type": "final",
+  "reason": "User asked for multiplication of 123 and 456. The multiply tool successfully computed the result as 56088.",
+  "payload": {{{{
+    "message": "계산이 완료되었습니다. 123 × 456 = 56088",
+    "data": 56088
+  }}}}
+}}}}
+
+Example 2 - Need additional steps (email needs to be sent):
+{{{{
+  "type": "nextSteps",
+  "reason": "Contact was found, but email hasn't been sent yet",
+  "payload": {{{{
+    "steps": [
+      {{{{
+        "tool_name": "send_email",
+        "input": {{{{
+          "to": "john@example.com",
+          "subject": "Meeting",
+          "body": "Meeting details..."
+        }}}},
+        "description": "Send email to John",
+        "dependencies": []
+      }}}}
+    ]
+  }}}}
+}}}}
+
+Example 3 - Need human input:
+{{{{
+  "type": "needsHuman",
+  "reason": "Multiple contacts found with name 'John', need user to specify which one",
+  "payload": {{{{
+    "question": "I found 3 contacts named John. Which one did you mean: John Smith, John Doe, or John Park?"
+  }}}}
+}}}}
+
+Example 4 - Task failed:
+{{{{
+  "type": "failed",
+  "reason": "API returned authentication error and cannot proceed",
+  "payload": {{{{
+    "error": "Authentication failed. Please check your credentials."
+  }}}}
+}}}}
+
+❌ INVALID RESPONSES (DO NOT DO THIS):
+- []
+- {{{{}}}}
+- ""
+- {{{{"steps": []}}}}
+- null
+- Any response without "type", "reason", and "payload" fields
+
+NOW, analyze the execution results above and return your decision as a valid JSON object:
 """
 
         try:
@@ -647,6 +694,30 @@ Return ONLY the JSON, no other text.
                 print(f"[Planner] After placeholder fix: {content[:500]}...")
                 decision_data = json.loads(content)
                 print(f"[Planner] Decision JSON parsing successful after fix")
+
+            # Validate decision_data format
+            if not isinstance(decision_data, dict):
+                print(f"[Planner] ERROR: LLM returned invalid format (expected dict, got {type(decision_data).__name__})")
+                print(f"[Planner] Raw content: {content}")
+                # Default to final decision with the result if all steps completed successfully
+                if results and all(r.get("status") == "success" for r in results):
+                    print(f"[Planner] Defaulting to 'final' decision since all steps succeeded")
+                    decision_data = {
+                        "type": "final",
+                        "reason": "All steps completed successfully (auto-recovered from LLM format error)",
+                        "payload": {
+                            "message": "Task completed successfully",
+                            "data": results[-1].get("output") if results else None
+                        }
+                    }
+                else:
+                    raise ValueError(f"LLM returned invalid decision format: {type(decision_data).__name__}. Expected a JSON object with 'type' field.")
+
+            if "type" not in decision_data:
+                print(f"[Planner] ERROR: Decision data missing 'type' field")
+                print(f"[Planner] Decision data: {decision_data}")
+                raise ValueError(f"LLM decision missing required 'type' field. Got: {decision_data}")
+
             decision_type = decision_data["type"]
             print(f"[Planner] Decision type: {decision_type}")
 
