@@ -324,19 +324,35 @@ class MCPExecutor:
             # Parse result based on type
             # FastMCP can return results in various formats depending on the tool
 
+            # Case 0: FastMCP CallToolResult object (most common in FastMCP 2.0)
+            # This has 'data' or 'structured_content' attributes with the actual result
+            if hasattr(result, 'data') and result.data is not None:
+                print(f"[MCPExecutor] CallToolResult detected, using 'data' field")
+                print(f"[MCPExecutor] data: {result.data}")
+                return result.data
+            if hasattr(result, 'structured_content') and result.structured_content is not None:
+                print(f"[MCPExecutor] CallToolResult detected, using 'structured_content' field")
+                print(f"[MCPExecutor] structured_content: {result.structured_content}")
+                return result.structured_content
+
             # Case 1: Result is already a dict (direct return from tool)
             if isinstance(result, dict):
                 print(f"[MCPExecutor] Result is dict, returning as-is")
                 return result
 
             # Case 2: Result is a list of content items (MCP protocol format)
-            if isinstance(result, list) and len(result) > 0:
+            if isinstance(result, list):
+                # Case 2a: Empty list - tool returned no content
+                if len(result) == 0:
+                    print(f"[MCPExecutor] Empty result list, returning success with no data")
+                    return {"success": True, "result": None, "message": "Tool returned empty result"}
+
                 # Get the first content item
                 first_content = result[0]
                 print(f"[MCPExecutor] First content type: {type(first_content)}")
                 print(f"[MCPExecutor] First content: {first_content}")
 
-                # Case 2a: Content has 'text' attribute (TextContent object)
+                # Case 2b: Content has 'text' attribute (TextContent object)
                 if hasattr(first_content, 'text'):
                     print(f"[MCPExecutor] First content.text: {first_content.text}")
                     try:
@@ -347,20 +363,44 @@ class MCPExecutor:
                         print(f"[MCPExecutor] JSON parsing failed: {e}")
                         return {"success": True, "result": first_content.text}
 
-                # Case 2b: Content is a dict
+                # Case 2c: Content is a dict
                 elif isinstance(first_content, dict):
                     print(f"[MCPExecutor] First content is dict, returning as-is")
                     return first_content
+
+                # Case 2d: Content has other attributes (handle MCP content types)
+                else:
+                    # Try to extract useful data from the content object
+                    print(f"[MCPExecutor] Unknown content type, attempting extraction")
+                    if hasattr(first_content, '__dict__'):
+                        content_dict = {k: v for k, v in first_content.__dict__.items() if not k.startswith('_')}
+                        print(f"[MCPExecutor] Extracted from __dict__: {content_dict}")
+                        if content_dict:
+                            return {"success": True, **content_dict}
+                    # Last resort: convert to string
+                    print(f"[MCPExecutor] Converting content to string")
+                    return {"success": True, "result": str(first_content)}
 
             # Case 3: Result is primitive (str, int, float, bool)
             if isinstance(result, (str, int, float, bool)):
                 print(f"[MCPExecutor] Result is primitive type, wrapping in dict")
                 return {"success": True, "result": result}
 
-            # Fallback: Unknown format
-            print(f"[MCPExecutor] WARNING: Unknown result format, using fallback")
+            # Case 4: Result is None
+            if result is None:
+                print(f"[MCPExecutor] Result is None")
+                return {"success": True, "result": None, "message": "Tool returned no result"}
+
+            # Fallback: Unknown format - still try to extract something useful
+            print(f"[MCPExecutor] WARNING: Unknown result format")
             print(f"[MCPExecutor] Result type: {type(result)}, value: {result}")
-            return {"success": True, "result": "completed"}
+            # Try __dict__ extraction as last resort
+            if hasattr(result, '__dict__'):
+                result_dict = {k: v for k, v in result.__dict__.items() if not k.startswith('_')}
+                if result_dict:
+                    print(f"[MCPExecutor] Extracted from __dict__: {result_dict}")
+                    return {"success": True, **result_dict}
+            return {"success": True, "result": str(result)}
 
     async def cleanup(self):
         """Cleanup connections"""
