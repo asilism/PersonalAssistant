@@ -71,8 +71,8 @@ const modelOptions = {
         'gpt-3.5-turbo'
     ],
     openrouter: [
-        'openai/gpt-oss-20b:free',
-        'openai/gpt-oss-120b:free',
+        'openai/gpt-oss-20b',
+        'openai/gpt-oss-120b',
     ]
 };
 
