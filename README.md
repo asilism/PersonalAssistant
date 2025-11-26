@@ -2,6 +2,26 @@
 
 LangGraph-based orchestration service with real MCP agent integration and multi-LLM support.
 
+## Live Demo
+
+**Try it now:** [http://34.64.178.95:8000/](http://34.64.178.95:8000/)
+
+### Screenshots
+
+<p align="center">
+  <img src="docs/images/demo-chat.png" alt="Chat Interface" width="800">
+  <br>
+  <em>Chat interface with multi-agent orchestration</em>
+</p>
+
+<p align="center">
+  <img src="docs/images/demo-settings.png" alt="LLM Settings" width="800">
+  <br>
+  <em>LLM provider configuration</em>
+</p>
+
+> **Note:** To add screenshots, place images in `docs/images/` directory with names `demo-chat.png` and `demo-settings.png`.
+
 ## Features
 
 ✨ **5 MCP Agent Servers** - Mail, Calendar, Jira, Calculator, and RPA agents
