@@ -201,7 +201,8 @@ def get_orchestrator(user_id: str, tenant: str) -> Orchestrator:
         orchestrators[key] = Orchestrator(
             user_id=user_id,
             tenant=tenant,
-            preloaded_mcp_tools=global_mcp_tools
+            preloaded_mcp_tools=global_mcp_tools,
+            preloaded_tool_server_map=global_tool_server_map
         )
     return orchestrators[key]
 
@@ -529,12 +530,24 @@ async def save_mcp_server(request: MCPServerRequest):
         )
 
         if success:
-            # Clear orchestrator cache to force reload with new settings
-            key = f"{request.tenant}:{request.user_id}"
-            if key in orchestrators:
-                del orchestrators[key]
+            # Auto-sync MCP servers to update global tools cache
+            logger.info(f"Auto-syncing MCP servers after saving {request.server_name}...")
+            sync_result = await sync_mcp_servers(user_id=request.user_id, tenant=request.tenant)
 
-            return {"success": True, "message": "MCP server settings saved successfully"}
+            if sync_result["success"]:
+                logger.info(f"Auto-sync completed: {sync_result['tools_count']} tools discovered")
+                return {
+                    "success": True,
+                    "message": f"MCP server '{request.server_name}' saved and synced successfully",
+                    "tools_synced": sync_result["tools_count"]
+                }
+            else:
+                logger.warning(f"Auto-sync failed: {sync_result.get('message')}")
+                return {
+                    "success": True,
+                    "message": f"MCP server '{request.server_name}' saved, but sync failed. Please sync manually.",
+                    "sync_error": sync_result.get("message")
+                }
         else:
             raise HTTPException(status_code=500, detail="Failed to save MCP server settings")
 
@@ -589,18 +602,22 @@ async def toggle_mcp_server(server_name: str, user_id: str = "test_user", tenant
         )
 
         if success:
-            # Clear orchestrator cache
-            key = f"{tenant}:{user_id}"
-            if key in orchestrators:
-                del orchestrators[key]
-
+            # Auto-sync MCP servers to update global tools cache
             status_text = "enabled" if new_enabled else "disabled"
-            logger.info(f"MCP server '{server_name}' {status_text}")
+            logger.info(f"MCP server '{server_name}' {status_text}, auto-syncing...")
+            sync_result = await sync_mcp_servers(user_id=user_id, tenant=tenant)
+
+            if sync_result["success"]:
+                logger.info(f"Auto-sync completed: {sync_result['tools_count']} tools")
+            else:
+                logger.warning(f"Auto-sync failed: {sync_result.get('message')}")
+
             return {
                 "success": True,
                 "server_name": server_name,
                 "enabled": new_enabled,
-                "message": f"MCP server '{server_name}' is now {status_text}"
+                "message": f"MCP server '{server_name}' is now {status_text}",
+                "tools_synced": sync_result.get("tools_count", 0) if sync_result["success"] else None
             }
         else:
             raise HTTPException(status_code=500, detail="Failed to update server status")

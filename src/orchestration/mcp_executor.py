@@ -155,6 +155,11 @@ class MCPExecutor:
         """Get the current tool-to-server mapping"""
         return self._tool_server_map.copy()
 
+    def set_tool_server_map(self, tool_server_map: Dict[str, str]):
+        """Set the tool-to-server mapping (used for preloaded mappings)"""
+        self._tool_server_map = tool_server_map.copy()
+        print(f"[MCPExecutor] Tool-server map set with {len(self._tool_server_map)} mappings")
+
     def get_server_status(self) -> Dict[str, Dict[str, Any]]:
         """Get status of all configured servers"""
         return {
