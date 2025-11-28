@@ -1013,23 +1013,46 @@ Return ONLY the JSON, no other text."""
             previous_results = context.additional_context.get("previous_execution_results", [])
             if previous_results:
                 lines.append("")
-                lines.append("=" * 60)
-                lines.append("PREVIOUS EXECUTION RESULTS (use these for follow-up requests):")
-                lines.append("=" * 60)
+                lines.append("🔴" * 30)
+                lines.append("🔴 CRITICAL: PREVIOUS EXECUTION RESULTS - YOU MUST USE THESE FOR FOLLOW-UP REQUESTS! 🔴")
+                lines.append("🔴" * 30)
+                lines.append("")
+
                 for i, result in enumerate(previous_results):
-                    lines.append(f"\n[Request {i+1}]: \"{result.get('request', 'Unknown')}\"")
+                    lines.append(f"━━━ [Previous Request {i+1}]: \"{result.get('request', 'Unknown')}\" ━━━")
                     lines.append(f"[Timestamp]: {result.get('timestamp', 'Unknown')}")
-                    lines.append(f"[Results]:")
+                    lines.append(f"[Structured Results - USE THESE VALUES]:")
                     # Pretty print the results data
                     results_data = result.get("results", {})
                     if isinstance(results_data, dict):
                         lines.append(json.dumps(results_data, indent=2, ensure_ascii=False))
                     else:
                         lines.append(str(results_data))
-                lines.append("=" * 60)
+                    lines.append("")
+
+                lines.append("🔴" * 30)
                 lines.append("")
-                lines.append("IMPORTANT: When user references previous results (e.g., 'play the first song', 'use that data'),")
-                lines.append("look up the actual values from the PREVIOUS EXECUTION RESULTS above.")
+                lines.append("🚨 MANDATORY FOLLOW-UP HANDLING RULES:")
+                lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                lines.append("When user says ANY of these (in any language):")
+                lines.append("  • '첫번째', '첫 번째', 'first', 'the first one'")
+                lines.append("  • '두번째', '두 번째', 'second', 'the second one'")
+                lines.append("  • '그것', '그거', 'that one', 'it'")
+                lines.append("  • '틀어줘', '재생해줘', 'play', 'play it'")
+                lines.append("  • '방금', '아까', 'just now', 'earlier'")
+                lines.append("")
+                lines.append("You MUST:")
+                lines.append("1. Look at PREVIOUS EXECUTION RESULTS above")
+                lines.append("2. Extract the ACTUAL values (URLs, IDs, titles, etc.)")
+                lines.append("3. Use those values DIRECTLY in your tool call")
+                lines.append("4. NEVER respond with 'What song?' or ask for clarification!")
+                lines.append("")
+                lines.append("Example: If previous results have videos: [{id: 'abc123', ...}]")
+                lines.append("  User: '첫번째 틀어줘' (play the first one)")
+                lines.append("  ✅ CORRECT: Call play_audio with url='https://youtube.com/watch?v=abc123'")
+                lines.append("  ❌ WRONG: Ask 'Which song do you want to play?'")
+                lines.append("  ❌ WRONG: Return direct_response asking for clarification")
+                lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                 lines.append("")
 
             # Handle other context (excluding internal fields)
@@ -1268,18 +1291,38 @@ Context:
 
 CRITICAL: You MUST use ONLY the exact tool names listed above. DO NOT create variations or guess tool names.
 
-🔄 FOLLOW-UP REQUESTS (IMPORTANT):
+🔴🔴🔴 CRITICAL: FOLLOW-UP REQUESTS - MUST USE TOOLS, NEVER direct_response! 🔴🔴🔴
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-If the user's request references previous results (e.g., "play the first one", "use that", "the second item"):
-1. Check the PREVIOUS EXECUTION RESULTS section in the Context above
-2. Extract the actual values (IDs, URLs, titles, etc.) from those results
-3. Use those real values directly in your tool inputs - NOT placeholders!
+If the user's request references previous results in ANY way:
+  • Korean: "첫번째", "두번째", "그것", "그거", "틀어줘", "재생해", "방금", "아까"
+  • English: "first", "second", "that one", "it", "play it", "the one", "just now"
 
-Example:
-- Previous results show: videos: [{id: "abc123", title: "Song A"}, {id: "xyz789", title: "Song B"}]
-- User says: "play the first song"
-- ✅ CORRECT: Use url "https://youtube.com/watch?v=abc123" directly
-- ❌ WRONG: Use placeholder {{previous_result.videos.0.id}}
+You MUST:
+1. Check the PREVIOUS EXECUTION RESULTS section in the Context above
+2. Extract the ACTUAL values (IDs, URLs, titles, etc.) from those results
+3. Create an execution plan with the appropriate tool using those real values
+4. NEVER return direct_response asking for clarification!
+
+🚨 ABSOLUTELY FORBIDDEN for follow-up requests:
+❌ Returning direct_response with "어떤 노래를 틀어드릴까요?" (Which song?)
+❌ Returning direct_response asking for more information
+❌ Returning direct_response saying you don't know which item
+❌ Any response that doesn't use a tool when previous results exist
+
+✅ CORRECT BEHAVIOR for follow-up requests:
+- Previous results show: videos: [{{id: "abc123", title: "Song A"}}, {{id: "xyz789", title: "Song B"}}]
+- User says: "첫번째 틀어줘" or "play the first song"
+- ✅ CORRECT: Create execution plan with play_audio tool using url="https://youtube.com/watch?v=abc123"
+
+Example execution plan for "첫번째 틀어줘":
+[
+  {{
+    "tool_name": "play_audio",
+    "input": {{"url": "https://youtube.com/watch?v=abc123"}},
+    "description": "Play the first song from previous search results",
+    "dependencies": []
+  }}
+]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 RESPONSE FORMAT - Choose ONE of the following:
@@ -1291,7 +1334,18 @@ Return a JSON array of steps. Each step should specify:
 3. description: what this step does
 4. dependencies: which previous step IDs this depends on (empty list if none)
 
-OPTION 2: If NO tools are needed (meta questions, general knowledge, etc.), return a direct response.
+OPTION 2: ONLY use direct_response when ALL of these conditions are met:
+  ✓ Meta questions about yourself (e.g., "What LLM are you?")
+  ✓ General knowledge that doesn't require tools
+  ✓ NO previous execution results in context
+  ✓ User is NOT referencing previous results (no "첫번째", "first", "그것", etc.)
+
+🚨 NEVER use direct_response if:
+  ✗ Previous execution results exist in context
+  ✗ User says "첫번째", "두번째", "first", "second", "그것", "that one"
+  ✗ User says "틀어줘", "재생해", "play", "play it"
+  ✗ User references any item from a previous search/query
+
 Return a JSON object with this format:
 {{
   "type": "direct_response",
@@ -1329,11 +1383,26 @@ For execution plan (array of steps):
   }}
 ]
 
-For direct response (object with type and message):
+For direct response (ONLY when no previous results exist and no references to previous items):
 {{
   "type": "direct_response",
   "message": "Your answer here"
 }}
+
+🔴 CRITICAL FOLLOW-UP EXAMPLE:
+If previous results show: videos: [{{id: "sDY7FUbYvkg", title: "Song A"}}]
+And user says: "첫번째 틀어줘" or "play the first one"
+✅ CORRECT - Use tool:
+[
+  {{
+    "tool_name": "play_audio",
+    "input": {{"url": "https://youtube.com/watch?v=sDY7FUbYvkg"}},
+    "description": "Play the first song from previous search results",
+    "dependencies": []
+  }}
+]
+❌ WRONG - Never do this:
+{{"type": "direct_response", "message": "어떤 노래를 틀어드릴까요?"}}
 
 Return ONLY the JSON (either execution plan array OR direct response object), no other text.
 """
@@ -1386,7 +1455,16 @@ OPTION 1: If tools are needed, return a JSON ARRAY of steps:
   }}
 ]
 
-OPTION 2: If NO tools are needed, return a direct response JSON OBJECT:
+OPTION 2: ONLY use direct_response when ALL conditions are met:
+  ✓ Meta questions about yourself (e.g., "What LLM are you?")
+  ✓ NO previous execution results in context
+  ✓ User is NOT referencing previous results
+
+🚨 NEVER use direct_response if:
+  ✗ Previous execution results exist in context
+  ✗ User says "첫번째", "두번째", "first", "second", "그것"
+  ✗ User says "틀어줘", "재생해", "play"
+
 {{
   "type": "direct_response",
   "message": "Your direct answer here"
@@ -1444,6 +1522,23 @@ CORRECT RESPONSE:
   "message": "저는 Claude 3.5 Sonnet 모델입니다. Anthropic이 개발한 대화형 AI 어시스턴트입니다."
 }}
 
+Example 5 - CRITICAL! User asks: "첫번째 틀어줘" (play the first one)
+When PREVIOUS EXECUTION RESULTS shows: videos: [{{id: "abc123", title: "Song A"}}]
+CORRECT RESPONSE - USE TOOL:
+[
+  {{
+    "tool_name": "play_audio",
+    "input": {{ "url": "https://youtube.com/watch?v=abc123" }},
+    "description": "Play the first song from previous search results",
+    "dependencies": []
+  }}
+]
+❌ WRONG for Example 5:
+{{
+  "type": "direct_response",
+  "message": "어떤 노래를 틀어드릴까요?"
+}}
+
 ❌ WRONG - DO NOT DO THIS:
 - Returning empty array: []  ← WRONG!
 - Using inappropriate tools to force tool usage  ← WRONG!
@@ -1464,18 +1559,33 @@ Example:
 - search_latest_news has key_fields: ["articles", "count"]
 - Use {{{{step_0.articles}}}} NOT {{{{step_0.news}}}}
 
-🔄 FOLLOW-UP REQUESTS (CRITICAL):
+🔴🔴🔴 CRITICAL: FOLLOW-UP REQUESTS - MUST USE TOOLS! 🔴🔴🔴
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-If user references previous results (e.g., "play the first one", "use that"):
-1. Check PREVIOUS EXECUTION RESULTS in Context section
-2. Extract ACTUAL values (IDs, URLs, etc.) from those results
-3. Use real values directly - NOT placeholders!
+If user references previous results in ANY way:
+  • Korean: "첫번째", "두번째", "그것", "틀어줘", "재생해"
+  • English: "first", "second", "that one", "play it"
 
-Example:
+You MUST:
+1. Check PREVIOUS EXECUTION RESULTS in Context section
+2. Extract ACTUAL values (IDs, URLs, etc.)
+3. Create execution plan with tool - NEVER direct_response!
+
+🚨 FORBIDDEN:
+❌ direct_response asking "어떤 노래?" (Which song?)
+❌ direct_response asking for clarification
+❌ Any response without tool when previous results exist
+
+✅ CORRECT for "첫번째 틀어줘":
 - Previous: videos: [{{id: "abc123", title: "Song A"}}]
-- User: "play the first song"
-- ✅ CORRECT: {{"url": "https://youtube.com/watch?v=abc123"}}
-- ❌ WRONG: {{"url": "{{{{previous.videos.0.id}}}}"}}
+- Create execution plan:
+[
+  {{
+    "tool_name": "play_audio",
+    "input": {{"url": "https://youtube.com/watch?v=abc123"}},
+    "description": "Play the first song",
+    "dependencies": []
+  }}
+]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 YOUR TASK:
