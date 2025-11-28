@@ -3,265 +3,249 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Personal Assistant System</title>
+    <title>Personal Assistant</title>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🤖 Personal Assistant System</h1>
-            <p class="subtitle">Multi Agent + RPA + RAG</p>
-        </div>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>Personal Assistant</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <button class="nav-item active" onclick="switchTab('manual')">Chat</button>
+                <button class="nav-item" onclick="switchTab('mcp')">MCP Servers</button>
+                <button class="nav-item" onclick="switchTab('settings')">Settings</button>
+            </nav>
+        </aside>
 
-        <div class="tabs">
-            <div class="tab active" onclick="switchTab('manual')">💬 Chat</div>
-            <div class="tab" onclick="switchTab('mcp')">🔌 MCP Servers</div>
-            <div class="tab" onclick="switchTab('settings')">⚙️ LLM Settings</div>
-        </div>
-
-        <!-- Chat Tab -->
-        <div id="manual-tab" class="tab-content active">
-            <div class="split-container">
-                <!-- Left: Chat Section -->
-                <div class="chat-container">
-                    <!-- Chat Messages Area -->
-                    <div class="chat-messages" id="chatMessages">
-                        <div class="welcome-message">
-                            <p>👋 Welcome to Personal Assistant!</p>
-                            <p style="font-size: 14px; color: #666;">MCP 서버에 등록된 도구들을 활용하여 다양한 작업을 수행할 수 있습니다.</p>
-                        </div>
-                    </div>
-
-                    <!-- Chat Input Area -->
-                    <div class="chat-input-container">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <div style="font-size: 12px; color: #999;">무엇을 도와드릴까요?</div>
-                            <button class="clear-chat-btn" onclick="clearChatHistory()" title="대화 이력을 삭제합니다">
-                                🗑️ Clear Chat
-                            </button>
-                        </div>
-                        <form id="requestForm" class="chat-input-form">
-                            <input type="hidden" id="userId" value="test_user">
-                            <input type="hidden" id="tenant" value="test_tenant">
-                            <textarea id="requestText" class="chat-input" placeholder="Type your message here..." required rows="1"></textarea>
-                            <button type="submit" id="submitBtn" class="chat-send-btn">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Chat Tab -->
+            <div id="manual-tab" class="tab-content active">
+                <div class="chat-layout">
+                    <!-- Chat Area -->
+                    <div class="chat-area">
+                        <!-- Chat Header -->
+                        <div class="chat-header">
+                            <span class="chat-title">New conversation</span>
+                            <button class="btn-icon" onclick="clearChatHistory()" title="Clear chat history">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
                                 </svg>
-                                <span style="margin-left: 6px;">전송</span>
                             </button>
-                        </form>
-                    </div>
-                </div>
+                        </div>
 
-                <!-- Right: Logs Section -->
-                <div class="logs-panel" id="logsPanel">
-                    <div class="logs-header">
-                        <span>📋 Execution Logs</span>
-                    </div>
-                    <div class="logs-content" id="logsContent">
-                        <p style="color: #999; text-align: center; padding: 20px;">No logs yet</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+                        <!-- Chat Messages -->
+                        <div class="chat-messages" id="chatMessages">
+                            <div class="welcome-message">
+                                <h2>What can I help you with?</h2>
+                                <p>MCP 서버에 등록된 도구들을 활용하여 다양한 작업을 수행할 수 있습니다.</p>
+                            </div>
+                        </div>
 
-        <!-- Settings Tab -->
-        <div id="settings-tab" class="tab-content">
-            <div class="settings-container">
-                <h2>⚙️ LLM Settings</h2>
-                <p style="color: #666; margin-bottom: 20px;">Manage multiple LLM configurations and select which one to use</p>
-
-                <!-- Saved Configurations List -->
-                <div class="current-settings-card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h3>Saved Configurations</h3>
-                        <button onclick="showAddConfigForm()" id="addConfigBtn" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
-                            ➕ Add New Configuration
-                        </button>
-                    </div>
-                    <div id="configsList">
-                        <div class="loading">Loading configurations...</div>
-                    </div>
-                </div>
-
-                <!-- Add/Edit Configuration Form (initially hidden) -->
-                <div class="settings-card" id="configFormCard" style="display: none;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h3 id="formTitle">Add New Configuration</h3>
-                        <button onclick="cancelConfigForm()" style="padding: 6px 12px; background: #999; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            Cancel
-                        </button>
+                        <!-- Chat Input (Fixed at bottom) -->
+                        <div class="chat-input-wrapper">
+                            <form id="requestForm" class="chat-input-form">
+                                <input type="hidden" id="userId" value="test_user">
+                                <input type="hidden" id="tenant" value="test_tenant">
+                                <div class="input-container">
+                                    <textarea id="requestText" class="chat-input" placeholder="Message..." required rows="1"></textarea>
+                                    <button type="submit" id="submitBtn" class="send-btn">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
 
-                    <input type="hidden" id="editingConfigName">
-
-                    <div class="form-group">
-                        <label for="configName">Configuration Name *</label>
-                        <input type="text" id="configName" placeholder="e.g., Claude Prod, GPT Dev" required>
-                        <small style="color: #666;">A unique name to identify this configuration</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="llmProvider">LLM Provider</label>
-                        <select id="llmProvider" onchange="updateModelOptions()">
-                            <option value="anthropic">Anthropic Claude</option>
-                            <option value="openai">OpenAI GPT</option>
-                            <option value="openrouter">OpenRouter</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="apiKey">API Key</label>
-                        <input type="password" id="apiKey" placeholder="Enter your API key">
-                        <small style="color: #666;">Your API key is encrypted and stored securely</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="baseUrl">Base URL (Optional)</label>
-                        <input type="text" id="baseUrl" placeholder="Leave empty for default">
-                        <small style="color: #666;">Override the default API endpoint URL</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="llmModel">Model</label>
-                        <select id="llmModel">
-                            <!-- Options will be populated based on provider -->
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="maxRetries">Max Retries</label>
-                        <input type="number" id="maxRetries" value="3" min="1" max="10">
-                        <small style="color: #666;">Maximum number of retry attempts</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="timeout">Timeout (ms)</label>
-                        <input type="number" id="timeout" value="30000" min="5000" step="1000">
-                        <small style="color: #666;">Request timeout in milliseconds</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="setAsActive">
-                            Set as active configuration
-                        </label>
-                        <small style="color: #666; display: block; margin-top: 5px;">
-                            If checked, this configuration will be used immediately
-                        </small>
-                    </div>
-
-                    <div class="settings-actions">
-                        <button onclick="testConnection()" id="testBtn">🧪 Test Connection</button>
-                        <button onclick="saveSettings()" id="saveBtn">💾 Save Configuration</button>
-                    </div>
-
-                    <div id="settingsResult" class="settings-result">
-                        <!-- Result messages will appear here -->
+                    <!-- Logs Panel -->
+                    <div class="logs-panel" id="logsPanel">
+                        <div class="logs-header">
+                            <span>Execution Logs</span>
+                        </div>
+                        <div class="logs-content" id="logsContent">
+                            <p class="logs-empty">No logs yet</p>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- MCP Servers Tab -->
-        <div id="mcp-tab" class="tab-content">
-            <div class="settings-container">
-                <h2>🔌 MCP Server Management</h2>
-                <p style="color: #666; margin-bottom: 20px;">MCP 서버를 등록하고 사용 가능한 도구들을 확인하세요</p>
-
-                <!-- Available Tools Section (Moved to top for visibility) -->
-                <div class="current-settings-card" style="border: 2px solid #2196F3; background: #f8fbff;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h3 style="margin: 0; color: #1976D2;">🔧 사용 가능한 도구 (Available Tools)</h3>
-                        <button onclick="loadMCPTools()" id="loadToolsBtn" style="padding: 8px 16px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            🔄 새로고침
-                        </button>
-                    </div>
-                    <div id="mcpToolsList">
-                        <div class="loading">Loading tools...</div>
-                    </div>
-                </div>
-
-                <!-- Current MCP Servers -->
-                <div class="current-settings-card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h3 style="margin: 0;">📡 등록된 MCP 서버</h3>
-                        <button onclick="showAddMCPServerForm()" id="addMCPBtn" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            ➕ 서버 추가
-                        </button>
-                    </div>
-                    <div id="currentMCPServers">
-                        <div class="loading">Loading...</div>
-                    </div>
-                </div>
-
-                <!-- Add/Edit MCP Server Form (initially hidden) -->
-                <div class="settings-card" id="mcpFormCard" style="display: none;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h3 id="mcpFormTitle">MCP 서버 추가</h3>
-                        <button onclick="cancelMCPForm()" style="padding: 6px 12px; background: #999; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            취소
-                        </button>
+            <!-- Settings Tab -->
+            <div id="settings-tab" class="tab-content">
+                <div class="settings-page">
+                    <div class="page-header">
+                        <h2>LLM Settings</h2>
+                        <p>Manage multiple LLM configurations</p>
                     </div>
 
-                    <div class="form-group">
-                        <label for="mcpServerName">서버 이름 *</label>
-                        <input type="text" id="mcpServerName" placeholder="예: my_custom_agent">
-                        <small style="color: #666;">고유한 서버 식별자</small>
+                    <!-- Saved Configurations List -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Saved Configurations</h3>
+                            <button onclick="showAddConfigForm()" class="btn btn-primary">Add New</button>
+                        </div>
+                        <div id="configsList">
+                            <div class="loading">Loading configurations...</div>
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="mcpEnabled">활성화</label>
-                        <select id="mcpEnabled">
-                            <option value="true">예 (Yes)</option>
-                            <option value="false">아니오 (No)</option>
-                        </select>
-                    </div>
+                    <!-- Add/Edit Configuration Form (initially hidden) -->
+                    <div class="card" id="configFormCard" style="display: none;">
+                        <div class="card-header">
+                            <h3 id="formTitle">Add New Configuration</h3>
+                            <button onclick="cancelConfigForm()" class="btn btn-secondary">Cancel</button>
+                        </div>
 
-                    <div class="form-group">
-                        <label for="mcpTransport">연결 방식</label>
-                        <select id="mcpTransport" onchange="updateMCPTransportFields()">
-                            <option value="stdio">STDIO (로컬 명령어)</option>
-                            <option value="http">HTTP (원격 URL)</option>
-                        </select>
-                        <small style="color: #666;">MCP 서버에 연결하는 방법을 선택하세요</small>
-                    </div>
+                        <input type="hidden" id="editingConfigName">
 
-                    <div class="form-group" id="mcpUrlGroup" style="display: none;">
-                        <label for="mcpUrl">서버 URL</label>
-                        <input type="text" id="mcpUrl" placeholder="http://localhost:8001">
-                        <small style="color: #666;">MCP 서버의 URL 엔드포인트</small>
-                    </div>
+                        <div class="form-group">
+                            <label for="configName">Configuration Name</label>
+                            <input type="text" id="configName" placeholder="e.g., Claude Prod, GPT Dev" required>
+                        </div>
 
-                    <div class="form-group" id="mcpCommandGroup">
-                        <label for="mcpCommand">실행 명령어</label>
-                        <input type="text" id="mcpCommand" value="fastmcp" placeholder="fastmcp">
-                        <small style="color: #666;">실행할 명령어 (예: fastmcp, python, node)</small>
-                    </div>
+                        <div class="form-group">
+                            <label for="llmProvider">LLM Provider</label>
+                            <select id="llmProvider" onchange="updateModelOptions()">
+                                <option value="anthropic">Anthropic Claude</option>
+                                <option value="openai">OpenAI GPT</option>
+                                <option value="openrouter">OpenRouter</option>
+                            </select>
+                        </div>
 
-                    <div class="form-group" id="mcpArgsGroup">
-                        <label for="mcpArgs">실행 인자 (JSON 배열)</label>
-                        <textarea id="mcpArgs" placeholder='["run", "mcp_servers/my_agent/server.py"]' rows="3"></textarea>
-                        <small style="color: #666;">명령어에 전달할 인자들</small>
-                    </div>
+                        <div class="form-group">
+                            <label for="apiKey">API Key</label>
+                            <input type="password" id="apiKey" placeholder="Enter your API key">
+                        </div>
 
-                    <div class="form-group">
-                        <label for="mcpEnvVars">환경 변수 (JSON 객체, 선택사항)</label>
-                        <textarea id="mcpEnvVars" placeholder='{"API_KEY": "your_key"}' rows="2"></textarea>
-                        <small style="color: #666;">서버 실행에 필요한 환경 변수</small>
-                    </div>
+                        <div class="form-group">
+                            <label for="baseUrl">Base URL (Optional)</label>
+                            <input type="text" id="baseUrl" placeholder="Leave empty for default">
+                        </div>
 
-                    <div class="settings-actions">
-                        <button onclick="saveMCPServer()" id="saveMCPBtn">💾 저장</button>
-                    </div>
+                        <div class="form-group">
+                            <label for="llmModel">Model</label>
+                            <select id="llmModel"></select>
+                        </div>
 
-                    <div id="mcpResult" class="settings-result">
-                        <!-- Result messages will appear here -->
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="maxRetries">Max Retries</label>
+                                <input type="number" id="maxRetries" value="3" min="1" max="10">
+                            </div>
+                            <div class="form-group">
+                                <label for="timeout">Timeout (ms)</label>
+                                <input type="number" id="timeout" value="30000" min="5000" step="1000">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="setAsActive">
+                                <span>Set as active configuration</span>
+                            </label>
+                        </div>
+
+                        <div class="form-actions">
+                            <button onclick="testConnection()" id="testBtn" class="btn btn-secondary">Test Connection</button>
+                            <button onclick="saveSettings()" id="saveBtn" class="btn btn-primary">Save</button>
+                        </div>
+
+                        <div id="settingsResult" class="result-area"></div>
                     </div>
                 </div>
             </div>
-        </div>
+
+            <!-- MCP Servers Tab -->
+            <div id="mcp-tab" class="tab-content">
+                <div class="settings-page">
+                    <div class="page-header">
+                        <h2>MCP Server Management</h2>
+                        <p>Register MCP servers and view available tools</p>
+                    </div>
+
+                    <!-- Available Tools Section -->
+                    <div class="card card-highlight">
+                        <div class="card-header">
+                            <h3>Available Tools</h3>
+                            <button onclick="loadMCPTools()" id="loadToolsBtn" class="btn btn-secondary">Refresh</button>
+                        </div>
+                        <div id="mcpToolsList">
+                            <div class="loading">Loading tools...</div>
+                        </div>
+                    </div>
+
+                    <!-- Current MCP Servers -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Registered Servers</h3>
+                            <button onclick="showAddMCPServerForm()" class="btn btn-primary">Add Server</button>
+                        </div>
+                        <div id="currentMCPServers">
+                            <div class="loading">Loading...</div>
+                        </div>
+                    </div>
+
+                    <!-- Add/Edit MCP Server Form (initially hidden) -->
+                    <div class="card" id="mcpFormCard" style="display: none;">
+                        <div class="card-header">
+                            <h3 id="mcpFormTitle">Add MCP Server</h3>
+                            <button onclick="cancelMCPForm()" class="btn btn-secondary">Cancel</button>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="mcpServerName">Server Name</label>
+                            <input type="text" id="mcpServerName" placeholder="e.g., my_custom_agent">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="mcpEnabled">Status</label>
+                            <select id="mcpEnabled">
+                                <option value="true">Enabled</option>
+                                <option value="false">Disabled</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="mcpTransport">Transport</label>
+                            <select id="mcpTransport" onchange="updateMCPTransportFields()">
+                                <option value="stdio">STDIO (Local command)</option>
+                                <option value="http">HTTP (Remote URL)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="mcpUrlGroup" style="display: none;">
+                            <label for="mcpUrl">Server URL</label>
+                            <input type="text" id="mcpUrl" placeholder="http://localhost:8001">
+                        </div>
+
+                        <div class="form-group" id="mcpCommandGroup">
+                            <label for="mcpCommand">Command</label>
+                            <input type="text" id="mcpCommand" value="fastmcp" placeholder="fastmcp">
+                        </div>
+
+                        <div class="form-group" id="mcpArgsGroup">
+                            <label for="mcpArgs">Arguments (JSON array)</label>
+                            <textarea id="mcpArgs" placeholder='["run", "mcp_servers/my_agent/server.py"]' rows="2"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="mcpEnvVars">Environment Variables (JSON object, optional)</label>
+                            <textarea id="mcpEnvVars" placeholder='{"API_KEY": "your_key"}' rows="2"></textarea>
+                        </div>
+
+                        <div class="form-actions">
+                            <button onclick="saveMCPServer()" id="saveMCPBtn" class="btn btn-primary">Save</button>
+                        </div>
+
+                        <div id="mcpResult" class="result-area"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
 
     <script src="/static/app.js"></script>
