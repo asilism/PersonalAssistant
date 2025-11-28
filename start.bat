@@ -65,8 +65,8 @@ echo.
 REM Set development mode
 set DEV_MODE=true
 
-REM Start Vite dev server in a new window
-start "Vite Dev Server" cmd /c "cd frontend && npm run dev"
+REM Start Vite dev server in a new window (cmd /k keeps window open on error)
+start "Vite Dev Server" cmd /k "cd frontend && npm run dev"
 
 REM Wait a moment for Vite to start
 timeout /t 2 /nobreak >nul
