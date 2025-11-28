@@ -1,0 +1,12 @@
+# Google Calendar MCP Server Dependencies
+
+# Google API Client libraries
+google-api-python-client>=2.100.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+
+# HTTP requests library (used for token revocation)
+requests>=2.31.0
+
+# MCP server framework
+fastmcp>=0.1.0
