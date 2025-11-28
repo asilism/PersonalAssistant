@@ -1491,29 +1491,26 @@ async function loadMCPTools() {
     }
 
     try {
-        const response = await fetch('/api/tools');
-        const data = await response.json();
+        // Fetch tools and servers in parallel
+        const [toolsResponse, serversResponse] = await Promise.all([
+            fetch('/api/tools'),
+            fetch('/api/mcp-servers?user_id=test_user&tenant=test_tenant')
+        ]);
+        const data = await toolsResponse.json();
+        const serversData = await serversResponse.json();
 
-        if (response.ok) {
+        // Get actual server count from MCP servers API
+        const actualServerCount = (serversData.servers && serversData.servers.length) || 0;
+
+        if (toolsResponse.ok) {
             let html = '';
 
             if (data.tools && data.tools.length > 0) {
-                // Group tools by server (based on naming convention)
-                const toolsByServer = {};
-                data.tools.forEach(tool => {
-                    // Extract server name from tool name (e.g., "calculator_add" -> "calculator")
-                    const serverName = tool.name.includes('_') ? tool.name.split('_')[0] : 'other';
-                    if (!toolsByServer[serverName]) {
-                        toolsByServer[serverName] = [];
-                    }
-                    toolsByServer[serverName].push(tool);
-                });
-
                 html = `
                     <div class="tools-summary" style="margin-bottom: 15px; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; color: white;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span><strong>총 ${data.count}개의 도구</strong>가 등록되어 있습니다</span>
-                            <span style="font-size: 12px; opacity: 0.9;">${Object.keys(toolsByServer).length}개 서버</span>
+                            <span style="font-size: 12px; opacity: 0.9;">${actualServerCount}개 서버</span>
                         </div>
                     </div>
                     <div class="tools-list" style="display: grid; gap: 12px;">
