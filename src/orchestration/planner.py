@@ -1009,10 +1009,32 @@ Return ONLY the JSON, no other text."""
                 lines.append(f"  - {msg}")
 
         if context.additional_context:
-            # Handle recent_results separately for better formatting
-            recent_results = context.additional_context.get("recent_results")
+            # Handle previous_execution_results - structured data from previous requests
+            previous_results = context.additional_context.get("previous_execution_results", [])
+            if previous_results:
+                lines.append("")
+                lines.append("=" * 60)
+                lines.append("PREVIOUS EXECUTION RESULTS (use these for follow-up requests):")
+                lines.append("=" * 60)
+                for i, result in enumerate(previous_results):
+                    lines.append(f"\n[Request {i+1}]: \"{result.get('request', 'Unknown')}\"")
+                    lines.append(f"[Timestamp]: {result.get('timestamp', 'Unknown')}")
+                    lines.append(f"[Results]:")
+                    # Pretty print the results data
+                    results_data = result.get("results", {})
+                    if isinstance(results_data, dict):
+                        lines.append(json.dumps(results_data, indent=2, ensure_ascii=False))
+                    else:
+                        lines.append(str(results_data))
+                lines.append("=" * 60)
+                lines.append("")
+                lines.append("IMPORTANT: When user references previous results (e.g., 'play the first song', 'use that data'),")
+                lines.append("look up the actual values from the PREVIOUS EXECUTION RESULTS above.")
+                lines.append("")
+
+            # Handle other context (excluding internal fields)
             other_context = {k: v for k, v in context.additional_context.items()
-                           if k not in ["recent_results", "recent_plan_id", "recent_request"]}
+                           if k not in ["recent_results", "recent_plan_id", "recent_request", "previous_execution_results"]}
 
             if other_context:
                 lines.append("Additional context:")
@@ -1246,6 +1268,20 @@ Context:
 
 CRITICAL: You MUST use ONLY the exact tool names listed above. DO NOT create variations or guess tool names.
 
+🔄 FOLLOW-UP REQUESTS (IMPORTANT):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+If the user's request references previous results (e.g., "play the first one", "use that", "the second item"):
+1. Check the PREVIOUS EXECUTION RESULTS section in the Context above
+2. Extract the actual values (IDs, URLs, titles, etc.) from those results
+3. Use those real values directly in your tool inputs - NOT placeholders!
+
+Example:
+- Previous results show: videos: [{id: "abc123", title: "Song A"}, {id: "xyz789", title: "Song B"}]
+- User says: "play the first song"
+- ✅ CORRECT: Use url "https://youtube.com/watch?v=abc123" directly
+- ❌ WRONG: Use placeholder {{previous_result.videos.0.id}}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 RESPONSE FORMAT - Choose ONE of the following:
 
 OPTION 1: If tools are needed, create a step-by-step execution plan.
@@ -1427,6 +1463,20 @@ When referencing outputs in placeholders:
 Example:
 - search_latest_news has key_fields: ["articles", "count"]
 - Use {{{{step_0.articles}}}} NOT {{{{step_0.news}}}}
+
+🔄 FOLLOW-UP REQUESTS (CRITICAL):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+If user references previous results (e.g., "play the first one", "use that"):
+1. Check PREVIOUS EXECUTION RESULTS in Context section
+2. Extract ACTUAL values (IDs, URLs, etc.) from those results
+3. Use real values directly - NOT placeholders!
+
+Example:
+- Previous: videos: [{{id: "abc123", title: "Song A"}}]
+- User: "play the first song"
+- ✅ CORRECT: {{"url": "https://youtube.com/watch?v=abc123"}}
+- ❌ WRONG: {{"url": "{{{{previous.videos.0.id}}}}"}}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 YOUR TASK:
 1. Read the user's request: "{state.request_text}"

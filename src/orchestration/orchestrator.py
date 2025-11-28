@@ -2,6 +2,7 @@
 Orchestrator - Main orchestration class using LangGraph
 """
 
+import json
 from datetime import datetime
 from typing import Annotated, Optional, TypedDict
 from langgraph.graph import StateGraph, END
@@ -488,7 +489,26 @@ class Orchestrator:
         for msg in chat_history:
             conversation_history.append(f"{msg.role}: {msg.content}")
 
-        # Extract recent results for context
+        # Load recent execution results (structured tool outputs from previous requests)
+        recent_execution_results = await self.tracker.load_recent_execution_results(
+            session_id=session_id,
+            limit=3  # Last 3 execution results
+        )
+
+        # Format execution results for context
+        formatted_execution_results = []
+        for exec_result in recent_execution_results:
+            try:
+                results_data = json.loads(exec_result.results_json)
+                formatted_execution_results.append({
+                    "request": exec_result.request_text,
+                    "results": results_data,
+                    "timestamp": exec_result.created_at
+                })
+            except json.JSONDecodeError:
+                pass  # Skip malformed results
+
+        # Extract recent results for context (legacy - from chat history text)
         recent_results = self._extract_recent_results(chat_history)
 
         # Configure thread_id for checkpointing (use session_id as thread_id)
@@ -559,6 +579,7 @@ class Orchestrator:
         else:
             # New request - create initial state
             print(f"[Orchestrator] New request - creating initial state")
+            print(f"[Orchestrator] Loaded {len(formatted_execution_results)} previous execution results for context")
             initial_state: OrchestrationState = {
                 "type": StateType.INIT.value,
                 "session_id": session_id,
@@ -570,7 +591,8 @@ class Orchestrator:
                     "session_id": session_id,
                     "conversation_history": conversation_history,
                     "additional_context": {
-                        "recent_results": recent_results
+                        "recent_results": recent_results,
+                        "previous_execution_results": formatted_execution_results  # Structured results from previous requests
                     }
                 },
                 "plan": None,  # Will be created by planner or restored from checkpoint
@@ -604,6 +626,7 @@ class Orchestrator:
             if final_state.get("type") == StateType.FINAL.value:
                 payload = final_state.get("final_payload", {})
                 response_message = payload.get("message", "Task completed successfully")
+                result_data = payload.get("data")
 
                 # Save assistant response to chat history
                 await self.tracker.save_assistant_message(
@@ -613,19 +636,34 @@ class Orchestrator:
                     content=response_message
                 )
 
+                # Save structured execution results for future context
+                if result_data is not None:
+                    try:
+                        results_json = json.dumps(result_data, default=str, ensure_ascii=False)
+                        await self.tracker.save_execution_result(
+                            session_id=session_id,
+                            user_id=self.user_id,
+                            tenant=self.tenant,
+                            request_text=request_text,
+                            results_json=results_json
+                        )
+                        print(f"[Orchestrator] Saved structured execution results for future context")
+                    except Exception as e:
+                        print(f"[Orchestrator] Warning: Failed to save execution results: {e}")
+
                 # Emit execution completed event
                 await self.event_emitter.emit_execution_completed(
                     trace_id=trace_id,
                     success=True,
                     message=response_message,
                     execution_time=execution_time,
-                    results=payload.get("data")
+                    results=result_data
                 )
 
                 return {
                     "success": True,
                     "message": response_message,
-                    "results": payload.get("data"),
+                    "results": result_data,
                     "execution_time": execution_time,
                     "plan_id": final_state.get("plan", {}).get("plan_id") if final_state.get("plan") else None,
                     "plan": final_state.get("plan")  # Include full plan for analysis
