@@ -4,8 +4,8 @@ function switchTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.remove('active');
     });
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.classList.remove('active');
+    document.querySelectorAll('.nav-item').forEach(nav => {
+        nav.classList.remove('active');
     });
 
     // Show selected tab
@@ -128,7 +128,7 @@ async function clearChatHistory() {
 
         if (response.ok && data.success) {
             // Clear UI
-            chatMessages.innerHTML = '<div class="placeholder">메시지를 입력하세요...</div>';
+            chatMessages.innerHTML = '<div class="welcome-message"><h2>What can I help you with?</h2><p>MCP 서버에 등록된 도구들을 활용하여 다양한 작업을 수행할 수 있습니다.</p></div>';
 
             // Use new session ID from backend
             if (data.new_session_id) {
@@ -174,11 +174,11 @@ async function executeRequest() {
     // Get session ID
     const currentSessionId = getOrCreateSessionId();
 
-    // Remove placeholder if it exists
+    // Remove placeholder or welcome message if exists
     const placeholder = chatMessages.querySelector('.placeholder');
-    if (placeholder) {
-        placeholder.remove();
-    }
+    const welcome = chatMessages.querySelector('.welcome-message');
+    if (placeholder) placeholder.remove();
+    if (welcome) welcome.remove();
 
     // Add user message bubble
     addMessageBubble('user', requestText);
