@@ -48,10 +48,11 @@ class Orchestrator:
     Orchestrator - LangGraph-based state machine for task orchestration
     """
 
-    def __init__(self, user_id: str, tenant: str, preloaded_mcp_tools: list = None):
+    def __init__(self, user_id: str, tenant: str, preloaded_mcp_tools: list = None, preloaded_tool_server_map: dict = None):
         self.user_id = user_id
         self.tenant = tenant
         self.preloaded_mcp_tools = preloaded_mcp_tools or []
+        self.preloaded_tool_server_map = preloaded_tool_server_map or {}
 
         # Initialize components
         self.config_loader = ConfigLoader()
@@ -80,13 +81,15 @@ class Orchestrator:
             self.mcp_executor = MCPExecutor()
 
             # Use preloaded tools if available, otherwise discover
-            if self.preloaded_mcp_tools:
+            if self.preloaded_mcp_tools and self.preloaded_tool_server_map:
                 print(f"[Orchestrator] Using {len(self.preloaded_mcp_tools)} preloaded MCP tools")
                 mcp_tools = self.preloaded_mcp_tools
-                # Still initialize servers for execution
+                # Initialize servers for execution and set preloaded tool-server mapping
                 await self.mcp_executor.initialize_servers()
+                self.mcp_executor.set_tool_server_map(self.preloaded_tool_server_map)
+                print(f"[Orchestrator] Set preloaded tool-server map with {len(self.preloaded_tool_server_map)} mappings")
             else:
-                print(f"[Orchestrator] No preloaded tools, discovering now...")
+                print(f"[Orchestrator] No preloaded tools or map, discovering now...")
                 await self.mcp_executor.initialize_servers()
                 mcp_tools = await self.mcp_executor.discover_tools()
                 print(f"[Orchestrator] Discovered {len(mcp_tools)} MCP tools")
