@@ -739,7 +739,7 @@ def main():
         print("   - Frontend (Vite): http://localhost:5173  <-- Use this!")
         print("   - API Docs: http://localhost:8000/docs")
         print("\n   Run 'npm run dev' in frontend/ folder to start Vite dev server")
-        print("   Or use './start-dev.sh' to start both servers together")
+        print("   Or use './start.sh' (or 'start.bat') to start both servers together")
     else:
         print("   - Web UI: http://localhost:8000")
         print("   - API Docs: http://localhost:8000/docs")
