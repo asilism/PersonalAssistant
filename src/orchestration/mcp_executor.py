@@ -80,36 +80,9 @@ class MCPExecutor:
         print(f"[MCPExecutor] Initialized {len(self._servers)} MCP servers")
 
     async def _initialize_default_servers(self):
-        """Initialize default MCP servers (fallback when no DB config exists)"""
-        server_configs = {
-            "mail-agent": {
-                "url": "http://localhost:8001/mcp",
-                "transport": "streamable-http"
-            },
-            "calendar-agent": {
-                "url": "http://localhost:8002/mcp",
-                "transport": "streamable-http"
-            },
-            "jira-agent": {
-                "url": "http://localhost:8004/mcp",
-                "transport": "streamable-http"
-            },
-            "calculator-agent": {
-                "url": "http://localhost:8003/mcp",
-                "transport": "streamable-http"
-            },
-            "rpa-agent": {
-                "url": "http://localhost:8005/mcp",
-                "transport": "streamable-http"
-            }
-        }
-
-        for server_name, config in server_configs.items():
-            self._servers[server_name] = {
-                "config": config,
-                "status": "ready"
-            }
-            print(f"[MCPExecutor] Configured default {server_name} at {config['url']}")
+        """Initialize default MCP servers (empty - servers are configured via database)"""
+        # No default servers - all MCP servers must be registered manually via Settings
+        print("[MCPExecutor] No default servers configured. Please register MCP servers via Settings.")
 
     async def discover_tools(self) -> List[ToolDefinition]:
         """Discover all available tools from MCP servers (in parallel)"""
@@ -323,48 +296,9 @@ class MCPExecutor:
 
     async def _find_server_for_tool(self, tool_name: str) -> Optional[str]:
         """Find which server provides a specific tool"""
-        # First, check dynamic mapping from tool discovery
-        if tool_name in self._tool_server_map:
-            return self._tool_server_map[tool_name]
-
-        # Fallback: Static tool name to server mapping (for backward compatibility)
-        static_tool_server_map = {
-            # Mail agent (includes contact lookup)
-            "send_email": "mail-agent",
-            "read_emails": "mail-agent",
-            "get_email": "mail-agent",
-            "delete_email": "mail-agent",
-            "search_emails": "mail-agent",
-            "lookup_contact": "mail-agent",
-
-            # Calendar agent
-            "create_event": "calendar-agent",
-            "read_event": "calendar-agent",
-            "update_event": "calendar-agent",
-            "delete_event": "calendar-agent",
-            "list_events": "calendar-agent",
-
-            # Jira agent
-            "create_issue": "jira-agent",
-            "read_issue": "jira-agent",
-            "update_issue": "jira-agent",
-            "delete_issue": "jira-agent",
-            "search_issues": "jira-agent",
-
-            # Calculator agent
-            "add": "calculator-agent",
-            "subtract": "calculator-agent",
-            "multiply": "calculator-agent",
-            "divide": "calculator-agent",
-            "power": "calculator-agent",
-
-            # RPA agent
-            "search_latest_news": "rpa-agent",
-            "write_report": "rpa-agent",
-            "collect_attendance": "rpa-agent",
-        }
-
-        return static_tool_server_map.get(tool_name)
+        # Use dynamic mapping from tool discovery only
+        # No static fallback - all tools must be discovered from registered MCP servers
+        return self._tool_server_map.get(tool_name)
 
     async def _execute_mcp_tool(self, server_name: str, tool_name: str, tool_input: dict[str, Any]) -> Any:
         """
