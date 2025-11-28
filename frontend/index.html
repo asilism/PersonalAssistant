@@ -14,10 +14,9 @@
         </div>
 
         <div class="tabs">
-            <div class="tab active" onclick="switchTab('manual')">📝 Manual Request</div>
+            <div class="tab active" onclick="switchTab('manual')">💬 Chat</div>
+            <div class="tab" onclick="switchTab('mcp')">🔌 MCP Servers</div>
             <div class="tab" onclick="switchTab('settings')">⚙️ LLM Settings</div>
-            <!-- MCP Server tab hidden - using predefined servers -->
-            <div class="tab" onclick="switchTab('mcp')" style="display: none;">🔌 MCP Servers</div>
         </div>
 
         <!-- Chat Tab -->
@@ -29,59 +28,14 @@
                     <div class="chat-messages" id="chatMessages">
                         <div class="welcome-message">
                             <p>👋 Welcome to Personal Assistant!</p>
-                            <p style="font-size: 14px; color: #666;">Start chatting or try one of the quick examples below</p>
-                        </div>
-                    </div>
-
-                    <!-- Simple Query Examples (Single Agent) -->
-                    <div class="example-category" style="margin-top: 10px; padding: 10px; background: #f0f7ff; border-radius: 8px; border-left: 4px solid #4CAF50;">
-                        <div class="category-header" onclick="toggleCategory('simple-examples')" style="font-size: 13px; font-weight: 600; color: #2E7D32; margin-bottom: 8px; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;">
-                            <span>✨ 단일 Agent 예제 (Single Agent)</span>
-                            <span class="toggle-icon" id="simple-examples-icon">▼</span>
-                        </div>
-                        <div class="chat-examples" id="simple-examples" style="display: flex;">
-                            <button class="example-btn" onclick='setExample("123 곱하기 456을 계산해줘")' title="Calculator Agent">🔢 Calculator</button>
-                            <button class="example-btn" onclick='setExample("jiho@samsung.com에게 \"See you at 2 PM\"이라는 내용으로 이메일 보내줘")' title="Mail Agent">📧 Mail</button>
-                            <button class="example-btn" onclick='setExample("내일 오전 10시부터 11시까지 \"Team Meeting\" 일정 만들어줘")' title="Calendar Agent">📅 Calendar</button>
-                            <button class="example-btn" onclick='setExample("\"Implement user authentication\"라는 제목으로 Jira 이슈 만들어줘")' title="Jira Agent">🎫 Jira</button>
-                            <button class="example-btn" onclick='setExample("김민지의 이메일 주소를 찾아줘")' title="Contact Lookup">👤 Contact</button>
-                        </div>
-                    </div>
-
-                    <!-- Multi-Agent Examples -->
-                    <div class="example-category" style="margin-top: 10px; padding: 10px; background: #fff8e1; border-radius: 8px; border-left: 4px solid #FF9800;">
-                        <div class="category-header" onclick="toggleCategory('multi-examples')" style="font-size: 13px; font-weight: 600; color: #E65100; margin-bottom: 8px; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;">
-                            <span>🔗 복수 Agent 예제 (Multi Agent)</span>
-                            <span class="toggle-icon" id="multi-examples-icon">▼</span>
-                        </div>
-                        <div class="chat-examples" id="multi-examples" style="display: flex;">
-                            <button class="example-btn" onclick='setExample("(150 + 250) / 2를 계산하고, 결과를 jiho@samsung.com에게 이메일로 보내줘")' title="Calculator + Mail" style="background: linear-gradient(135deg, #43cea2 0%, #185a9d 100%); color: white;">🔢📧 계산 + 이메일</button>
-                            <button class="example-btn" onclick='setExample("김민지에게 \"Meeting reminder for tomorrow\"라는 이메일 보내줘")' title="Contact + Mail" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white;">👤📧 연락처 + 이메일</button>
-                            <button class="example-btn" onclick='setExample("내일 오전 10시부터 11시까지 \"Sprint Planning\" 일정을 만들고, 김민지에게 안건을 이메일로 보내줘")' title="Calendar + Contact + Mail" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">📅👤📧 일정 + 연락처 + 이메일</button>
-                            <button class="example-btn" onclick='setExample("\"Fix login bug\"라는 Jira 이슈를 만들고, haneul@samsung.com에게 알림 이메일 보내줘")' title="Jira + Mail" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">🎫📧 Jira + 이메일</button>
-                            <button class="example-btn" onclick='setExample("\"Code Review\" 일정을 11월 21일 오후 3시에 만들고, \"Prepare code review materials\"라는 Jira 이슈도 생성해줘")' title="Calendar + Jira" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">📅🎫 일정 + Jira</button>
-                        </div>
-                    </div>
-
-                    <!-- RPA Examples -->
-                    <div class="example-category" style="margin-top: 10px; padding: 10px; background: #f3e5f5; border-radius: 8px; border-left: 4px solid #9C27B0;">
-                        <div class="category-header" onclick="toggleCategory('rpa-examples')" style="font-size: 13px; font-weight: 600; color: #6A1B9A; margin-bottom: 8px; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;">
-                            <span>🤖 RPA 포함 예제 (With RPA)</span>
-                            <span class="toggle-icon" id="rpa-examples-icon">▼</span>
-                        </div>
-                        <div class="chat-examples" id="rpa-examples" style="display: flex;">
-                            <button class="example-btn" onclick='setExample("\"AI\"에 관한 최신 뉴스를 검색하고, 리포트를 작성해줘")' title="RPA: News + Report" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;">📰📄 뉴스 리포트</button>
-                            <button class="example-btn" onclick='setExample("\"Samsung\" 뉴스를 검색하고, 리포트를 작성한 다음, 김민지에게 이메일로 보내줘")' title="RPA: News + Report + Mail" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #333;">📰📄📧 뉴스 + 리포트 + 이메일</button>
-                            <button class="example-btn" onclick='setExample("\"Product Launch Dinner\" 행사에 minji@samsung.com, haneul@samsung.com, jisu@samsung.com의 참석 여부를 수집하고, 요약을 soobin@samsung.com에게 보내줘")' title="RPA: Attendance Collection" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: #333;">👥📊 출석 수집</button>
-                            <button class="example-btn" onclick='setExample("\"TO DO\" 상태의 모든 Jira 이슈를 검색하고, 요약 리포트를 작성한 다음, haneul@samsung.com에게 이메일로 보내줘")' title="RPA + Jira + Mail" style="background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); color: #333;">🤖🎫📧 RPA + Jira + 이메일</button>
-                            <button class="example-btn" onclick='setExample("\"Samsung\" 뉴스를 검색하고, 리포트를 작성한 다음, \"News Summary\" Jira 이슈를 만들고, 김민지에게 이메일 보내줘")' title="Complex: RPA + Jira + Contact + Mail" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: #333;">🤖📰🎫📧 복합 RPA</button>
+                            <p style="font-size: 14px; color: #666;">MCP 서버에 등록된 도구들을 활용하여 다양한 작업을 수행할 수 있습니다.</p>
                         </div>
                     </div>
 
                     <!-- Chat Input Area -->
                     <div class="chat-input-container">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <div style="font-size: 12px; color: #999;">질문을 입력하거나 위의 예제 버튼을 클릭하세요</div>
+                            <div style="font-size: 12px; color: #999;">무엇을 도와드릴까요?</div>
                             <button class="clear-chat-btn" onclick="clearChatHistory()" title="대화 이력을 삭제합니다">
                                 🗑️ Clear Chat
                             </button>
@@ -213,82 +167,97 @@
         <!-- MCP Servers Tab -->
         <div id="mcp-tab" class="tab-content">
             <div class="settings-container">
-                <h2>🔌 MCP Server Settings</h2>
-                <p style="color: #666; margin-bottom: 20px;">Configure your MCP servers</p>
+                <h2>🔌 MCP Server Management</h2>
+                <p style="color: #666; margin-bottom: 20px;">MCP 서버를 등록하고 사용 가능한 도구들을 확인하세요</p>
 
-                <div class="settings-card">
-                    <h3>Add/Update MCP Server</h3>
-
-                    <div class="form-group">
-                        <label for="mcpServerName">Server Name</label>
-                        <input type="text" id="mcpServerName" placeholder="e.g., mail_agent">
+                <!-- Available Tools Section (Moved to top for visibility) -->
+                <div class="current-settings-card" style="border: 2px solid #2196F3; background: #f8fbff;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0; color: #1976D2;">🔧 사용 가능한 도구 (Available Tools)</h3>
+                        <button onclick="loadMCPTools()" id="loadToolsBtn" style="padding: 8px 16px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            🔄 새로고침
+                        </button>
                     </div>
-
-                    <div class="form-group">
-                        <label for="mcpEnabled">Enabled</label>
-                        <select id="mcpEnabled">
-                            <option value="true">Yes</option>
-                            <option value="false">No</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="mcpTransport">Transport Type</label>
-                        <select id="mcpTransport" onchange="updateMCPTransportFields()">
-                            <option value="http">HTTP (URL-based)</option>
-                            <option value="stdio">STDIO (Command-based)</option>
-                        </select>
-                        <small style="color: #666;">Choose how to connect to the MCP server</small>
-                    </div>
-
-                    <div class="form-group" id="mcpUrlGroup">
-                        <label for="mcpUrl">Server URL</label>
-                        <input type="text" id="mcpUrl" placeholder="http://localhost:8001">
-                        <small style="color: #666;">URL endpoint for the MCP server</small>
-                    </div>
-
-                    <div class="form-group" id="mcpCommandGroup" style="display: none;">
-                        <label for="mcpCommand">Command</label>
-                        <input type="text" id="mcpCommand" value="fastmcp" placeholder="fastmcp">
-                        <small style="color: #666;">Command to execute (usually 'fastmcp')</small>
-                    </div>
-
-                    <div class="form-group" id="mcpArgsGroup" style="display: none;">
-                        <label for="mcpArgs">Arguments (JSON Array)</label>
-                        <textarea id="mcpArgs" placeholder='["run", "path/to/server.py"]' rows="3"></textarea>
-                        <small style="color: #666;">Arguments as JSON array</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="mcpEnvVars">Environment Variables (JSON Object)</label>
-                        <textarea id="mcpEnvVars" placeholder='{"KEY": "value"}' rows="3"></textarea>
-                        <small style="color: #666;">Environment variables as JSON object (optional)</small>
-                    </div>
-
-                    <div class="settings-actions">
-                        <button onclick="saveMCPServer()" id="saveMCPBtn">💾 Save MCP Server</button>
-                    </div>
-
-                    <div id="mcpResult" class="settings-result">
-                        <!-- Result messages will appear here -->
+                    <div id="mcpToolsList">
+                        <div class="loading">Loading tools...</div>
                     </div>
                 </div>
 
+                <!-- Current MCP Servers -->
                 <div class="current-settings-card">
-                    <h3>Current MCP Servers</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0;">📡 등록된 MCP 서버</h3>
+                        <button onclick="showAddMCPServerForm()" id="addMCPBtn" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            ➕ 서버 추가
+                        </button>
+                    </div>
                     <div id="currentMCPServers">
                         <div class="loading">Loading...</div>
                     </div>
                 </div>
 
-                <div class="current-settings-card">
-                    <h3>Available MCP Tools</h3>
-                    <p style="color: #666; margin-bottom: 15px;">View all tools discovered from your MCP servers</p>
-                    <div class="settings-actions">
-                        <button onclick="loadMCPTools()" id="loadToolsBtn">🔧 Load Available Tools</button>
+                <!-- Add/Edit MCP Server Form (initially hidden) -->
+                <div class="settings-card" id="mcpFormCard" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 id="mcpFormTitle">MCP 서버 추가</h3>
+                        <button onclick="cancelMCPForm()" style="padding: 6px 12px; background: #999; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            취소
+                        </button>
                     </div>
-                    <div id="mcpToolsList">
-                        <p style="color: #999; text-align: center; padding: 20px;">Click "Load Available Tools" to see what tools are registered</p>
+
+                    <div class="form-group">
+                        <label for="mcpServerName">서버 이름 *</label>
+                        <input type="text" id="mcpServerName" placeholder="예: my_custom_agent">
+                        <small style="color: #666;">고유한 서버 식별자</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="mcpEnabled">활성화</label>
+                        <select id="mcpEnabled">
+                            <option value="true">예 (Yes)</option>
+                            <option value="false">아니오 (No)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="mcpTransport">연결 방식</label>
+                        <select id="mcpTransport" onchange="updateMCPTransportFields()">
+                            <option value="stdio">STDIO (로컬 명령어)</option>
+                            <option value="http">HTTP (원격 URL)</option>
+                        </select>
+                        <small style="color: #666;">MCP 서버에 연결하는 방법을 선택하세요</small>
+                    </div>
+
+                    <div class="form-group" id="mcpUrlGroup" style="display: none;">
+                        <label for="mcpUrl">서버 URL</label>
+                        <input type="text" id="mcpUrl" placeholder="http://localhost:8001">
+                        <small style="color: #666;">MCP 서버의 URL 엔드포인트</small>
+                    </div>
+
+                    <div class="form-group" id="mcpCommandGroup">
+                        <label for="mcpCommand">실행 명령어</label>
+                        <input type="text" id="mcpCommand" value="fastmcp" placeholder="fastmcp">
+                        <small style="color: #666;">실행할 명령어 (예: fastmcp, python, node)</small>
+                    </div>
+
+                    <div class="form-group" id="mcpArgsGroup">
+                        <label for="mcpArgs">실행 인자 (JSON 배열)</label>
+                        <textarea id="mcpArgs" placeholder='["run", "mcp_servers/my_agent/server.py"]' rows="3"></textarea>
+                        <small style="color: #666;">명령어에 전달할 인자들</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="mcpEnvVars">환경 변수 (JSON 객체, 선택사항)</label>
+                        <textarea id="mcpEnvVars" placeholder='{"API_KEY": "your_key"}' rows="2"></textarea>
+                        <small style="color: #666;">서버 실행에 필요한 환경 변수</small>
+                    </div>
+
+                    <div class="settings-actions">
+                        <button onclick="saveMCPServer()" id="saveMCPBtn">💾 저장</button>
+                    </div>
+
+                    <div id="mcpResult" class="settings-result">
+                        <!-- Result messages will appear here -->
                     </div>
                 </div>
             </div>

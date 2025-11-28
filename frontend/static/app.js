@@ -17,26 +17,7 @@ function switchTab(tabName) {
         loadCurrentSettings();
     } else if (tabName === 'mcp') {
         loadMCPServers();
-    }
-}
-
-// Set example text
-function setExample(text) {
-    document.getElementById('requestText').value = text;
-    document.getElementById('requestText').focus();
-}
-
-// Toggle category visibility
-function toggleCategory(categoryId) {
-    const category = document.getElementById(categoryId);
-    const icon = document.getElementById(categoryId + '-icon');
-
-    if (category.style.display === 'none') {
-        category.style.display = 'flex';
-        icon.textContent = '▼';
-    } else {
-        category.style.display = 'none';
-        icon.textContent = '▶';
+        loadMCPTools();
     }
 }
 
@@ -1219,16 +1200,49 @@ function updateMCPTransportFields() {
         commandGroup.style.display = 'none';
         argsGroup.style.display = 'none';
     } else {
-        urlGroup.style.display = 'none';
+        urlGroup.style.display = 'block';
         commandGroup.style.display = 'block';
         argsGroup.style.display = 'block';
+        // Hide URL for stdio
+        urlGroup.style.display = 'none';
     }
+}
+
+// Show add MCP server form
+function showAddMCPServerForm() {
+    const formCard = document.getElementById('mcpFormCard');
+    const formTitle = document.getElementById('mcpFormTitle');
+
+    // Clear form
+    document.getElementById('mcpServerName').value = '';
+    document.getElementById('mcpEnabled').value = 'true';
+    document.getElementById('mcpTransport').value = 'stdio';
+    document.getElementById('mcpUrl').value = '';
+    document.getElementById('mcpCommand').value = 'fastmcp';
+    document.getElementById('mcpArgs').value = '';
+    document.getElementById('mcpEnvVars').value = '';
+
+    updateMCPTransportFields();
+
+    formTitle.textContent = 'MCP 서버 추가';
+    formCard.style.display = 'block';
+    formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Clear any previous messages
+    document.getElementById('mcpResult').innerHTML = '';
+}
+
+// Cancel MCP form
+function cancelMCPForm() {
+    const formCard = document.getElementById('mcpFormCard');
+    formCard.style.display = 'none';
+    document.getElementById('mcpResult').innerHTML = '';
 }
 
 // Load MCP servers
 async function loadMCPServers() {
     const container = document.getElementById('currentMCPServers');
-    container.innerHTML = '<div class="loading">Loading MCP servers</div>';
+    container.innerHTML = '<div class="loading">Loading MCP servers...</div>';
 
     try {
         const response = await fetch('/api/mcp-servers?user_id=test_user&tenant=test_tenant');
@@ -1238,41 +1252,92 @@ async function loadMCPServers() {
             let html = '';
 
             if (data.servers && data.servers.length > 0) {
-                html = '<div class="mcp-servers-list">';
+                html = '<div class="mcp-servers-list" style="display: grid; gap: 15px;">';
                 data.servers.forEach(server => {
                     const transport = server.transport || 'stdio';
+                    const statusColor = server.enabled ? '#4CAF50' : '#999';
+                    const statusBg = server.enabled ? '#e8f5e9' : '#f5f5f5';
                     html += `
-                        <div class="mcp-server-item">
-                            <div class="mcp-server-header">
-                                <strong>${server.server_name}</strong>
-                                <span class="mcp-status ${server.enabled ? 'enabled' : 'disabled'}">
-                                    ${server.enabled ? '✓ Enabled' : '✗ Disabled'}
-                                </span>
+                        <div class="mcp-server-item" style="padding: 15px; border: 1px solid ${statusColor}; border-radius: 8px; background: ${statusBg};">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <div>
+                                    <strong style="font-size: 16px; color: #333;">${escapeHtml(server.server_name)}</strong>
+                                    <span style="margin-left: 10px; padding: 3px 10px; background: ${statusColor}; color: white; border-radius: 12px; font-size: 11px;">
+                                        ${server.enabled ? '활성' : '비활성'}
+                                    </span>
+                                </div>
+                                <div style="display: flex; gap: 8px;">
+                                    <button onclick="editMCPServer('${escapeHtml(server.server_name)}')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                        ✏️ 수정
+                                    </button>
+                                    <button onclick="deleteMCPServer('${escapeHtml(server.server_name)}')" style="padding: 6px 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                        🗑️ 삭제
+                                    </button>
+                                </div>
                             </div>
-                            <div class="mcp-server-details">
-                                <div><strong>Transport:</strong> ${transport.toUpperCase()}</div>
+                            <div style="font-size: 13px; color: #666;">
+                                <div style="margin-bottom: 5px;">
+                                    <strong>연결:</strong> ${transport.toUpperCase()}
+                                </div>
                                 ${transport === 'http'
-                                    ? `<div><strong>URL:</strong> ${server.url || 'N/A'}</div>`
-                                    : `<div><strong>Command:</strong> ${server.command || 'N/A'}</div>
-                                       <div><strong>Args:</strong> ${JSON.stringify(server.args || [])}</div>`
+                                    ? `<div><strong>URL:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">${escapeHtml(server.url || 'N/A')}</code></div>`
+                                    : `<div style="margin-bottom: 5px;"><strong>명령어:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">${escapeHtml(server.command || 'N/A')} ${(server.args || []).join(' ')}</code></div>`
                                 }
-                                ${server.env_vars ? `<div><strong>Env Vars:</strong> ${JSON.stringify(server.env_vars)}</div>` : ''}
                             </div>
-                            <button onclick="deleteMCPServer('${server.server_name}')" class="delete-btn">Delete</button>
                         </div>
                     `;
                 });
                 html += '</div>';
             } else {
-                html = '<p style="color: #999;">No MCP servers configured yet</p>';
+                html = `
+                    <div style="text-align: center; padding: 40px; color: #999;">
+                        <p style="font-size: 48px; margin-bottom: 15px;">📡</p>
+                        <p>등록된 MCP 서버가 없습니다.</p>
+                        <p style="font-size: 13px;">위의 "서버 추가" 버튼을 클릭하여 새 서버를 등록하세요.</p>
+                    </div>
+                `;
             }
 
             container.innerHTML = html;
         } else {
-            container.innerHTML = '<p style="color: #f44336;">Failed to load MCP servers</p>';
+            container.innerHTML = '<p style="color: #f44336;">MCP 서버 목록을 불러오지 못했습니다.</p>';
         }
     } catch (error) {
-        container.innerHTML = '<p style="color: #f44336;">Network error</p>';
+        container.innerHTML = '<p style="color: #f44336;">네트워크 오류가 발생했습니다.</p>';
+    }
+}
+
+// Edit MCP server
+async function editMCPServer(serverName) {
+    try {
+        const response = await fetch('/api/mcp-servers?user_id=test_user&tenant=test_tenant');
+        const data = await response.json();
+
+        if (response.ok && data.servers) {
+            const server = data.servers.find(s => s.server_name === serverName);
+            if (server) {
+                const formCard = document.getElementById('mcpFormCard');
+                const formTitle = document.getElementById('mcpFormTitle');
+
+                document.getElementById('mcpServerName').value = server.server_name;
+                document.getElementById('mcpEnabled').value = server.enabled ? 'true' : 'false';
+                document.getElementById('mcpTransport').value = server.transport || 'stdio';
+                document.getElementById('mcpUrl').value = server.url || '';
+                document.getElementById('mcpCommand').value = server.command || 'fastmcp';
+                document.getElementById('mcpArgs').value = server.args ? JSON.stringify(server.args) : '';
+                document.getElementById('mcpEnvVars').value = server.env_vars ? JSON.stringify(server.env_vars) : '';
+
+                updateMCPTransportFields();
+
+                formTitle.textContent = `MCP 서버 수정: ${serverName}`;
+                formCard.style.display = 'block';
+                formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                document.getElementById('mcpResult').innerHTML = '';
+            }
+        }
+    } catch (error) {
+        alert('서버 정보를 불러오지 못했습니다: ' + error.message);
     }
 }
 
@@ -1359,21 +1424,16 @@ async function saveMCPServer() {
         if (response.ok && data.success) {
             resultDiv.innerHTML = `
                 <div class="result-success">
-                    <div class="result-label">✓ MCP server saved successfully!</div>
+                    <div class="result-label">✓ MCP 서버가 저장되었습니다!</div>
                     <div class="result-value">${data.message}</div>
                 </div>
             `;
 
-            // Clear form
-            document.getElementById('mcpServerName').value = '';
-            document.getElementById('mcpUrl').value = '';
-            document.getElementById('mcpCommand').value = 'fastmcp';
-            document.getElementById('mcpArgs').value = '';
-            document.getElementById('mcpEnvVars').value = '';
-
-            // Reload servers list
+            // Clear form and hide
             setTimeout(() => {
+                cancelMCPForm();
                 loadMCPServers();
+                loadMCPTools();
             }, 500);
         } else {
             resultDiv.innerHTML = `
@@ -1424,9 +1484,11 @@ async function loadMCPTools() {
     const container = document.getElementById('mcpToolsList');
     const loadBtn = document.getElementById('loadToolsBtn');
 
-    container.innerHTML = '<div class="loading">Loading MCP tools...</div>';
-    loadBtn.disabled = true;
-    loadBtn.textContent = '🔧 Loading...';
+    container.innerHTML = '<div class="loading">도구 목록을 불러오는 중...</div>';
+    if (loadBtn) {
+        loadBtn.disabled = true;
+        loadBtn.textContent = '🔄 로딩...';
+    }
 
     try {
         const response = await fetch('/api/tools');
@@ -1436,57 +1498,91 @@ async function loadMCPTools() {
             let html = '';
 
             if (data.tools && data.tools.length > 0) {
+                // Group tools by server (based on naming convention)
+                const toolsByServer = {};
+                data.tools.forEach(tool => {
+                    // Extract server name from tool name (e.g., "calculator_add" -> "calculator")
+                    const serverName = tool.name.includes('_') ? tool.name.split('_')[0] : 'other';
+                    if (!toolsByServer[serverName]) {
+                        toolsByServer[serverName] = [];
+                    }
+                    toolsByServer[serverName].push(tool);
+                });
+
                 html = `
-                    <div class="tools-summary" style="margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
-                        <strong>Total Tools Discovered:</strong> ${data.count}
+                    <div class="tools-summary" style="margin-bottom: 15px; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; color: white;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span><strong>총 ${data.count}개의 도구</strong>가 등록되어 있습니다</span>
+                            <span style="font-size: 12px; opacity: 0.9;">${Object.keys(toolsByServer).length}개 서버</span>
+                        </div>
                     </div>
-                    <div class="tools-list">
+                    <div class="tools-list" style="display: grid; gap: 12px;">
                 `;
 
                 data.tools.forEach((tool, index) => {
                     // Format input schema for display
-                    let schemaHtml = '';
+                    let paramsHtml = '';
                     if (tool.input_schema && tool.input_schema.properties) {
                         const properties = tool.input_schema.properties;
                         const required = tool.input_schema.required || [];
+                        const paramCount = Object.keys(properties).length;
 
-                        schemaHtml = '<div class="tool-schema"><strong>Parameters:</strong><ul style="margin: 5px 0; padding-left: 20px;">';
+                        paramsHtml = `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">`;
+                        paramsHtml += `<div style="font-size: 12px; color: #666; margin-bottom: 5px;"><strong>파라미터 (${paramCount}개):</strong></div>`;
+                        paramsHtml += `<div style="display: flex; flex-wrap: wrap; gap: 5px;">`;
 
                         for (const [propName, propDetails] of Object.entries(properties)) {
                             const isRequired = required.includes(propName);
-                            const requiredBadge = isRequired ? '<span style="color: #f44336; font-size: 11px;">[required]</span>' : '<span style="color: #999; font-size: 11px;">[optional]</span>';
-                            schemaHtml += `<li><code>${propName}</code> ${requiredBadge} - ${propDetails.description || propDetails.type || 'No description'}</li>`;
+                            const bgColor = isRequired ? '#ffebee' : '#f5f5f5';
+                            const borderColor = isRequired ? '#ef9a9a' : '#e0e0e0';
+                            paramsHtml += `
+                                <span style="display: inline-block; padding: 3px 8px; background: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 4px; font-size: 11px;">
+                                    <code>${propName}</code>
+                                    ${isRequired ? '<span style="color: #f44336;">*</span>' : ''}
+                                </span>
+                            `;
                         }
 
-                        schemaHtml += '</ul></div>';
+                        paramsHtml += `</div></div>`;
                     }
 
                     html += `
-                        <div class="tool-item" style="margin-bottom: 15px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 4px;">
-                            <div class="tool-header" style="margin-bottom: 10px;">
-                                <strong style="font-size: 16px; color: #2196F3;">${index + 1}. ${tool.name}</strong>
+                        <div class="tool-item" style="padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; background: white; transition: box-shadow 0.2s;">
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                <span style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: #e3f2fd; border-radius: 50%; font-size: 12px; color: #1976D2; font-weight: bold;">
+                                    ${index + 1}
+                                </span>
+                                <strong style="font-size: 15px; color: #1976D2;">${escapeHtml(tool.name)}</strong>
                             </div>
-                            <div class="tool-description" style="margin-bottom: 10px; color: #666;">
-                                ${tool.description || 'No description available'}
+                            <div style="margin-left: 38px; font-size: 13px; color: #666;">
+                                ${escapeHtml(tool.description || '설명 없음')}
                             </div>
-                            ${schemaHtml}
+                            ${paramsHtml ? `<div style="margin-left: 38px;">${paramsHtml}</div>` : ''}
                         </div>
                     `;
                 });
 
                 html += '</div>';
             } else {
-                html = '<p style="color: #f44336;">No tools available. Please configure MCP servers first.</p>';
+                html = `
+                    <div style="text-align: center; padding: 40px; color: #999;">
+                        <p style="font-size: 48px; margin-bottom: 15px;">🔧</p>
+                        <p>사용 가능한 도구가 없습니다.</p>
+                        <p style="font-size: 13px;">MCP 서버를 등록하면 도구들이 여기에 표시됩니다.</p>
+                    </div>
+                `;
             }
 
             container.innerHTML = html;
         } else {
-            container.innerHTML = `<p style="color: #f44336;">Failed to load tools: ${data.detail || 'Unknown error'}</p>`;
+            container.innerHTML = `<p style="color: #f44336;">도구 목록 로드 실패: ${data.detail || 'Unknown error'}</p>`;
         }
     } catch (error) {
-        container.innerHTML = `<p style="color: #f44336;">Network error: ${error.message}</p>`;
+        container.innerHTML = `<p style="color: #f44336;">네트워크 오류: ${error.message}</p>`;
     } finally {
-        loadBtn.disabled = false;
-        loadBtn.textContent = '🔧 Load Available Tools';
+        if (loadBtn) {
+            loadBtn.disabled = false;
+            loadBtn.textContent = '🔄 새로고침';
+        }
     }
 }
