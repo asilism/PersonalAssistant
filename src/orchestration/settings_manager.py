@@ -46,6 +46,17 @@ class ChatMessage(BaseModel):
     created_at: Optional[str] = None
 
 
+class ExecutionResult(BaseModel):
+    """Execution result model for storing structured tool outputs"""
+    id: Optional[int] = None
+    session_id: str
+    user_id: str
+    tenant: str
+    request_text: str
+    results_json: str  # JSON string of structured results
+    created_at: Optional[str] = None
+
+
 class SettingsManager:
     """Manages application settings with SQLite storage and encryption"""
 
@@ -267,6 +278,25 @@ class SettingsManager:
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_chat_user_tenant
                 ON chat_history(user_id, tenant, created_at)
+            """)
+
+            # Create execution results table for storing structured tool outputs
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS execution_results (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    tenant TEXT NOT NULL,
+                    request_text TEXT NOT NULL,
+                    results_json TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Create index for execution results (for fast session lookups)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_execution_session
+                ON execution_results(session_id, created_at)
             """)
 
             conn.commit()
@@ -760,6 +790,79 @@ class SettingsManager:
                 DELETE FROM chat_history
                 WHERE user_id = ? AND tenant = ?
             """, (user_id, tenant))
+
+            deleted = cursor.rowcount > 0
+            conn.commit()
+
+        return deleted
+
+    # Execution Results Methods
+    def save_execution_result(
+        self,
+        session_id: str,
+        user_id: str,
+        tenant: str,
+        request_text: str,
+        results_json: str
+    ) -> bool:
+        """Save execution results (structured tool outputs) to history"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO execution_results (session_id, user_id, tenant, request_text, results_json)
+                VALUES (?, ?, ?, ?, ?)
+            """, (session_id, user_id, tenant, request_text, results_json))
+
+            conn.commit()
+
+        return True
+
+    def get_recent_execution_results(
+        self,
+        session_id: str,
+        limit: int = 5
+    ) -> list[ExecutionResult]:
+        """Get recent execution results for a session"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            # Get last N execution results
+            cursor.execute("""
+                SELECT id, session_id, user_id, tenant, request_text, results_json, created_at
+                FROM execution_results
+                WHERE session_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            """, (session_id, limit))
+
+            results = []
+            rows = cursor.fetchall()
+
+            # Reverse to get chronological order
+            for row in reversed(rows):
+                result_id, session_id, user_id, tenant, request_text, results_json, created_at = row
+                results.append(ExecutionResult(
+                    id=result_id,
+                    session_id=session_id,
+                    user_id=user_id,
+                    tenant=tenant,
+                    request_text=request_text,
+                    results_json=results_json,
+                    created_at=created_at
+                ))
+
+            return results
+
+    def delete_execution_results(self, session_id: str) -> bool:
+        """Delete all execution results for a session"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                DELETE FROM execution_results
+                WHERE session_id = ?
+            """, (session_id,))
 
             deleted = cursor.rowcount > 0
             conn.commit()

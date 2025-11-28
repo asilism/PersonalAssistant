@@ -14,7 +14,7 @@ from .types import (
     PlanState,
     PlanSummary
 )
-from .settings_manager import SettingsManager, ChatMessage
+from .settings_manager import SettingsManager, ChatMessage, ExecutionResult
 
 
 class TaskTracker:
@@ -205,3 +205,36 @@ class TaskTracker:
     async def clear_chat_history(self, session_id: str) -> bool:
         """Clear chat history for a session"""
         return self._settings_manager.delete_chat_history(session_id)
+
+    # Execution Results Methods
+    async def save_execution_result(
+        self,
+        session_id: str,
+        user_id: str,
+        tenant: str,
+        request_text: str,
+        results_json: str
+    ) -> bool:
+        """Save execution results (structured tool outputs) to history"""
+        return self._settings_manager.save_execution_result(
+            session_id=session_id,
+            user_id=user_id,
+            tenant=tenant,
+            request_text=request_text,
+            results_json=results_json
+        )
+
+    async def load_recent_execution_results(
+        self,
+        session_id: str,
+        limit: int = 5
+    ) -> list[ExecutionResult]:
+        """Load recent execution results for a session"""
+        return self._settings_manager.get_recent_execution_results(
+            session_id=session_id,
+            limit=limit
+        )
+
+    async def clear_execution_results(self, session_id: str) -> bool:
+        """Clear execution results for a session"""
+        return self._settings_manager.delete_execution_results(session_id)
