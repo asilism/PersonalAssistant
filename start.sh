@@ -1,9 +1,12 @@
 #!/bin/bash
 
-# Start the Personal Assistant Orchestration Service
+# Start Personal Assistant in Development Mode
+# This script runs both Vite (frontend) and FastAPI (backend) simultaneously
+
+set -e
 
 echo "========================================"
-echo "Personal Assistant Orchestration Service"
+echo "Personal Assistant - Development Mode"
 echo "========================================"
 echo ""
 
@@ -33,70 +36,82 @@ if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$OPENAI_API_KEY" ] && [ -z "$OPENROUTER_
 fi
 
 echo "Configuration loaded"
+
+# Check if Node.js is installed
+if ! command -v node &> /dev/null; then
+    echo "Error: Node.js is not installed"
+    echo "Please install Node.js to use Vite for frontend development"
+    exit 1
+fi
+
+# Install Python dependencies
 echo "Installing Python dependencies..."
 pip install -r requirements.txt > /dev/null 2>&1
-
 if [ $? -ne 0 ]; then
     echo "Error: Failed to install Python dependencies"
     exit 1
 fi
-
 echo "Python dependencies installed"
 
-# Check if production mode is requested
-if [ "$1" = "--prod" ]; then
-    export DEV_MODE=false
-    echo ""
-    echo "Building frontend for production..."
-
-    # Check if Node.js is installed
-    if ! command -v node &> /dev/null; then
-        echo "Error: Node.js is not installed"
-        echo "Please install Node.js to build the frontend"
-        exit 1
-    fi
-
-    # Install frontend dependencies and build
-    cd frontend
-    if [ ! -d "node_modules" ]; then
-        npm install > /dev/null 2>&1
-        if [ $? -ne 0 ]; then
-            echo "Error: Failed to install frontend dependencies"
-            exit 1
-        fi
-    fi
-
-    npm run build
+# Install frontend dependencies
+echo "Installing frontend dependencies..."
+cd frontend
+if [ ! -d "node_modules" ]; then
+    npm install > /dev/null 2>&1
     if [ $? -ne 0 ]; then
-        echo "Error: Failed to build frontend"
+        echo "Error: Failed to install frontend dependencies"
         exit 1
     fi
-    cd ..
-
-    echo "Frontend built successfully"
-    echo ""
-    echo "Starting in PRODUCTION mode..."
-    echo ""
-    echo "Available at:"
-    echo "  - Web UI:       http://localhost:8000"
-    echo "  - API Docs:     http://localhost:8000/docs"
-    echo "  - Health Check: http://localhost:8000/api/health"
-else
-    export DEV_MODE=true
-    echo ""
-    echo "Starting in DEVELOPMENT mode..."
-    echo ""
-    echo "For frontend development with HMR, use './start-dev.sh' instead"
-    echo "This will start both Vite and FastAPI servers together"
-    echo ""
-    echo "Available at:"
-    echo "  - API Backend:  http://localhost:8000"
-    echo "  - API Docs:     http://localhost:8000/docs"
 fi
+echo "Frontend dependencies installed"
+cd ..
 
 echo ""
-echo "Press Ctrl+C to stop the server"
+echo "========================================"
+echo "Starting servers..."
+echo "========================================"
+echo ""
+echo "  Frontend (Vite):  http://localhost:5173  <-- Open this!"
+echo "  Backend (FastAPI): http://localhost:8000"
+echo "  API Docs:          http://localhost:8000/docs"
+echo ""
+echo "  Vite will proxy /api requests to FastAPI"
+echo "  Hot Module Replacement (HMR) is enabled"
+echo ""
+echo "Press Ctrl+C to stop both servers"
+echo "========================================"
 echo ""
 
-# Start the server
-python src/api_server.py
+# Set development mode
+export DEV_MODE=true
+
+# Function to cleanup background processes on exit
+cleanup() {
+    echo ""
+    echo "Shutting down servers..."
+    kill $VITE_PID 2>/dev/null
+    kill $API_PID 2>/dev/null
+    wait $VITE_PID 2>/dev/null
+    wait $API_PID 2>/dev/null
+    echo "Servers stopped"
+    exit 0
+}
+
+# Set trap to cleanup on Ctrl+C
+trap cleanup SIGINT SIGTERM
+
+# Start Vite dev server in background
+cd frontend
+npm run dev &
+VITE_PID=$!
+cd ..
+
+# Wait a moment for Vite to start
+sleep 2
+
+# Start FastAPI server in background
+python src/api_server.py &
+API_PID=$!
+
+# Wait for both processes
+wait $VITE_PID $API_PID
