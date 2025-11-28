@@ -1671,3 +1671,25 @@ async function loadMCPTools() {
         }
     }
 }
+
+// Expose functions to global scope for inline onclick handlers (ES modules)
+window.switchTab = switchTab;
+window.clearChatHistory = clearChatHistory;
+window.showAddConfigForm = showAddConfigForm;
+window.cancelConfigForm = cancelConfigForm;
+window.editConfig = editConfig;
+window.activateConfig = activateConfig;
+window.deleteConfig = deleteConfig;
+window.testConnection = testConnection;
+window.saveSettings = saveSettings;
+window.updateModelOptions = updateModelOptions;
+window.showAddMCPServerForm = showAddMCPServerForm;
+window.cancelMCPForm = cancelMCPForm;
+window.loadMCPTools = loadMCPTools;
+window.syncMCPServers = syncMCPServers;
+window.loadMCPServers = loadMCPServers;
+window.toggleMCPServer = toggleMCPServer;
+window.editMCPServer = editMCPServer;
+window.saveMCPServer = saveMCPServer;
+window.deleteMCPServer = deleteMCPServer;
+window.updateMCPTransportFields = updateMCPTransportFields;
