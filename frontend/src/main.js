@@ -835,37 +835,36 @@ async function loadCurrentSettings() {
 
                 data.configs.forEach(config => {
                     const isActive = config.is_active;
-                    const activeClass = isActive ? 'config-active' : 'config-inactive';
-                    const activeIndicator = isActive ? '✓ Active' : '';
+                    const activeClass = isActive ? 'config-active' : '';
 
                     html += `
-                        <div class="config-card ${activeClass}" style="margin-bottom: 15px; padding: 15px; border: 2px solid ${isActive ? '#4CAF50' : '#ddd'}; border-radius: 8px; background: ${isActive ? '#f1f8f4' : '#fafafa'};">
-                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
-                                <div style="flex: 1;">
-                                    <h4 style="margin: 0 0 8px 0; color: ${isActive ? '#2E7D32' : '#333'};">
-                                        ${isActive ? '●' : '○'} ${escapeHtml(config.config_name)}
-                                        ${isActive ? `<span style="margin-left: 10px; padding: 3px 10px; background: #4CAF50; color: white; border-radius: 12px; font-size: 12px; font-weight: normal;">${activeIndicator}</span>` : ''}
+                        <div class="config-card ${activeClass}">
+                            <div class="config-card-header">
+                                <div>
+                                    <h4 class="config-card-title">
+                                        ${escapeHtml(config.config_name)}
+                                        ${isActive ? '<span class="status-badge active">Active</span>' : ''}
                                     </h4>
-                                    <div style="font-size: 13px; color: #666;">
+                                    <div class="config-card-details">
                                         <strong>${config.provider}</strong> · ${config.model}
                                         ${config.base_url ? ` · ${config.base_url}` : ''}
                                     </div>
-                                    <div style="font-size: 12px; color: #999; margin-top: 5px;">
+                                    <div class="config-card-meta">
                                         API Key: ${config.api_key_masked} · Max Retries: ${config.max_retries} · Timeout: ${config.timeout}ms
                                     </div>
                                 </div>
                             </div>
-                            <div style="display: flex; gap: 8px; margin-top: 12px;">
-                                <button onclick="editConfig('${escapeHtml(config.config_name)}')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
-                                    ✏️ Edit
+                            <div class="config-card-actions">
+                                <button onclick="editConfig('${escapeHtml(config.config_name)}')" class="btn btn-sm btn-secondary">
+                                    Edit
                                 </button>
                                 ${!isActive ? `
-                                    <button onclick="activateConfig('${escapeHtml(config.config_name)}')" style="padding: 6px 12px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
-                                        ✓ Activate
+                                    <button onclick="activateConfig('${escapeHtml(config.config_name)}')" class="btn btn-sm btn-primary">
+                                        Activate
                                     </button>
                                 ` : ''}
-                                <button onclick="deleteConfig('${escapeHtml(config.config_name)}')" style="padding: 6px 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
-                                    🗑️ Delete
+                                <button onclick="deleteConfig('${escapeHtml(config.config_name)}')" class="btn btn-sm btn-danger">
+                                    Delete
                                 </button>
                             </div>
                         </div>
@@ -875,16 +874,17 @@ async function loadCurrentSettings() {
                 container.innerHTML = html;
             } else {
                 container.innerHTML = `
-                    <p style="color: #999; text-align: center; padding: 30px;">
-                        No configurations yet. Click "Add New Configuration" to create one.
-                    </p>
+                    <div class="empty-state">
+                        <div class="empty-state-title">No configurations yet</div>
+                        <div class="empty-state-description">Click "Add New" to create your first configuration.</div>
+                    </div>
                 `;
             }
         } else {
-            container.innerHTML = '<p style="color: #f44336;">Failed to load configurations</p>';
+            container.innerHTML = '<div class="result-error">Failed to load configurations</div>';
         }
     } catch (error) {
-        container.innerHTML = '<p style="color: #f44336;">Network error</p>';
+        container.innerHTML = '<div class="result-error">Network error</div>';
     }
 }
 
@@ -1036,8 +1036,8 @@ async function testConnection() {
     }
 
     testBtn.disabled = true;
-    testBtn.textContent = '🧪 Testing...';
-    resultDiv.innerHTML = '<div class="loading">Testing connection</div>';
+    testBtn.textContent = 'Testing...';
+    resultDiv.innerHTML = '<div class="loading">Testing connection...</div>';
 
     try {
         const response = await fetch('/api/settings/test', {
@@ -1058,14 +1058,14 @@ async function testConnection() {
         if (response.ok && data.success) {
             resultDiv.innerHTML = `
                 <div class="result-success">
-                    <div class="result-label">✓ Connection successful!</div>
+                    <div class="result-label">Connection successful</div>
                     <div class="result-value">${data.message}</div>
                 </div>
             `;
         } else {
             resultDiv.innerHTML = `
                 <div class="result-error">
-                    <div class="result-label">✗ Connection failed</div>
+                    <div class="result-label">Connection failed</div>
                     <div class="result-value">${data.message || data.detail || 'Unknown error'}</div>
                 </div>
             `;
@@ -1073,13 +1073,13 @@ async function testConnection() {
     } catch (error) {
         resultDiv.innerHTML = `
             <div class="result-error">
-                <div class="result-label">✗ Network error</div>
+                <div class="result-label">Network error</div>
                 <div class="result-value">${error.message}</div>
             </div>
         `;
     } finally {
         testBtn.disabled = false;
-        testBtn.textContent = '🧪 Test Connection';
+        testBtn.textContent = 'Test Connection';
     }
 }
 
@@ -1111,7 +1111,7 @@ async function saveSettings() {
     }
 
     saveBtn.disabled = true;
-    saveBtn.textContent = '💾 Saving...';
+    saveBtn.textContent = 'Saving...';
     resultDiv.innerHTML = '<div class="loading">Saving configuration...</div>';
 
     try {
@@ -1160,7 +1160,7 @@ async function saveSettings() {
         if (response.ok && data.success) {
             resultDiv.innerHTML = `
                 <div class="result-success">
-                    <div class="result-label">✓ Configuration saved successfully!</div>
+                    <div class="result-label">Configuration saved successfully</div>
                     <div class="result-value">${data.message}</div>
                 </div>
             `;
@@ -1173,7 +1173,7 @@ async function saveSettings() {
         } else {
             resultDiv.innerHTML = `
                 <div class="result-error">
-                    <div class="result-label">✗ Failed to save configuration</div>
+                    <div class="result-label">Failed to save configuration</div>
                     <div class="result-value">${data.message || data.detail || 'Unknown error'}</div>
                 </div>
             `;
@@ -1181,13 +1181,13 @@ async function saveSettings() {
     } catch (error) {
         resultDiv.innerHTML = `
             <div class="result-error">
-                <div class="result-label">✗ Network error</div>
+                <div class="result-label">Network error</div>
                 <div class="result-value">${error.message}</div>
             </div>
         `;
     } finally {
         saveBtn.disabled = false;
-        saveBtn.textContent = '💾 Save Configuration';
+        saveBtn.textContent = 'Save';
     }
 }
 
@@ -1227,7 +1227,7 @@ function showAddMCPServerForm() {
 
     updateMCPTransportFields();
 
-    formTitle.textContent = 'MCP 서버 추가';
+    formTitle.textContent = 'Add MCP Server';
     formCard.style.display = 'block';
     formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -1256,66 +1256,59 @@ async function loadMCPServers() {
             let html = '';
 
             if (data.servers && data.servers.length > 0) {
-                // Summary bar
+                // Summary bar - Claude minimal style
                 html = `
-                    <div style="margin-bottom: 15px; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; color: white;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span><strong>${data.enabled_servers}/${data.total_servers}개 서버 활성</strong> | ${data.total_tools}개 도구 연결됨</span>
-                        </div>
+                    <div class="summary-bar">
+                        <span><strong>${data.enabled_servers}/${data.total_servers}</strong> servers active</span>
+                        <span>${data.total_tools} tools connected</span>
                     </div>
                 `;
 
-                html += '<div class="mcp-servers-list" style="display: grid; gap: 15px;">';
+                html += '<div class="mcp-servers-list">';
                 data.servers.forEach(server => {
                     const transport = server.transport || 'stdio';
 
-                    // Status colors based on connection status
-                    let statusColor, statusBg, statusText, statusIcon;
+                    // Status class based on connection status
+                    let statusClass, statusText;
                     if (!server.enabled) {
-                        statusColor = '#999';
-                        statusBg = '#f5f5f5';
-                        statusText = '비활성';
-                        statusIcon = '⏸️';
+                        statusClass = 'server-disabled';
+                        statusText = 'Disabled';
                     } else if (server.status === 'connected') {
-                        statusColor = '#4CAF50';
-                        statusBg = '#e8f5e9';
-                        statusText = `연결됨 (${server.tool_count}개 도구)`;
-                        statusIcon = '🟢';
+                        statusClass = 'server-connected';
+                        statusText = `Connected (${server.tool_count} tools)`;
                     } else {
-                        statusColor = '#ff9800';
-                        statusBg = '#fff3e0';
-                        statusText = '연결 안됨';
-                        statusIcon = '🟠';
+                        statusClass = 'server-disconnected';
+                        statusText = 'Not connected';
                     }
 
                     html += `
-                        <div class="mcp-server-item" style="padding: 15px; border: 1px solid ${statusColor}; border-radius: 8px; background: ${statusBg};">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div class="mcp-server-card ${statusClass}">
+                            <div class="mcp-server-header">
                                 <div>
-                                    <strong style="font-size: 16px; color: #333;">${statusIcon} ${escapeHtml(server.server_name)}</strong>
-                                    <span style="margin-left: 10px; padding: 3px 10px; background: ${statusColor}; color: white; border-radius: 12px; font-size: 11px;">
+                                    <span class="mcp-server-name">${escapeHtml(server.server_name)}</span>
+                                    <span class="status-badge ${server.enabled && server.status === 'connected' ? 'active' : 'inactive'}">
                                         ${statusText}
                                     </span>
                                 </div>
-                                <div style="display: flex; gap: 8px;">
-                                    <button onclick="toggleMCPServer('${escapeHtml(server.server_name)}')" style="padding: 6px 12px; background: ${server.enabled ? '#ff9800' : '#4CAF50'}; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                        ${server.enabled ? '⏸️ 비활성화' : '▶️ 활성화'}
+                                <div class="mcp-server-actions">
+                                    <button onclick="toggleMCPServer('${escapeHtml(server.server_name)}')" class="btn btn-sm btn-secondary">
+                                        ${server.enabled ? 'Disable' : 'Enable'}
                                     </button>
-                                    <button onclick="editMCPServer('${escapeHtml(server.server_name)}')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                        ✏️ 수정
+                                    <button onclick="editMCPServer('${escapeHtml(server.server_name)}')" class="btn btn-sm btn-secondary">
+                                        Edit
                                     </button>
-                                    <button onclick="deleteMCPServer('${escapeHtml(server.server_name)}')" style="padding: 6px 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                        🗑️ 삭제
+                                    <button onclick="deleteMCPServer('${escapeHtml(server.server_name)}')" class="btn btn-sm btn-danger">
+                                        Delete
                                     </button>
                                 </div>
                             </div>
-                            <div style="font-size: 13px; color: #666;">
-                                <div style="margin-bottom: 5px;">
-                                    <strong>연결:</strong> ${transport.toUpperCase()}
+                            <div class="mcp-server-details">
+                                <div>
+                                    <strong>Transport:</strong> ${transport.toUpperCase()}
                                 </div>
                                 ${transport === 'http' || transport === 'streamable-http'
-                                    ? `<div><strong>URL:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">${escapeHtml(server.url || 'N/A')}</code></div>`
-                                    : `<div style="margin-bottom: 5px;"><strong>명령어:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">${escapeHtml(server.command || 'N/A')}</code></div>`
+                                    ? `<div><strong>URL:</strong> <code>${escapeHtml(server.url || 'N/A')}</code></div>`
+                                    : `<div><strong>Command:</strong> <code>${escapeHtml(server.command || 'N/A')}</code></div>`
                                 }
                             </div>
                         </div>
@@ -1324,20 +1317,19 @@ async function loadMCPServers() {
                 html += '</div>';
             } else {
                 html = `
-                    <div style="text-align: center; padding: 40px; color: #999;">
-                        <p style="font-size: 48px; margin-bottom: 15px;">📡</p>
-                        <p>등록된 MCP 서버가 없습니다.</p>
-                        <p style="font-size: 13px;">위의 "서버 추가" 버튼을 클릭하여 새 서버를 등록하세요.</p>
+                    <div class="empty-state">
+                        <div class="empty-state-title">No registered servers</div>
+                        <div class="empty-state-description">Click "Add Server" to register a new MCP server.</div>
                     </div>
                 `;
             }
 
             container.innerHTML = html;
         } else {
-            container.innerHTML = '<p style="color: #f44336;">MCP 서버 목록을 불러오지 못했습니다.</p>';
+            container.innerHTML = '<div class="result-error">Failed to load MCP servers.</div>';
         }
     } catch (error) {
-        container.innerHTML = '<p style="color: #f44336;">네트워크 오류가 발생했습니다.</p>';
+        container.innerHTML = '<div class="result-error">Network error occurred.</div>';
     }
 }
 
@@ -1354,10 +1346,10 @@ async function toggleMCPServer(serverName) {
             // Reload servers list
             await loadMCPServers();
         } else {
-            alert(`서버 상태 변경 실패: ${data.message || data.detail || 'Unknown error'}`);
+            alert(`Failed to toggle server: ${data.message || data.detail || 'Unknown error'}`);
         }
     } catch (error) {
-        alert(`네트워크 오류: ${error.message}`);
+        alert(`Network error: ${error.message}`);
     }
 }
 
@@ -1367,7 +1359,7 @@ async function syncMCPServers() {
 
     if (syncBtn) {
         syncBtn.disabled = true;
-        syncBtn.textContent = '🔄 동기화 중...';
+        syncBtn.textContent = 'Syncing...';
     }
 
     try {
@@ -1378,19 +1370,19 @@ async function syncMCPServers() {
         const data = await response.json();
 
         if (response.ok && data.success) {
-            alert(`동기화 완료: ${data.tools_count}개 도구가 ${data.servers_synced}개 서버에서 발견되었습니다.`);
+            alert(`Sync complete: ${data.tools_count} tools discovered from ${data.servers_synced} servers.`);
             // Reload both servers and tools
             await loadMCPServers();
             await loadMCPTools();
         } else {
-            alert(`동기화 실패: ${data.message || data.detail || 'Unknown error'}`);
+            alert(`Sync failed: ${data.message || data.detail || 'Unknown error'}`);
         }
     } catch (error) {
-        alert(`네트워크 오류: ${error.message}`);
+        alert(`Network error: ${error.message}`);
     } finally {
         if (syncBtn) {
             syncBtn.disabled = false;
-            syncBtn.textContent = '🔄 서버 동기화';
+            syncBtn.textContent = 'Sync Servers';
         }
     }
 }
@@ -1417,7 +1409,7 @@ async function editMCPServer(serverName) {
 
                 updateMCPTransportFields();
 
-                formTitle.textContent = `MCP 서버 수정: ${serverName}`;
+                formTitle.textContent = `Edit MCP Server: ${serverName}`;
                 formCard.style.display = 'block';
                 formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -1425,7 +1417,7 @@ async function editMCPServer(serverName) {
             }
         }
     } catch (error) {
-        alert('서버 정보를 불러오지 못했습니다: ' + error.message);
+        alert('Failed to load server info: ' + error.message);
     }
 }
 
@@ -1474,8 +1466,8 @@ async function saveMCPServer() {
     }
 
     saveBtn.disabled = true;
-    saveBtn.textContent = '💾 Saving...';
-    resultDiv.innerHTML = '<div class="loading">Saving MCP server</div>';
+    saveBtn.textContent = 'Saving...';
+    resultDiv.innerHTML = '<div class="loading">Saving MCP server...</div>';
 
     try {
         const requestBody = {
@@ -1512,7 +1504,7 @@ async function saveMCPServer() {
         if (response.ok && data.success) {
             resultDiv.innerHTML = `
                 <div class="result-success">
-                    <div class="result-label">✓ MCP 서버가 저장되었습니다!</div>
+                    <div class="result-label">MCP server saved successfully</div>
                     <div class="result-value">${data.message}</div>
                 </div>
             `;
@@ -1526,7 +1518,7 @@ async function saveMCPServer() {
         } else {
             resultDiv.innerHTML = `
                 <div class="result-error">
-                    <div class="result-label">✗ Failed to save MCP server</div>
+                    <div class="result-label">Failed to save MCP server</div>
                     <div class="result-value">${data.message || data.detail || 'Unknown error'}</div>
                 </div>
             `;
@@ -1534,13 +1526,13 @@ async function saveMCPServer() {
     } catch (error) {
         resultDiv.innerHTML = `
             <div class="result-error">
-                <div class="result-label">✗ Network error</div>
+                <div class="result-label">Network error</div>
                 <div class="result-value">${error.message}</div>
             </div>
         `;
     } finally {
         saveBtn.disabled = false;
-        saveBtn.textContent = '💾 Save MCP Server';
+        saveBtn.textContent = 'Save';
     }
 }
 
@@ -1572,10 +1564,10 @@ async function loadMCPTools() {
     const container = document.getElementById('mcpToolsList');
     const loadBtn = document.getElementById('loadToolsBtn');
 
-    container.innerHTML = '<div class="loading">도구 목록을 불러오는 중...</div>';
+    container.innerHTML = '<div class="loading">Loading tools...</div>';
     if (loadBtn) {
         loadBtn.disabled = true;
-        loadBtn.textContent = '🔄 로딩...';
+        loadBtn.textContent = 'Loading...';
     }
 
     try {
@@ -1594,14 +1586,13 @@ async function loadMCPTools() {
             let html = '';
 
             if (data.tools && data.tools.length > 0) {
+                // Summary bar - Claude minimal style
                 html = `
-                    <div class="tools-summary" style="margin-bottom: 15px; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; color: white;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span><strong>총 ${data.count}개의 도구</strong>가 등록되어 있습니다</span>
-                            <span style="font-size: 12px; opacity: 0.9;">${actualServerCount}개 서버</span>
-                        </div>
+                    <div class="summary-bar">
+                        <span><strong>${data.count}</strong> tools registered</span>
+                        <span>${actualServerCount} servers</span>
                     </div>
-                    <div class="tools-list" style="display: grid; gap: 12px;">
+                    <div class="tools-list">
                 `;
 
                 data.tools.forEach((tool, index) => {
@@ -1612,18 +1603,15 @@ async function loadMCPTools() {
                         const required = tool.input_schema.required || [];
                         const paramCount = Object.keys(properties).length;
 
-                        paramsHtml = `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">`;
-                        paramsHtml += `<div style="font-size: 12px; color: #666; margin-bottom: 5px;"><strong>파라미터 (${paramCount}개):</strong></div>`;
-                        paramsHtml += `<div style="display: flex; flex-wrap: wrap; gap: 5px;">`;
+                        paramsHtml = `<div class="tool-card-params">`;
+                        paramsHtml += `<div class="tool-card-params-label">Parameters (${paramCount})</div>`;
+                        paramsHtml += `<div class="tool-card-params-list">`;
 
                         for (const [propName, propDetails] of Object.entries(properties)) {
                             const isRequired = required.includes(propName);
-                            const bgColor = isRequired ? '#ffebee' : '#f5f5f5';
-                            const borderColor = isRequired ? '#ef9a9a' : '#e0e0e0';
                             paramsHtml += `
-                                <span style="display: inline-block; padding: 3px 8px; background: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 4px; font-size: 11px;">
-                                    <code>${propName}</code>
-                                    ${isRequired ? '<span style="color: #f44336;">*</span>' : ''}
+                                <span class="param-tag ${isRequired ? 'required' : ''}">
+                                    ${propName}${isRequired ? '*' : ''}
                                 </span>
                             `;
                         }
@@ -1632,17 +1620,15 @@ async function loadMCPTools() {
                     }
 
                     html += `
-                        <div class="tool-item" style="padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; background: white; transition: box-shadow 0.2s;">
-                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                                <span style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: #e3f2fd; border-radius: 50%; font-size: 12px; color: #1976D2; font-weight: bold;">
-                                    ${index + 1}
-                                </span>
-                                <strong style="font-size: 15px; color: #1976D2;">${escapeHtml(tool.name)}</strong>
+                        <div class="tool-card">
+                            <div class="tool-card-header">
+                                <span class="tool-card-number">${index + 1}</span>
+                                <span class="tool-card-name">${escapeHtml(tool.name)}</span>
                             </div>
-                            <div style="margin-left: 38px; font-size: 13px; color: #666;">
-                                ${escapeHtml(tool.description || '설명 없음')}
+                            <div class="tool-card-description">
+                                ${escapeHtml(tool.description || 'No description')}
                             </div>
-                            ${paramsHtml ? `<div style="margin-left: 38px;">${paramsHtml}</div>` : ''}
+                            ${paramsHtml}
                         </div>
                     `;
                 });
@@ -1650,24 +1636,23 @@ async function loadMCPTools() {
                 html += '</div>';
             } else {
                 html = `
-                    <div style="text-align: center; padding: 40px; color: #999;">
-                        <p style="font-size: 48px; margin-bottom: 15px;">🔧</p>
-                        <p>사용 가능한 도구가 없습니다.</p>
-                        <p style="font-size: 13px;">MCP 서버를 등록하면 도구들이 여기에 표시됩니다.</p>
+                    <div class="empty-state">
+                        <div class="empty-state-title">No tools available</div>
+                        <div class="empty-state-description">Register MCP servers to see available tools.</div>
                     </div>
                 `;
             }
 
             container.innerHTML = html;
         } else {
-            container.innerHTML = `<p style="color: #f44336;">도구 목록 로드 실패: ${data.detail || 'Unknown error'}</p>`;
+            container.innerHTML = `<div class="result-error">Failed to load tools: ${data.detail || 'Unknown error'}</div>`;
         }
     } catch (error) {
-        container.innerHTML = `<p style="color: #f44336;">네트워크 오류: ${error.message}</p>`;
+        container.innerHTML = `<div class="result-error">Network error: ${error.message}</div>`;
     } finally {
         if (loadBtn) {
             loadBtn.disabled = false;
-            loadBtn.textContent = '🔄 새로고침';
+            loadBtn.textContent = 'Refresh';
         }
     }
 }

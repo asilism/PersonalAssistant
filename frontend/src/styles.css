@@ -895,3 +895,275 @@ body {
     padding: 40px 20px;
     font-size: 14px;
 }
+
+/* ===== Claude-tone Settings & Server Cards ===== */
+
+/* Summary Bar - Clean, minimal design */
+.summary-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.summary-bar strong {
+    color: var(--text-primary);
+}
+
+/* Config Card - Claude minimal style */
+.config-card {
+    padding: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    background: var(--bg-primary);
+    transition: border-color 0.15s ease;
+}
+
+.config-card:hover {
+    border-color: var(--text-tertiary);
+}
+
+.config-card.config-active {
+    border-color: var(--success-color);
+    background: var(--bg-primary);
+}
+
+.config-card.config-active::before {
+    content: '';
+    display: block;
+    width: 100%;
+    height: 2px;
+    background: var(--success-color);
+    margin: -16px -16px 16px -16px;
+    width: calc(100% + 32px);
+    border-radius: 8px 8px 0 0;
+}
+
+.config-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.config-card-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.config-card-details {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.config-card-meta {
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+
+.config-card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-light);
+}
+
+/* MCP Server Card - Claude minimal style */
+.mcp-server-card {
+    padding: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    background: var(--bg-primary);
+    transition: border-color 0.15s ease;
+}
+
+.mcp-server-card:hover {
+    border-color: var(--text-tertiary);
+}
+
+.mcp-server-card.server-connected {
+    border-left: 3px solid var(--success-color);
+}
+
+.mcp-server-card.server-disconnected {
+    border-left: 3px solid var(--accent-color);
+}
+
+.mcp-server-card.server-disabled {
+    border-left: 3px solid var(--text-tertiary);
+    background: var(--bg-secondary);
+}
+
+.mcp-server-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.mcp-server-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.mcp-server-details {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.mcp-server-details code {
+    background: var(--bg-tertiary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.mcp-server-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Tool Item - Claude minimal style */
+.tool-card {
+    padding: 14px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    background: var(--bg-primary);
+    transition: border-color 0.15s ease;
+}
+
+.tool-card:hover {
+    border-color: var(--text-tertiary);
+}
+
+.tool-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.tool-card-number {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.tool-card-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.tool-card-description {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-left: 34px;
+}
+
+.tool-card-params {
+    margin-top: 10px;
+    margin-left: 34px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-light);
+}
+
+.tool-card-params-label {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin-bottom: 6px;
+}
+
+.tool-card-params-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.param-tag {
+    display: inline-block;
+    padding: 3px 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: monospace;
+}
+
+.param-tag.required {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: var(--error-color);
+}
+
+/* Empty State - Claude minimal style */
+.empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text-tertiary);
+}
+
+.empty-state-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.empty-state-title {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.empty-state-description {
+    font-size: 13px;
+}
+
+/* Small Button Variants for card actions */
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.btn-text {
+    background: transparent;
+    color: var(--text-secondary);
+    padding: 6px 10px;
+}
+
+.btn-text:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.btn-text.btn-danger-text {
+    color: var(--error-color);
+}
+
+.btn-text.btn-danger-text:hover {
+    background: #fef2f2;
+}
