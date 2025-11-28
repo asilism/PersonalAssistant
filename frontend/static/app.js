@@ -1239,34 +1239,65 @@ function cancelMCPForm() {
     document.getElementById('mcpResult').innerHTML = '';
 }
 
-// Load MCP servers
+// Load MCP servers with status
 async function loadMCPServers() {
     const container = document.getElementById('currentMCPServers');
     container.innerHTML = '<div class="loading">Loading MCP servers...</div>';
 
     try {
-        const response = await fetch('/api/mcp-servers?user_id=test_user&tenant=test_tenant');
+        // Fetch servers with status information
+        const response = await fetch('/api/mcp-servers/status?user_id=test_user&tenant=test_tenant');
         const data = await response.json();
 
         if (response.ok) {
             let html = '';
 
             if (data.servers && data.servers.length > 0) {
-                html = '<div class="mcp-servers-list" style="display: grid; gap: 15px;">';
+                // Summary bar
+                html = `
+                    <div style="margin-bottom: 15px; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; color: white;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span><strong>${data.enabled_servers}/${data.total_servers}개 서버 활성</strong> | ${data.total_tools}개 도구 연결됨</span>
+                        </div>
+                    </div>
+                `;
+
+                html += '<div class="mcp-servers-list" style="display: grid; gap: 15px;">';
                 data.servers.forEach(server => {
                     const transport = server.transport || 'stdio';
-                    const statusColor = server.enabled ? '#4CAF50' : '#999';
-                    const statusBg = server.enabled ? '#e8f5e9' : '#f5f5f5';
+
+                    // Status colors based on connection status
+                    let statusColor, statusBg, statusText, statusIcon;
+                    if (!server.enabled) {
+                        statusColor = '#999';
+                        statusBg = '#f5f5f5';
+                        statusText = '비활성';
+                        statusIcon = '⏸️';
+                    } else if (server.status === 'connected') {
+                        statusColor = '#4CAF50';
+                        statusBg = '#e8f5e9';
+                        statusText = `연결됨 (${server.tool_count}개 도구)`;
+                        statusIcon = '🟢';
+                    } else {
+                        statusColor = '#ff9800';
+                        statusBg = '#fff3e0';
+                        statusText = '연결 안됨';
+                        statusIcon = '🟠';
+                    }
+
                     html += `
                         <div class="mcp-server-item" style="padding: 15px; border: 1px solid ${statusColor}; border-radius: 8px; background: ${statusBg};">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                                 <div>
-                                    <strong style="font-size: 16px; color: #333;">${escapeHtml(server.server_name)}</strong>
+                                    <strong style="font-size: 16px; color: #333;">${statusIcon} ${escapeHtml(server.server_name)}</strong>
                                     <span style="margin-left: 10px; padding: 3px 10px; background: ${statusColor}; color: white; border-radius: 12px; font-size: 11px;">
-                                        ${server.enabled ? '활성' : '비활성'}
+                                        ${statusText}
                                     </span>
                                 </div>
                                 <div style="display: flex; gap: 8px;">
+                                    <button onclick="toggleMCPServer('${escapeHtml(server.server_name)}')" style="padding: 6px 12px; background: ${server.enabled ? '#ff9800' : '#4CAF50'}; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                        ${server.enabled ? '⏸️ 비활성화' : '▶️ 활성화'}
+                                    </button>
                                     <button onclick="editMCPServer('${escapeHtml(server.server_name)}')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                         ✏️ 수정
                                     </button>
@@ -1279,9 +1310,9 @@ async function loadMCPServers() {
                                 <div style="margin-bottom: 5px;">
                                     <strong>연결:</strong> ${transport.toUpperCase()}
                                 </div>
-                                ${transport === 'http'
+                                ${transport === 'http' || transport === 'streamable-http'
                                     ? `<div><strong>URL:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">${escapeHtml(server.url || 'N/A')}</code></div>`
-                                    : `<div style="margin-bottom: 5px;"><strong>명령어:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">${escapeHtml(server.command || 'N/A')} ${(server.args || []).join(' ')}</code></div>`
+                                    : `<div style="margin-bottom: 5px;"><strong>명령어:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">${escapeHtml(server.command || 'N/A')}</code></div>`
                                 }
                             </div>
                         </div>
@@ -1304,6 +1335,60 @@ async function loadMCPServers() {
         }
     } catch (error) {
         container.innerHTML = '<p style="color: #f44336;">네트워크 오류가 발생했습니다.</p>';
+    }
+}
+
+// Toggle MCP server enabled/disabled
+async function toggleMCPServer(serverName) {
+    try {
+        const response = await fetch(`/api/mcp-servers/${encodeURIComponent(serverName)}/toggle?user_id=test_user&tenant=test_tenant`, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            // Reload servers list
+            await loadMCPServers();
+        } else {
+            alert(`서버 상태 변경 실패: ${data.message || data.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        alert(`네트워크 오류: ${error.message}`);
+    }
+}
+
+// Sync MCP servers - re-discover tools
+async function syncMCPServers() {
+    const syncBtn = document.getElementById('syncMCPBtn');
+
+    if (syncBtn) {
+        syncBtn.disabled = true;
+        syncBtn.textContent = '🔄 동기화 중...';
+    }
+
+    try {
+        const response = await fetch('/api/mcp-servers/sync?user_id=test_user&tenant=test_tenant', {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            alert(`동기화 완료: ${data.tools_count}개 도구가 ${data.servers_synced}개 서버에서 발견되었습니다.`);
+            // Reload both servers and tools
+            await loadMCPServers();
+            await loadMCPTools();
+        } else {
+            alert(`동기화 실패: ${data.message || data.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        alert(`네트워크 오류: ${error.message}`);
+    } finally {
+        if (syncBtn) {
+            syncBtn.disabled = false;
+            syncBtn.textContent = '🔄 서버 동기화';
+        }
     }
 }
 

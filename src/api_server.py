@@ -85,14 +85,54 @@ class TestConnectionRequest(BaseModel):
     base_url: Optional[str] = None
 
 
-# Global MCP tools cache
+# Global MCP tools cache and tool-server mapping
 global_mcp_tools = []
+global_tool_server_map = {}
+
+
+async def sync_mcp_servers(user_id: str = "test_user", tenant: str = "test_tenant"):
+    """Sync MCP servers and update global tools cache"""
+    global global_mcp_tools, global_tool_server_map
+
+    logger.info(f"Syncing MCP servers for {user_id}@{tenant}...")
+
+    try:
+        # Create MCP executor and discover tools
+        mcp_executor = MCPExecutor(user_id=user_id, tenant=tenant)
+        await mcp_executor.initialize_servers()
+        global_mcp_tools = await mcp_executor.discover_tools()
+        global_tool_server_map = mcp_executor.get_tool_server_map()
+
+        logger.info(f"✓ Synced {len(global_mcp_tools)} MCP tools from {len(global_tool_server_map)} unique tool mappings")
+
+        # Clear orchestrator cache to force reload with new tools
+        orchestrators.clear()
+        logger.info("Cleared orchestrator cache")
+
+        # Cleanup MCP executor after discovery
+        await mcp_executor.cleanup()
+
+        return {
+            "success": True,
+            "tools_count": len(global_mcp_tools),
+            "servers_synced": len(set(global_tool_server_map.values())),
+            "message": f"Successfully synced {len(global_mcp_tools)} tools"
+        }
+
+    except Exception as e:
+        logger.error(f"✗ Failed to sync MCP servers: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": f"Failed to sync: {str(e)}"
+        }
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler to preload MCP tools on startup"""
-    global global_mcp_tools
+    global global_mcp_tools, global_tool_server_map
 
     logger.info("=" * 80)
     logger.info("Starting Personal Assistant - Preloading MCP tools...")
@@ -103,6 +143,7 @@ async def lifespan(app: FastAPI):
         mcp_executor = MCPExecutor()
         await mcp_executor.initialize_servers()
         global_mcp_tools = await mcp_executor.discover_tools()
+        global_tool_server_map = mcp_executor.get_tool_server_map()
 
         logger.info(f"✓ Successfully preloaded {len(global_mcp_tools)} MCP tools")
         logger.info("=" * 80)
@@ -498,6 +539,107 @@ async def delete_mcp_server(server_name: str, user_id: str = "test_user", tenant
             raise HTTPException(status_code=404, detail="MCP server settings not found")
 
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/mcp-servers/{server_name}/toggle")
+async def toggle_mcp_server(server_name: str, user_id: str = "test_user", tenant: str = "test_tenant"):
+    """Toggle MCP server enabled/disabled status"""
+    try:
+        # Get current server settings
+        server = settings_manager.get_mcp_server_settings(user_id, tenant, server_name)
+
+        if not server:
+            raise HTTPException(status_code=404, detail=f"MCP server '{server_name}' not found")
+
+        # Toggle enabled status
+        new_enabled = not server.enabled
+
+        # Update server settings
+        success = settings_manager.save_mcp_server_settings(
+            user_id=user_id,
+            tenant=tenant,
+            server_name=server.server_name,
+            enabled=new_enabled,
+            transport=server.transport,
+            url=server.url,
+            command=server.command,
+            args=server.args,
+            env_vars=server.env_vars
+        )
+
+        if success:
+            # Clear orchestrator cache
+            key = f"{tenant}:{user_id}"
+            if key in orchestrators:
+                del orchestrators[key]
+
+            status_text = "enabled" if new_enabled else "disabled"
+            logger.info(f"MCP server '{server_name}' {status_text}")
+            return {
+                "success": True,
+                "server_name": server_name,
+                "enabled": new_enabled,
+                "message": f"MCP server '{server_name}' is now {status_text}"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to update server status")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error toggling MCP server '{server_name}': {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/mcp-servers/sync")
+async def sync_mcp_servers_api(user_id: str = "test_user", tenant: str = "test_tenant"):
+    """Sync MCP servers - re-discover tools from all enabled servers"""
+    try:
+        result = await sync_mcp_servers(user_id=user_id, tenant=tenant)
+
+        if result["success"]:
+            return result
+        else:
+            raise HTTPException(status_code=500, detail=result.get("message", "Sync failed"))
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error syncing MCP servers: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/mcp-servers/status")
+async def get_mcp_servers_status(user_id: str = "test_user", tenant: str = "test_tenant"):
+    """Get detailed status of all MCP servers including tool counts"""
+    try:
+        servers = settings_manager.get_all_mcp_servers(user_id, tenant)
+
+        # Build status info with tool counts from global mapping
+        server_status = []
+        for s in servers:
+            tool_count = len([t for t, srv in global_tool_server_map.items() if srv == s.server_name])
+            server_status.append({
+                "server_name": s.server_name,
+                "enabled": s.enabled,
+                "transport": s.transport if hasattr(s, 'transport') else "stdio",
+                "url": s.url if hasattr(s, 'url') else None,
+                "command": s.command,
+                "tool_count": tool_count,
+                "status": "connected" if tool_count > 0 else ("disabled" if not s.enabled else "disconnected")
+            })
+
+        return {
+            "servers": server_status,
+            "total_tools": len(global_mcp_tools),
+            "total_servers": len(servers),
+            "enabled_servers": len([s for s in servers if s.enabled])
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting MCP servers status: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

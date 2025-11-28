@@ -8,26 +8,79 @@ import json
 import os
 from datetime import datetime
 from typing import Any, Optional, Dict, List
-from contextlib import asynccontextmanager
 
 from fastmcp import Client
 
 from .types import Step, StepResult, ToolDefinition
 from .validators import validate_email
+from .settings_manager import SettingsManager
 
 
 class MCPExecutor:
     """MCPExecutor - Executes MCP tools via Streamable-HTTP using FastMCP 2.0"""
 
-    def __init__(self):
+    def __init__(self, user_id: str = "test_user", tenant: str = "test_tenant"):
         self._execution_count = 0
         self._servers: Dict[str, Dict[str, Any]] = {}
         self._clients: Dict[str, Client] = {}
         self._available_tools: Dict[str, ToolDefinition] = {}
+        self._tool_server_map: Dict[str, str] = {}  # Dynamic tool-to-server mapping
+        self._user_id = user_id
+        self._tenant = tenant
+        self._settings_manager = SettingsManager()
 
     async def initialize_servers(self):
-        """Initialize connections to all MCP servers"""
-        # Define MCP server configurations (Streamable-HTTP based)
+        """Initialize connections to all MCP servers from database settings"""
+        print(f"[MCPExecutor] Initializing MCP servers for {self._user_id}@{self._tenant}...")
+
+        # Get MCP servers from database
+        db_servers = self._settings_manager.get_all_mcp_servers(self._user_id, self._tenant)
+
+        if db_servers:
+            print(f"[MCPExecutor] Found {len(db_servers)} servers in database")
+            for server in db_servers:
+                if not server.enabled:
+                    print(f"[MCPExecutor] Skipping disabled server: {server.server_name}")
+                    continue
+
+                try:
+                    # Build server config from DB settings
+                    config = {
+                        "transport": server.transport or "http",
+                        "enabled": server.enabled
+                    }
+
+                    if server.transport == "http" or server.transport == "streamable-http":
+                        config["url"] = server.url
+                        config["transport"] = "streamable-http"
+                    else:
+                        # STDIO transport
+                        config["command"] = server.command
+                        config["args"] = server.args or []
+                        config["env_vars"] = server.env_vars or {}
+
+                    self._servers[server.server_name] = {
+                        "config": config,
+                        "status": "ready" if config.get("url") or config.get("command") else "error"
+                    }
+
+                    print(f"[MCPExecutor] Configured {server.server_name} from database")
+
+                except Exception as e:
+                    print(f"[MCPExecutor] Error configuring {server.server_name}: {e}")
+                    self._servers[server.server_name] = {
+                        "config": {},
+                        "status": "error"
+                    }
+        else:
+            # Fallback to default servers if no database config
+            print("[MCPExecutor] No servers in database, using default configuration")
+            await self._initialize_default_servers()
+
+        print(f"[MCPExecutor] Initialized {len(self._servers)} MCP servers")
+
+    async def _initialize_default_servers(self):
+        """Initialize default MCP servers (fallback when no DB config exists)"""
         server_configs = {
             "mail-agent": {
                 "url": "http://localhost:8001/mcp",
@@ -51,28 +104,17 @@ class MCPExecutor:
             }
         }
 
-        print("[MCPExecutor] Initializing MCP servers...")
-
         for server_name, config in server_configs.items():
-            try:
-                # Store server config
-                self._servers[server_name] = {
-                    "config": config,
-                    "status": "starting"
-                }
-
-                print(f"[MCPExecutor] Configured {server_name} at {config['url']}")
-                self._servers[server_name]["status"] = "ready"
-
-            except Exception as e:
-                print(f"[MCPExecutor] Error configuring {server_name}: {e}")
-                self._servers[server_name]["status"] = "error"
-
-        print(f"[MCPExecutor] Initialized {len(self._servers)} MCP servers")
+            self._servers[server_name] = {
+                "config": config,
+                "status": "ready"
+            }
+            print(f"[MCPExecutor] Configured default {server_name} at {config['url']}")
 
     async def discover_tools(self) -> List[ToolDefinition]:
         """Discover all available tools from MCP servers (in parallel)"""
         all_tools = []
+        self._tool_server_map.clear()  # Reset tool-server mapping
 
         async def discover_from_server(server_name: str, server_info: dict):
             """Discover tools from a single server"""
@@ -81,6 +123,11 @@ class MCPExecutor:
 
             try:
                 config = server_info["config"]
+
+                # Only support HTTP/Streamable-HTTP for now
+                if config.get("transport") != "streamable-http":
+                    print(f"[MCPExecutor] Skipping non-HTTP server: {server_name}")
+                    return []
 
                 # Create FastMCP client
                 client = Client(config["url"])
@@ -102,6 +149,8 @@ class MCPExecutor:
                         )
                         tools.append(tool_def)
                         self._available_tools[tool.name] = tool_def
+                        # Build dynamic tool-server mapping
+                        self._tool_server_map[tool.name] = server_name
 
                     print(f"[MCPExecutor] Discovered {len(tools_result)} tools from {server_name}")
                     return tools
@@ -128,6 +177,22 @@ class MCPExecutor:
                 print(f"[MCPExecutor] Exception during parallel discovery: {result}")
 
         return all_tools
+
+    def get_tool_server_map(self) -> Dict[str, str]:
+        """Get the current tool-to-server mapping"""
+        return self._tool_server_map.copy()
+
+    def get_server_status(self) -> Dict[str, Dict[str, Any]]:
+        """Get status of all configured servers"""
+        return {
+            name: {
+                "status": info["status"],
+                "url": info["config"].get("url"),
+                "transport": info["config"].get("transport"),
+                "tool_count": len([t for t, s in self._tool_server_map.items() if s == name])
+            }
+            for name, info in self._servers.items()
+        }
 
     async def execute_step(self, step: Step) -> StepResult:
         """
@@ -258,8 +323,12 @@ class MCPExecutor:
 
     async def _find_server_for_tool(self, tool_name: str) -> Optional[str]:
         """Find which server provides a specific tool"""
-        # Tool name to server mapping
-        tool_server_map = {
+        # First, check dynamic mapping from tool discovery
+        if tool_name in self._tool_server_map:
+            return self._tool_server_map[tool_name]
+
+        # Fallback: Static tool name to server mapping (for backward compatibility)
+        static_tool_server_map = {
             # Mail agent (includes contact lookup)
             "send_email": "mail-agent",
             "read_emails": "mail-agent",
@@ -295,7 +364,7 @@ class MCPExecutor:
             "collect_attendance": "rpa-agent",
         }
 
-        return tool_server_map.get(tool_name)
+        return static_tool_server_map.get(tool_name)
 
     async def _execute_mcp_tool(self, server_name: str, tool_name: str, tool_input: dict[str, Any]) -> Any:
         """
@@ -408,3 +477,4 @@ class MCPExecutor:
         self._clients.clear()
         self._servers.clear()
         self._available_tools.clear()
+        self._tool_server_map.clear()
