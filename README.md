@@ -1,35 +1,15 @@
-# Personal Assistant Orchestration Service
+# Personal Assistant
 
-LangGraph-based orchestration service with real MCP agent integration and multi-LLM support.
-
-## Live Demo
-
-**Try it now:** [http://34.64.178.95:8000/](http://34.64.178.95:8000/)
-
-### Screenshots
-
-<p align="center">
-  <img src="docs/images/demo-chat.png" alt="Chat Interface" width="800">
-  <br>
-  <em>Chat interface with multi-agent orchestration</em>
-</p>
-
-<p align="center">
-  <img src="docs/images/demo-settings.png" alt="LLM Settings" width="800">
-  <br>
-  <em>LLM provider configuration</em>
-</p>
-
-> **Note:** To add screenshots, place images in `docs/images/` directory with names `demo-chat.png` and `demo-settings.png`.
+LangGraph 기반의 개인 비서 시스템입니다. MCP(Model Context Protocol) 서버를 동적으로 연결하여 다양한 도구들을 활용할 수 있습니다.
 
 ## Features
 
-✨ **5 MCP Agent Servers** - Mail, Calendar, Jira, Calculator, and RPA agents
-🤖 **Multi-LLM Support** - Works with Anthropic Claude, OpenAI GPT, and OpenRouter
-🎯 **LangGraph Orchestration** - Robust state machine for task execution
-🌐 **Modern Web UI** - Beautiful interface with configurable LLM settings
-📡 **REST API** - FastAPI-based API for programmatic access
-🔧 **Flexible Configuration** - Configure LLM provider, model, and base URL through UI
+🔌 **동적 MCP 서버 관리** - 웹 UI에서 MCP 서버를 동적으로 추가/수정/삭제
+🔧 **Tool 시각화** - 등록된 모든 도구들을 한눈에 확인
+🤖 **Multi-LLM 지원** - Anthropic Claude, OpenAI GPT, OpenRouter 지원
+🎯 **LangGraph Orchestration** - 안정적인 상태 머신 기반 태스크 실행
+🌐 **Modern Web UI** - 직관적인 인터페이스
+📡 **REST API** - FastAPI 기반 프로그래밍 접근 지원
 
 ## Quick Start
 
@@ -219,9 +199,9 @@ PersonalAssistant/
 
 1. **Frontend** (`frontend/`)
    - Modern, responsive web UI
+   - MCP 서버 관리 및 도구 확인
    - LLM settings configuration
    - Real-time request execution
-   - Example requests for quick testing
 
 2. **API Server** (`src/api_server.py`)
    - FastAPI-based REST API
@@ -621,8 +601,8 @@ Robust orchestration with:
 
 Beautiful, responsive interface with:
 - Real-time feedback
+- MCP 서버 및 도구 관리
 - LLM configuration
-- Example requests
 - Result visualization
 
 ### 5. Secure Settings Management
