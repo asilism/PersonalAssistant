@@ -182,7 +182,10 @@
                     <div class="card">
                         <div class="card-header">
                             <h3>Registered Servers</h3>
-                            <button onclick="showAddMCPServerForm()" class="btn btn-primary">Add Server</button>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="syncMCPServers()" id="syncMCPBtn" class="btn btn-secondary">Sync Servers</button>
+                                <button onclick="showAddMCPServerForm()" class="btn btn-primary">Add Server</button>
+                            </div>
                         </div>
                         <div id="currentMCPServers">
                             <div class="loading">Loading...</div>
