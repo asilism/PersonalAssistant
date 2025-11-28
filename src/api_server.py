@@ -170,9 +170,22 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Mount static files
+# Frontend paths
 frontend_path = Path(__file__).parent.parent / "frontend"
-app.mount("/static", StaticFiles(directory=str(frontend_path / "static")), name="static")
+frontend_dist_path = frontend_path / "dist"
+
+# Check if running in development mode (Vite handles frontend)
+dev_mode = os.getenv("DEV_MODE", "true").lower() == "true"
+
+# Mount static files only in production mode (when dist folder exists)
+if not dev_mode and frontend_dist_path.exists():
+    # Production: serve built assets from dist
+    app.mount("/assets", StaticFiles(directory=str(frontend_dist_path / "assets")), name="assets")
+else:
+    # Development fallback: serve from static folder (for non-Vite access)
+    static_path = frontend_path / "static"
+    if static_path.exists():
+        app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
 # Store orchestrator instances per user
 orchestrators = {}
@@ -196,7 +209,14 @@ def get_orchestrator(user_id: str, tenant: str) -> Orchestrator:
 @app.get("/", response_class=HTMLResponse)
 async def root():
     """Serve the web UI"""
-    index_file = frontend_path / "index.html"
+    # In production mode, serve from dist folder
+    if not dev_mode and frontend_dist_path.exists():
+        index_file = frontend_dist_path / "index.html"
+    else:
+        # Development mode or fallback: serve original index.html
+        # Note: In dev mode, Vite serves at port 5173, this is just a fallback
+        index_file = frontend_path / "index.html"
+
     with open(index_file, 'r', encoding='utf-8') as f:
         return f.read()
 
@@ -709,28 +729,32 @@ def main():
     print("Personal Assistant Orchestration Service - API Server")
     print("=" * 80)
     print("\nStarting server...")
-    print("- Web UI: http://localhost:8000")
-    print("- API Docs: http://localhost:8000/docs")
-    print("- Health Check: http://localhost:8000/api/health")
 
     # Check if running in development mode
-    dev_mode = os.getenv("DEV_MODE", "true").lower() == "true"
+    is_dev_mode = os.getenv("DEV_MODE", "true").lower() == "true"
 
-    if dev_mode:
-        print("\n⚡ Development mode: Hot reload enabled")
-        print("   - Backend changes will auto-reload")
-        print("   - Frontend changes will auto-reload")
+    if is_dev_mode:
+        print("\n⚡ Development mode")
+        print("   - Backend API: http://localhost:8000")
+        print("   - Frontend (Vite): http://localhost:5173  <-- Use this!")
+        print("   - API Docs: http://localhost:8000/docs")
+        print("\n   Run 'npm run dev' in frontend/ folder to start Vite dev server")
+        print("   Or use './start-dev.sh' to start both servers together")
+    else:
+        print("   - Web UI: http://localhost:8000")
+        print("   - API Docs: http://localhost:8000/docs")
+        print("   - Health Check: http://localhost:8000/api/health")
 
     print("\n" + "=" * 80 + "\n")
 
-    if dev_mode:
-        # Development mode with hot reload
+    if is_dev_mode:
+        # Development mode with hot reload (API only, frontend via Vite)
         uvicorn.run(
             "api_server:app",
             host="0.0.0.0",
             port=8000,
             reload=True,
-            reload_dirs=["src", "frontend"],
+            reload_dirs=["src"],  # Only watch backend code
             log_level="info"
         )
     else:
