@@ -1255,6 +1255,8 @@ You must decide whether to use tools or respond directly based on the user's req
 - Questions about capabilities or limitations
 - No suitable tool exists for the request
 
+IMPORTANT: Always consider the Conversation history in the Context when responding. Use information the user has shared in previous messages.
+
 ❌ FORBIDDEN BEHAVIORS:
 - Do NOT use inappropriate tools just to force tool usage
 - Do NOT create execution plans when direct response is more appropriate
@@ -1433,12 +1435,16 @@ DECIDE BASED ON THE USER'S REQUEST:
 - General knowledge questions without tool requirements
 - No suitable tool exists for the request
 - DO NOT force inappropriate tool usage!
+
+IMPORTANT: Always consider the Conversation history when responding. Use information the user has shared in previous messages.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CONTEXT:
 - Today's date: {today_str}
 - Current time: {current_time_str}
 - User request: {state.request_text}
+
+{context_str}
 
 AVAILABLE TOOLS (use these exact names):
 {tools_list_detailed}
