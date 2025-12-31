@@ -28,11 +28,12 @@ class MCPServerSettings(BaseModel):
     """MCP Server Settings model"""
     server_name: str
     enabled: bool = True
-    transport: str = "http"  # "stdio" or "http"
-    url: Optional[str] = None  # URL for HTTP transport
+    transport: str = "http"  # "stdio", "http", "streamable-http", or "sse"
+    url: Optional[str] = None  # URL for HTTP/SSE transport
     command: Optional[str] = None  # Command for STDIO transport
     args: Optional[list] = None  # Args for STDIO transport
     env_vars: Optional[Dict[str, str]] = None
+    headers: Optional[Dict[str, str]] = None  # Custom headers for HTTP/SSE transport (e.g., API keys)
 
 
 class ChatMessage(BaseModel):
@@ -236,7 +237,7 @@ class SettingsManager:
                 )
             """)
 
-            # Check if transport and url columns exist and add if missing
+            # Check if transport, url, headers columns exist and add if missing
             cursor.execute("PRAGMA table_info(mcp_server_settings)")
             mcp_columns = [row[1] for row in cursor.fetchall()]
 
@@ -249,6 +250,11 @@ class SettingsManager:
                 print("⚠️  Migrating database: Adding url column to mcp_server_settings table")
                 cursor.execute("ALTER TABLE mcp_server_settings ADD COLUMN url TEXT")
                 migrations_performed.append("url")
+
+            if "headers" not in mcp_columns:
+                print("⚠️  Migrating database: Adding headers column to mcp_server_settings table")
+                cursor.execute("ALTER TABLE mcp_server_settings ADD COLUMN headers TEXT")
+                migrations_performed.append("headers")
 
             # Create index for MCP server settings
             cursor.execute("""
@@ -592,18 +598,20 @@ class SettingsManager:
         url: Optional[str] = None,
         command: Optional[str] = None,
         args: Optional[list] = None,
-        env_vars: Optional[Dict[str, str]] = None
+        env_vars: Optional[Dict[str, str]] = None,
+        headers: Optional[Dict[str, str]] = None
     ) -> bool:
         """Save MCP server settings"""
         args_json = json.dumps(args or [])
         env_vars_json = json.dumps(env_vars or {})
+        headers_json = json.dumps(headers or {})
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
             cursor.execute("""
-                INSERT INTO mcp_server_settings (user_id, tenant, server_name, enabled, transport, url, command, args, env_vars)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO mcp_server_settings (user_id, tenant, server_name, enabled, transport, url, command, args, env_vars, headers)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_id, tenant, server_name) DO UPDATE SET
                     enabled = excluded.enabled,
                     transport = excluded.transport,
@@ -611,8 +619,9 @@ class SettingsManager:
                     command = excluded.command,
                     args = excluded.args,
                     env_vars = excluded.env_vars,
+                    headers = excluded.headers,
                     updated_at = CURRENT_TIMESTAMP
-            """, (user_id, tenant, server_name, int(enabled), transport, url, command, args_json, env_vars_json))
+            """, (user_id, tenant, server_name, int(enabled), transport, url, command, args_json, env_vars_json, headers_json))
 
             conn.commit()
 
@@ -629,7 +638,7 @@ class SettingsManager:
             cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT server_name, enabled, transport, url, command, args, env_vars
+                SELECT server_name, enabled, transport, url, command, args, env_vars, headers
                 FROM mcp_server_settings
                 WHERE user_id = ? AND tenant = ? AND server_name = ?
             """, (user_id, tenant, server_name))
@@ -637,7 +646,7 @@ class SettingsManager:
             row = cursor.fetchone()
 
             if row:
-                server_name, enabled, transport, url, command, args_json, env_vars_json = row
+                server_name, enabled, transport, url, command, args_json, env_vars_json, headers_json = row
                 return MCPServerSettings(
                     server_name=server_name,
                     enabled=bool(enabled),
@@ -645,7 +654,8 @@ class SettingsManager:
                     url=url,
                     command=command,
                     args=json.loads(args_json) if args_json else None,
-                    env_vars=json.loads(env_vars_json) if env_vars_json else None
+                    env_vars=json.loads(env_vars_json) if env_vars_json else None,
+                    headers=json.loads(headers_json) if headers_json else None
                 )
 
         return None
@@ -656,14 +666,14 @@ class SettingsManager:
             cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT server_name, enabled, transport, url, command, args, env_vars
+                SELECT server_name, enabled, transport, url, command, args, env_vars, headers
                 FROM mcp_server_settings
                 WHERE user_id = ? AND tenant = ?
             """, (user_id, tenant))
 
             servers = []
             for row in cursor.fetchall():
-                server_name, enabled, transport, url, command, args_json, env_vars_json = row
+                server_name, enabled, transport, url, command, args_json, env_vars_json, headers_json = row
                 servers.append(MCPServerSettings(
                     server_name=server_name,
                     enabled=bool(enabled),
@@ -671,7 +681,8 @@ class SettingsManager:
                     url=url,
                     command=command,
                     args=json.loads(args_json) if args_json else None,
-                    env_vars=json.loads(env_vars_json) if env_vars_json else None
+                    env_vars=json.loads(env_vars_json) if env_vars_json else None,
+                    headers=json.loads(headers_json) if headers_json else None
                 ))
 
             return servers

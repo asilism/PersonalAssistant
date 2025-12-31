@@ -1,5 +1,5 @@
 """
-MCP Executor - Connects to and executes MCP tools via Streamable-HTTP
+MCP Executor - Connects to and executes MCP tools via Streamable-HTTP or SSE
 """
 
 import asyncio
@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Any, Optional, Dict, List
 
 from fastmcp import Client
+from fastmcp.client.transports import StreamableHttpTransport, SseTransport
 
 from .types import Step, StepResult, ToolDefinition
 from .validators import validate_email
@@ -17,7 +18,7 @@ from .settings_manager import SettingsManager
 
 
 class MCPExecutor:
-    """MCPExecutor - Executes MCP tools via Streamable-HTTP using FastMCP 2.0"""
+    """MCPExecutor - Executes MCP tools via Streamable-HTTP or SSE using FastMCP 2.0"""
 
     def __init__(self, user_id: str = "test_user", tenant: str = "test_tenant"):
         self._execution_count = 0
@@ -45,14 +46,20 @@ class MCPExecutor:
 
                 try:
                     # Build server config from DB settings
+                    transport_type = server.transport or "http"
                     config = {
-                        "transport": server.transport or "http",
+                        "transport": transport_type,
                         "enabled": server.enabled
                     }
 
-                    if server.transport == "http" or server.transport == "streamable-http":
+                    if transport_type in ("http", "streamable-http"):
                         config["url"] = server.url
                         config["transport"] = "streamable-http"
+                        config["headers"] = server.headers or {}
+                    elif transport_type == "sse":
+                        config["url"] = server.url
+                        config["transport"] = "sse"
+                        config["headers"] = server.headers or {}
                     else:
                         # STDIO transport
                         config["command"] = server.command
@@ -64,7 +71,7 @@ class MCPExecutor:
                         "status": "ready" if config.get("url") or config.get("command") else "error"
                     }
 
-                    print(f"[MCPExecutor] Configured {server.server_name} from database")
+                    print(f"[MCPExecutor] Configured {server.server_name} from database (transport: {config['transport']})")
 
                 except Exception as e:
                     print(f"[MCPExecutor] Error configuring {server.server_name}: {e}")
@@ -96,14 +103,22 @@ class MCPExecutor:
 
             try:
                 config = server_info["config"]
+                transport_type = config.get("transport")
 
-                # Only support HTTP/Streamable-HTTP for now
-                if config.get("transport") != "streamable-http":
-                    print(f"[MCPExecutor] Skipping non-HTTP server: {server_name}")
+                # Only support HTTP/Streamable-HTTP and SSE for now
+                if transport_type not in ("streamable-http", "sse"):
+                    print(f"[MCPExecutor] Skipping non-HTTP/SSE server: {server_name} (transport: {transport_type})")
                     return []
 
-                # Create FastMCP client
-                client = Client(config["url"])
+                # Create transport with headers support
+                headers = config.get("headers", {})
+                if transport_type == "sse":
+                    transport = SseTransport(config["url"], headers=headers) if headers else SseTransport(config["url"])
+                else:
+                    transport = StreamableHttpTransport(config["url"], headers=headers) if headers else StreamableHttpTransport(config["url"])
+
+                # Create FastMCP client with transport
+                client = Client(transport)
 
                 async with client:
                     # List tools
@@ -307,7 +322,7 @@ class MCPExecutor:
 
     async def _execute_mcp_tool(self, server_name: str, tool_name: str, tool_input: dict[str, Any]) -> Any:
         """
-        Execute MCP tool via Streamable-HTTP connection using FastMCP 2.0
+        Execute MCP tool via Streamable-HTTP or SSE connection using FastMCP 2.0
         """
         if server_name not in self._servers:
             raise ValueError(f"Unknown server: {server_name}")
@@ -317,9 +332,17 @@ class MCPExecutor:
             raise ValueError(f"Server {server_name} is not ready")
 
         config = server_info["config"]
+        transport_type = config.get("transport", "streamable-http")
+
+        # Create transport with headers support
+        headers = config.get("headers", {})
+        if transport_type == "sse":
+            transport = SseTransport(config["url"], headers=headers) if headers else SseTransport(config["url"])
+        else:
+            transport = StreamableHttpTransport(config["url"], headers=headers) if headers else StreamableHttpTransport(config["url"])
 
         # Connect and execute via FastMCP Client
-        client = Client(config["url"])
+        client = Client(transport)
 
         async with client:
             # Call the tool

@@ -69,11 +69,12 @@ class SettingsRequest(BaseModel):
 class MCPServerRequest(BaseModel):
     server_name: str
     enabled: bool = True
-    transport: str = "http"  # "stdio" or "http"
-    url: Optional[str] = None  # URL for HTTP transport
+    transport: str = "http"  # "stdio", "http", "streamable-http", or "sse"
+    url: Optional[str] = None  # URL for HTTP/SSE transport
     command: Optional[str] = None  # Command for STDIO transport
     args: Optional[list] = None  # Args for STDIO transport
     env_vars: Optional[dict] = None
+    headers: Optional[dict] = None  # Custom headers for HTTP/SSE transport (e.g., API keys)
     user_id: Optional[str] = "test_user"
     tenant: Optional[str] = "test_tenant"
 
@@ -160,6 +161,15 @@ async def lifespan(app: FastAPI):
 
     # Cleanup on shutdown
     logger.info("Shutting down Personal Assistant...")
+
+    # Cleanup orchestrator checkpointers
+    for key, orchestrator in orchestrators.items():
+        try:
+            await orchestrator.cleanup()
+            logger.info(f"Cleaned up orchestrator: {key}")
+        except Exception as e:
+            logger.error(f"Error cleaning up orchestrator {key}: {e}")
+    orchestrators.clear()
 
 
 # Create FastAPI app with lifespan
@@ -504,7 +514,8 @@ async def get_mcp_servers(user_id: str = "test_user", tenant: str = "test_tenant
                     "url": s.url if hasattr(s, 'url') else None,
                     "command": s.command,
                     "args": s.args,
-                    "env_vars": s.env_vars
+                    "env_vars": s.env_vars,
+                    "headers": s.headers if hasattr(s, 'headers') else None
                 }
                 for s in servers
             ]
@@ -526,7 +537,8 @@ async def save_mcp_server(request: MCPServerRequest):
             url=request.url,
             command=request.command,
             args=request.args,
-            env_vars=request.env_vars
+            env_vars=request.env_vars,
+            headers=request.headers
         )
 
         if success:
@@ -598,7 +610,8 @@ async def toggle_mcp_server(server_name: str, user_id: str = "test_user", tenant
             url=server.url,
             command=server.command,
             args=server.args,
-            env_vars=server.env_vars
+            env_vars=server.env_vars,
+            headers=server.headers
         )
 
         if success:
