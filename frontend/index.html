@@ -214,22 +214,29 @@
                         <div class="form-group">
                             <label for="mcpTransport">Transport</label>
                             <select id="mcpTransport" onchange="updateMCPTransportFields()">
+                                <option value="streamable-http">Streamable HTTP (Recommended)</option>
+                                <option value="sse">SSE (Server-Sent Events)</option>
                                 <option value="stdio">STDIO (Local command)</option>
-                                <option value="http">HTTP (Remote URL)</option>
                             </select>
                         </div>
 
-                        <div class="form-group" id="mcpUrlGroup" style="display: none;">
+                        <div class="form-group" id="mcpUrlGroup">
                             <label for="mcpUrl">Server URL</label>
                             <input type="text" id="mcpUrl" placeholder="http://localhost:8001">
                         </div>
 
-                        <div class="form-group" id="mcpCommandGroup">
+                        <div class="form-group" id="mcpHeadersGroup">
+                            <label for="mcpHeaders">HTTP Headers (JSON object, optional)</label>
+                            <textarea id="mcpHeaders" placeholder='{"Authorization": "Bearer your-api-key", "X-Custom-Header": "value"}' rows="2"></textarea>
+                            <small class="form-hint">Add custom headers like API keys for authentication</small>
+                        </div>
+
+                        <div class="form-group" id="mcpCommandGroup" style="display: none;">
                             <label for="mcpCommand">Command</label>
                             <input type="text" id="mcpCommand" value="fastmcp" placeholder="fastmcp">
                         </div>
 
-                        <div class="form-group" id="mcpArgsGroup">
+                        <div class="form-group" id="mcpArgsGroup" style="display: none;">
                             <label for="mcpArgs">Arguments (JSON array)</label>
                             <textarea id="mcpArgs" placeholder='["run", "mcp_servers/my_agent/server.py"]' rows="2"></textarea>
                         </div>
