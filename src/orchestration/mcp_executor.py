@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Any, Optional, Dict, List
 
 from fastmcp import Client
-from fastmcp.client.transports import StreamableHttpTransport, SseTransport
+from fastmcp.client.transports import StreamableHttpTransport, SSETransport
 
 from .types import Step, StepResult, ToolDefinition
 from .validators import validate_email
@@ -113,7 +113,7 @@ class MCPExecutor:
                 # Create transport with headers support
                 headers = config.get("headers", {})
                 if transport_type == "sse":
-                    transport = SseTransport(config["url"], headers=headers) if headers else SseTransport(config["url"])
+                    transport = SSETransport(config["url"], headers=headers) if headers else SSETransport(config["url"])
                 else:
                     transport = StreamableHttpTransport(config["url"], headers=headers) if headers else StreamableHttpTransport(config["url"])
 
@@ -337,7 +337,7 @@ class MCPExecutor:
         # Create transport with headers support
         headers = config.get("headers", {})
         if transport_type == "sse":
-            transport = SseTransport(config["url"], headers=headers) if headers else SseTransport(config["url"])
+            transport = SSETransport(config["url"], headers=headers) if headers else SSETransport(config["url"])
         else:
             transport = StreamableHttpTransport(config["url"], headers=headers) if headers else StreamableHttpTransport(config["url"])
 
