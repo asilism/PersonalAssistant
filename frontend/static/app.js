@@ -529,19 +529,23 @@ function formatCalendarEvents(message, data) {
     html += `</div>`;
 
     data.events.forEach((event, index) => {
+        // Support both field naming conventions (title/summary, start_time/start, end_time/end)
+        const title = event.title || event.summary || 'No title';
+        const startTime = event.start_time || event.start;
+        const endTime = event.end_time || event.end;
+        const description = event.description || '';
+
         html += `
             <div class="data-item" style="margin-bottom: 12px; padding: 12px; border-left: 4px solid #4caf50; border-radius: 4px; background: #fafafa;">
                 <div style="margin-bottom: 8px;">
-                    <strong style="color: #4caf50; font-size: 14px;">${escapeHtml(event.title || 'No title')}</strong>
+                    <strong style="color: #4caf50; font-size: 14px;">${escapeHtml(title)}</strong>
                 </div>
-                <div style="margin-bottom: 6px; font-size: 12px; color: #666;">
-                    ${escapeHtml(event.description || 'No description')}
-                </div>
+                ${description ? `<div style="margin-bottom: 6px; font-size: 12px; color: #666;">${escapeHtml(description)}</div>` : ''}
                 <div style="margin-bottom: 6px; font-size: 12px;">
-                    <strong>📍 Time:</strong> ${formatDate(event.start_time)} - ${formatDate(event.end_time)}
+                    <strong>📍 Time:</strong> ${formatDate(startTime)} - ${formatDate(endTime)}
                 </div>
                 ${event.location ? `<div style="margin-bottom: 6px; font-size: 12px;"><strong>📌 Location:</strong> ${escapeHtml(event.location)}</div>` : ''}
-                ${event.attendees && event.attendees.length > 0 ? `<div style="font-size: 11px; color: #999;"><strong>👥 Attendees:</strong> ${event.attendees.map(a => escapeHtml(a)).join(', ')}</div>` : ''}
+                ${event.attendees && event.attendees.length > 0 ? `<div style="font-size: 11px; color: #999;"><strong>👥 Attendees:</strong> ${event.attendees.map(a => escapeHtml(typeof a === 'string' ? a : a.email || a.name || '')).join(', ')}</div>` : ''}
             </div>
         `;
     });
