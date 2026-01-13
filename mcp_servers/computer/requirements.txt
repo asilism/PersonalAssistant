@@ -1,0 +1,9 @@
+# Computer Control MCP Server Dependencies
+fastmcp>=0.1.0
+pyautogui>=0.9.54
+Pillow>=10.0.0
+pyperclip>=1.8.2
+
+# Note: On Linux, you may also need:
+# sudo apt-get install python3-tk python3-dev scrot
+# For headless environments: Xvfb or similar

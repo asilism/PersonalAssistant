@@ -32,6 +32,9 @@ declare -A MCP_SERVERS
 MCP_SERVERS["google-calendar"]="mcp_servers/google_calendar/server.py:8010"
 MCP_SERVERS["youtube-music"]="mcp_servers/youtube_music/server.py:8011"
 MCP_SERVERS["weather"]="mcp_servers/weather/server.py:8012"
+MCP_SERVERS["browser"]="mcp_servers/browser/server.py:8013"
+MCP_SERVERS["computer"]="mcp_servers/computer/server.py:8014"
+MCP_SERVERS["filesystem"]="mcp_servers/filesystem/server.py:8015"
 
 # Function to check if a port is in use
 check_port() {
