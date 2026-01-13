@@ -4,10 +4,11 @@ Orchestrator - Main orchestration class using LangGraph
 
 import json
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated, Optional, TypedDict
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from .types import (
     State,
@@ -61,8 +62,9 @@ class Orchestrator:
         self.listener = ResultListener(self.tracker)
         self.event_emitter = get_event_emitter()
 
-        # Initialize LangGraph checkpointer for state persistence
-        self.checkpointer = MemorySaver()
+        # LangGraph checkpointer will be initialized in _initialize (SQLite-based for persistence)
+        self.checkpointer = None
+        self._checkpointer_initialized = False
 
         # Settings and planner will be initialized on first run
         self.settings = None
@@ -75,6 +77,15 @@ class Orchestrator:
 
     async def _initialize(self):
         """Initialize settings and components"""
+        # Initialize SQLite checkpointer for persistent state
+        if not self._checkpointer_initialized:
+            checkpoint_path = Path(__file__).parent.parent.parent / "data" / "checkpoints.db"
+            checkpoint_path.parent.mkdir(exist_ok=True)
+            self.checkpointer = AsyncSqliteSaver.from_conn_string(str(checkpoint_path))
+            await self.checkpointer.__aenter__()
+            self._checkpointer_initialized = True
+            print(f"[Orchestrator] Initialized SQLite checkpointer at {checkpoint_path}")
+
         if not self.settings:
             # Initialize MCP executor and discover tools
             from .mcp_executor import MCPExecutor
@@ -754,3 +765,13 @@ class Orchestrator:
                 "message": f"Orchestration failed: {str(e)}",
                 "execution_time": execution_time
             }
+
+    async def cleanup(self):
+        """Cleanup resources including checkpointer connection"""
+        if self._checkpointer_initialized and self.checkpointer:
+            try:
+                await self.checkpointer.__aexit__(None, None, None)
+                self._checkpointer_initialized = False
+                print("[Orchestrator] Closed SQLite checkpointer connection")
+            except Exception as e:
+                print(f"[Orchestrator] Error closing checkpointer: {e}")

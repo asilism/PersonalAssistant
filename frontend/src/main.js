@@ -1195,19 +1195,22 @@ async function saveSettings() {
 function updateMCPTransportFields() {
     const transport = document.getElementById('mcpTransport').value;
     const urlGroup = document.getElementById('mcpUrlGroup');
+    const headersGroup = document.getElementById('mcpHeadersGroup');
     const commandGroup = document.getElementById('mcpCommandGroup');
     const argsGroup = document.getElementById('mcpArgsGroup');
 
-    if (transport === 'http') {
+    if (transport === 'streamable-http' || transport === 'sse' || transport === 'http') {
+        // HTTP-based transports: show URL and headers
         urlGroup.style.display = 'block';
+        headersGroup.style.display = 'block';
         commandGroup.style.display = 'none';
         argsGroup.style.display = 'none';
     } else {
-        urlGroup.style.display = 'block';
+        // STDIO transport: show command and args, hide URL and headers
+        urlGroup.style.display = 'none';
+        headersGroup.style.display = 'none';
         commandGroup.style.display = 'block';
         argsGroup.style.display = 'block';
-        // Hide URL for stdio
-        urlGroup.style.display = 'none';
     }
 }
 
@@ -1219,8 +1222,9 @@ function showAddMCPServerForm() {
     // Clear form
     document.getElementById('mcpServerName').value = '';
     document.getElementById('mcpEnabled').value = 'true';
-    document.getElementById('mcpTransport').value = 'stdio';
+    document.getElementById('mcpTransport').value = 'streamable-http';
     document.getElementById('mcpUrl').value = '';
+    document.getElementById('mcpHeaders').value = '';
     document.getElementById('mcpCommand').value = 'fastmcp';
     document.getElementById('mcpArgs').value = '';
     document.getElementById('mcpEnvVars').value = '';
@@ -1267,6 +1271,16 @@ async function loadMCPServers() {
                 html += '<div class="mcp-servers-list">';
                 data.servers.forEach(server => {
                     const transport = server.transport || 'stdio';
+                    const isHttpTransport = transport === 'http' || transport === 'streamable-http' || transport === 'sse';
+                    const hasHeaders = server.headers && Object.keys(server.headers).length > 0;
+
+                    // Transport display name
+                    const transportDisplay = {
+                        'streamable-http': 'Streamable HTTP',
+                        'sse': 'SSE',
+                        'http': 'HTTP',
+                        'stdio': 'STDIO'
+                    }[transport] || transport.toUpperCase();
 
                     // Status class based on connection status
                     let statusClass, statusText;
@@ -1304,9 +1318,10 @@ async function loadMCPServers() {
                             </div>
                             <div class="mcp-server-details">
                                 <div>
-                                    <strong>Transport:</strong> ${transport.toUpperCase()}
+                                    <strong>Transport:</strong> ${transportDisplay}
+                                    ${hasHeaders ? '<span class="badge-small">🔑 Headers</span>' : ''}
                                 </div>
-                                ${transport === 'http' || transport === 'streamable-http'
+                                ${isHttpTransport
                                     ? `<div><strong>URL:</strong> <code>${escapeHtml(server.url || 'N/A')}</code></div>`
                                     : `<div><strong>Command:</strong> <code>${escapeHtml(server.command || 'N/A')}</code></div>`
                                 }
@@ -1401,8 +1416,9 @@ async function editMCPServer(serverName) {
 
                 document.getElementById('mcpServerName').value = server.server_name;
                 document.getElementById('mcpEnabled').value = server.enabled ? 'true' : 'false';
-                document.getElementById('mcpTransport').value = server.transport || 'stdio';
+                document.getElementById('mcpTransport').value = server.transport || 'streamable-http';
                 document.getElementById('mcpUrl').value = server.url || '';
+                document.getElementById('mcpHeaders').value = server.headers ? JSON.stringify(server.headers, null, 2) : '';
                 document.getElementById('mcpCommand').value = server.command || 'fastmcp';
                 document.getElementById('mcpArgs').value = server.args ? JSON.stringify(server.args) : '';
                 document.getElementById('mcpEnvVars').value = server.env_vars ? JSON.stringify(server.env_vars) : '';
@@ -1427,6 +1443,7 @@ async function saveMCPServer() {
     const enabled = document.getElementById('mcpEnabled').value === 'true';
     const transport = document.getElementById('mcpTransport').value;
     const url = document.getElementById('mcpUrl').value;
+    const headersText = document.getElementById('mcpHeaders').value;
     const command = document.getElementById('mcpCommand').value;
     const argsText = document.getElementById('mcpArgs').value;
     const envVarsText = document.getElementById('mcpEnvVars').value;
@@ -1439,8 +1456,10 @@ async function saveMCPServer() {
     }
 
     // Validate based on transport type
-    if (transport === 'http' && !url) {
-        resultDiv.innerHTML = '<div class="result-error">Please enter a server URL for HTTP transport</div>';
+    const isHttpTransport = transport === 'http' || transport === 'streamable-http' || transport === 'sse';
+
+    if (isHttpTransport && !url) {
+        resultDiv.innerHTML = '<div class="result-error">Please enter a server URL for HTTP/SSE transport</div>';
         return;
     }
 
@@ -1452,6 +1471,7 @@ async function saveMCPServer() {
     // Parse JSON
     let args = [];
     let envVars = null;
+    let headers = null;
 
     try {
         if (argsText) {
@@ -1460,8 +1480,11 @@ async function saveMCPServer() {
         if (envVarsText) {
             envVars = JSON.parse(envVarsText);
         }
+        if (headersText) {
+            headers = JSON.parse(headersText);
+        }
     } catch (e) {
-        resultDiv.innerHTML = '<div class="result-error">Invalid JSON in arguments or environment variables</div>';
+        resultDiv.innerHTML = '<div class="result-error">Invalid JSON in arguments, headers, or environment variables</div>';
         return;
     }
 
@@ -1479,8 +1502,11 @@ async function saveMCPServer() {
         };
 
         // Add transport-specific fields
-        if (transport === 'http') {
+        if (isHttpTransport) {
             requestBody.url = url;
+            if (headers) {
+                requestBody.headers = headers;
+            }
         } else {
             requestBody.command = command;
             requestBody.args = args;
