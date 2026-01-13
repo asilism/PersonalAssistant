@@ -641,6 +641,7 @@ class Orchestrator:
                 payload = final_state.get("final_payload", {})
                 response_message = payload.get("message", "Task completed successfully")
                 result_data = payload.get("data")
+                data_type = payload.get("data_type")  # For frontend formatting
 
                 # Save assistant response to chat history
                 await self.tracker.save_assistant_message(
@@ -671,7 +672,8 @@ class Orchestrator:
                     success=True,
                     message=response_message,
                     execution_time=execution_time,
-                    results=result_data
+                    results=result_data,
+                    data_type=data_type
                 )
 
                 return {
