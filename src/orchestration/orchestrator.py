@@ -3,6 +3,7 @@ Orchestrator - Main orchestration class using LangGraph
 """
 
 import json
+import aiosqlite
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Optional, TypedDict
@@ -64,7 +65,7 @@ class Orchestrator:
 
         # LangGraph checkpointer will be initialized in _initialize (SQLite-based for persistence)
         self.checkpointer = None
-        self._checkpointer_cm = None  # Context manager for cleanup
+        self._db_conn = None  # aiosqlite connection
         self._checkpointer_initialized = False
 
         # Settings and planner will be initialized on first run
@@ -82,9 +83,9 @@ class Orchestrator:
         if not self._checkpointer_initialized:
             checkpoint_path = Path(__file__).parent.parent.parent / "data" / "checkpoints.db"
             checkpoint_path.parent.mkdir(exist_ok=True)
-            # from_conn_string returns an async context manager, need to store both
-            self._checkpointer_cm = AsyncSqliteSaver.from_conn_string(str(checkpoint_path))
-            self.checkpointer = await self._checkpointer_cm.__aenter__()
+            # Use aiosqlite directly for cleaner connection management
+            self._db_conn = await aiosqlite.connect(str(checkpoint_path))
+            self.checkpointer = AsyncSqliteSaver(self._db_conn)
             self._checkpointer_initialized = True
             print(f"[Orchestrator] Initialized SQLite checkpointer at {checkpoint_path}")
 
@@ -770,12 +771,12 @@ class Orchestrator:
 
     async def cleanup(self):
         """Cleanup resources including checkpointer connection"""
-        if self._checkpointer_initialized and self._checkpointer_cm:
+        if self._checkpointer_initialized and self._db_conn:
             try:
-                await self._checkpointer_cm.__aexit__(None, None, None)
+                await self._db_conn.close()
                 self._checkpointer_initialized = False
                 self.checkpointer = None
-                self._checkpointer_cm = None
+                self._db_conn = None
                 print("[Orchestrator] Closed SQLite checkpointer connection")
             except Exception as e:
                 print(f"[Orchestrator] Error closing checkpointer: {e}")
