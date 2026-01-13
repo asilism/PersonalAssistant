@@ -1,0 +1,2 @@
+# Filesystem MCP Server Dependencies (Read + Create Only)
+fastmcp>=0.1.0
