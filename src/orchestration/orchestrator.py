@@ -64,6 +64,7 @@ class Orchestrator:
 
         # LangGraph checkpointer will be initialized in _initialize (SQLite-based for persistence)
         self.checkpointer = None
+        self._checkpointer_cm = None  # Context manager for cleanup
         self._checkpointer_initialized = False
 
         # Settings and planner will be initialized on first run
@@ -81,8 +82,9 @@ class Orchestrator:
         if not self._checkpointer_initialized:
             checkpoint_path = Path(__file__).parent.parent.parent / "data" / "checkpoints.db"
             checkpoint_path.parent.mkdir(exist_ok=True)
-            self.checkpointer = AsyncSqliteSaver.from_conn_string(str(checkpoint_path))
-            await self.checkpointer.__aenter__()
+            # from_conn_string returns an async context manager, need to store both
+            self._checkpointer_cm = AsyncSqliteSaver.from_conn_string(str(checkpoint_path))
+            self.checkpointer = await self._checkpointer_cm.__aenter__()
             self._checkpointer_initialized = True
             print(f"[Orchestrator] Initialized SQLite checkpointer at {checkpoint_path}")
 
@@ -768,10 +770,12 @@ class Orchestrator:
 
     async def cleanup(self):
         """Cleanup resources including checkpointer connection"""
-        if self._checkpointer_initialized and self.checkpointer:
+        if self._checkpointer_initialized and self._checkpointer_cm:
             try:
-                await self.checkpointer.__aexit__(None, None, None)
+                await self._checkpointer_cm.__aexit__(None, None, None)
                 self._checkpointer_initialized = False
+                self.checkpointer = None
+                self._checkpointer_cm = None
                 print("[Orchestrator] Closed SQLite checkpointer connection")
             except Exception as e:
                 print(f"[Orchestrator] Error closing checkpointer: {e}")
