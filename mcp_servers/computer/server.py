@@ -396,19 +396,19 @@ async def keyboard_press(
 
 
 @mcp.tool()
-async def keyboard_hotkey(*keys: str) -> dict:
+async def keyboard_hotkey(keys: list[str]) -> dict:
     """
     단축키 조합을 입력합니다.
 
     Args:
-        keys: 키 조합 (예: "ctrl", "c"를 개별 인자로)
+        keys: 키 조합 리스트 (예: ["ctrl", "c"])
 
     Returns:
         단축키 입력 결과
 
     예시:
-        keyboard_hotkey("ctrl", "c")  # Ctrl+C
-        keyboard_hotkey("ctrl", "alt", "delete")  # Ctrl+Alt+Delete
+        keyboard_hotkey(["ctrl", "c"])  # Ctrl+C
+        keyboard_hotkey(["ctrl", "alt", "delete"])  # Ctrl+Alt+Delete
     """
     check_pyautogui()
 
