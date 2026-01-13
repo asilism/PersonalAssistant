@@ -349,7 +349,20 @@ function formatResults(results) {
     return escapeHtml(String(results));
 }
 
-// Formatter registry - maps data_type to formatter function
+/**
+ * Formatter Registry - Maps data_type to formatter function
+ *
+ * HOW TO ADD A NEW FORMATTER:
+ * 1. Create a formatter function: function formatYourType(message, data) { ... }
+ * 2. Add entry here: 'your_type': formatYourType
+ * 3. Update planner.py data_type list
+ * 4. Sync changes to frontend/src/main.js
+ *
+ * NOTE: If data_type is not registered, formatGenericData will auto-render
+ * arrays as tables and objects as key-value pairs.
+ *
+ * See: mcp_servers/DEVELOPMENT_GUIDE.md for full documentation
+ */
 const dataTypeFormatters = {
     'jira_issues': formatJiraIssues,
     'emails': formatEmails,
