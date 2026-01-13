@@ -234,7 +234,8 @@ class ExecutionEventEmitter:
         success: bool,
         message: str,
         execution_time: float,
-        results: Optional[dict] = None
+        results: Optional[dict] = None,
+        data_type: Optional[str] = None
     ):
         """Emit execution completed event"""
         event_data = {
@@ -242,6 +243,10 @@ class ExecutionEventEmitter:
             "message": message,
             "execution_time": execution_time
         }
+
+        # Include data_type if provided (for frontend formatting)
+        if data_type is not None:
+            event_data["data_type"] = data_type
 
         # Include results if provided
         if results is not None:

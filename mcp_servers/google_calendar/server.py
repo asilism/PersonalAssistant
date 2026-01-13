@@ -82,11 +82,14 @@ def format_event(event: dict) -> dict:
 
     return {
         "id": event.get("id"),
-        "summary": event.get("summary", "(No title)"),
+        "title": event.get("summary", "(No title)"),
+        "summary": event.get("summary", "(No title)"),  # Keep for backward compatibility
         "description": event.get("description", ""),
         "location": event.get("location", ""),
-        "start": start.get("dateTime") or start.get("date"),
-        "end": end.get("dateTime") or end.get("date"),
+        "start_time": start.get("dateTime") or start.get("date"),
+        "end_time": end.get("dateTime") or end.get("date"),
+        "start": start.get("dateTime") or start.get("date"),  # Keep for backward compatibility
+        "end": end.get("dateTime") or end.get("date"),  # Keep for backward compatibility
         "attendees": [
             {
                 "email": a.get("email"),

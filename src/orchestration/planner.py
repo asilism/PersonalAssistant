@@ -1628,11 +1628,12 @@ When returning "final" type, you MUST include the ACTUAL step output data in pay
   }}}}
 }}}}
 
-✅ CORRECT - Include actual results in data field:
+✅ CORRECT - Include actual results in data field with data_type:
 {{{{
   "type": "final",
   "payload": {{{{
     "message": "Found 1 critical issue",
+    "data_type": "jira_issues",
     "data": {{{{
       "issues": [...actual issue objects from step output...]
     }}}}
@@ -1641,6 +1642,18 @@ When returning "final" type, you MUST include the ACTUAL step output data in pay
 
 RULE: The user needs to SEE the actual results (issues, events, calculation results, etc.)
 Copy the relevant data from the step outputs into payload.data!
+
+IMPORTANT: Always include "data_type" field to specify the type of data being returned.
+Available data_type values:
+- "jira_issues" - for Jira issue search results
+- "calendar_events" - for calendar event lists
+- "emails" - for email search results
+- "news_articles" - for news article lists
+- "report" - for generated reports (markdown/html/text)
+- "attendance" - for meeting attendance summaries
+- "calculator" - for calculation results
+- "weather" - for weather information
+- "generic" - for any other data types (will be auto-formatted)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CORRECT RESPONSE EXAMPLES:
@@ -1651,7 +1664,8 @@ Example 1 - Task completed (multiplication was performed):
   "reason": "User asked for multiplication of 123 and 456. The multiply tool successfully computed the result as 56088.",
   "payload": {{{{
     "message": "계산이 완료되었습니다. 123 × 456 = 56088",
-    "data": 56088
+    "data_type": "calculator",
+    "data": {{{{ "operation": "multiply", "operands": [123, 456], "result": 56088 }}}}
   }}}}
 }}}}
 
@@ -1661,6 +1675,7 @@ Example 2 - Task completed (Jira issues found):
   "reason": "User asked for critical Jira issues. The search_issues tool found 1 critical issue.",
   "payload": {{{{
     "message": "Critical 이슈 1건을 찾았습니다.",
+    "data_type": "jira_issues",
     "data": {{{{
       "count": 1,
       "issues": [
@@ -1681,11 +1696,12 @@ Example 3 - Task completed (calendar events listed):
   "reason": "User asked for this week's events. The list_events tool returned 3 events.",
   "payload": {{{{
     "message": "이번 주 일정 3건을 찾았습니다.",
+    "data_type": "calendar_events",
     "data": {{{{
       "events": [
-        {{{{"id": "evt_1", "title": "Team Meeting", "start": "2025-11-22T10:00:00"}}}},
-        {{{{"id": "evt_2", "title": "Project Review", "start": "2025-11-23T14:00:00"}}}},
-        {{{{"id": "evt_3", "title": "Client Call", "start": "2025-11-24T15:00:00"}}}}
+        {{{{"id": "evt_1", "title": "Team Meeting", "start_time": "2025-11-22T10:00:00"}}}},
+        {{{{"id": "evt_2", "title": "Project Review", "start_time": "2025-11-23T14:00:00"}}}},
+        {{{{"id": "evt_3", "title": "Client Call", "start_time": "2025-11-24T15:00:00"}}}}
       ]
     }}}}
   }}}}

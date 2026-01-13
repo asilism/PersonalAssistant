@@ -257,7 +257,8 @@ async function executeRequest() {
                         finalMessage = eventData.message;
                         // Check if there's structured data to display
                         if (eventData.data && eventData.data.results) {
-                            finalMessage = formatExecutionResults(eventData.message, eventData.data.results);
+                            const dataType = eventData.data.data_type;
+                            finalMessage = formatExecutionResults(eventData.message, eventData.data.results, dataType);
                         }
                     }
                 } catch (e) {
@@ -351,8 +352,40 @@ function formatResults(results) {
     return escapeHtml(String(results));
 }
 
+/**
+ * Formatter Registry - Maps data_type to formatter function
+ *
+ * HOW TO ADD A NEW FORMATTER:
+ * 1. Create a formatter function: function formatYourType(message, data) { ... }
+ * 2. Add entry here: 'your_type': formatYourType
+ * 3. Update planner.py data_type list
+ * 4. Sync changes to frontend/static/app.js
+ *
+ * NOTE: If data_type is not registered, formatGenericData will auto-render
+ * arrays as tables and objects as key-value pairs.
+ *
+ * See: mcp_servers/DEVELOPMENT_GUIDE.md for full documentation
+ */
+const dataTypeFormatters = {
+    'jira_issues': formatJiraIssues,
+    'emails': formatEmails,
+    'calendar_events': formatCalendarEvents,
+    'news_articles': formatNewsArticles,
+    'report': formatReport,
+    'attendance': formatAttendanceSummary,
+    'calculator': formatCalculatorResult,
+    'weather': formatWeatherData,
+    'generic': formatGenericData
+};
+
 // Format execution results (e.g., Jira issues, emails, calendar events, etc.)
-function formatExecutionResults(message, data) {
+function formatExecutionResults(message, data, dataType) {
+    // 1. First, try data_type based routing (preferred)
+    if (dataType && dataTypeFormatters[dataType]) {
+        return dataTypeFormatters[dataType](message, data);
+    }
+
+    // 2. Fallback: field-based detection for backward compatibility
     // Jira issues
     if (data.issues && Array.isArray(data.issues)) {
         return formatJiraIssues(message, data);
@@ -403,7 +436,12 @@ function formatExecutionResults(message, data) {
         return formatEmails(message, { emails: [data.email], count: 1 });
     }
 
-    // Generic formatter for other data types
+    // Weather data
+    if (data.current && (data.current.temperature !== undefined || data.current.temp !== undefined)) {
+        return formatWeatherData(message, data);
+    }
+
+    // 3. Generic formatter for unknown data types
     return formatGenericData(message, data);
 }
 
@@ -626,16 +664,171 @@ function formatCalculatorResult(message, data) {
     return html;
 }
 
-// Format generic data
+// Format weather data
+function formatWeatherData(message, data) {
+    let html = `<div class="message-text">${escapeHtml(message)}</div>`;
+    html += `<div class="data-container" style="margin-top: 15px;">`;
+
+    // Location info
+    if (data.location) {
+        const loc = data.location;
+        html += `<div style="margin-bottom: 10px; padding: 8px; background: #e3f2fd; border-radius: 4px;">`;
+        html += `<strong>📍 ${escapeHtml(loc.name || loc.city || 'Unknown location')}</strong>`;
+        if (loc.country) html += ` (${escapeHtml(loc.country)})`;
+        html += `</div>`;
+    }
+
+    // Current weather
+    if (data.current) {
+        const current = data.current;
+        const temp = current.temperature ?? current.temp ?? current.temp_c ?? 'N/A';
+        const humidity = current.humidity ?? 'N/A';
+        const condition = current.condition?.text || current.weather || current.description || '';
+        const feelsLike = current.feels_like ?? current.feelslike_c ?? null;
+
+        html += `<div class="data-item" style="padding: 15px; border-left: 4px solid #2196F3; border-radius: 4px; background: #fafafa;">`;
+        html += `<div style="font-size: 24px; font-weight: bold; color: #1976D2;">🌡️ ${temp}°C</div>`;
+        if (feelsLike !== null) {
+            html += `<div style="color: #666; font-size: 13px;">체감 온도: ${feelsLike}°C</div>`;
+        }
+        if (condition) {
+            html += `<div style="margin-top: 8px; color: #333;">${escapeHtml(condition)}</div>`;
+        }
+        html += `<div style="margin-top: 8px; color: #666;">💧 습도: ${humidity}%</div>`;
+        if (current.wind_kph || current.wind_speed) {
+            html += `<div style="color: #666;">💨 바람: ${current.wind_kph || current.wind_speed} km/h</div>`;
+        }
+        html += `</div>`;
+    }
+
+    html += `</div>`;
+    return html;
+}
+
 function formatGenericData(message, data) {
     let html = `<div class="message-text">${escapeHtml(message)}</div>`;
     html += `<div style="margin-top: 10px;">`;
-    html += `<details style="cursor: pointer;">`;
-    html += `<summary style="font-weight: 500; color: #1976D2; padding: 8px; background: #f5f5f5; border-radius: 4px;">📦 View detailed results</summary>`;
-    html += `<pre style="margin: 10px 0 0 0; padding: 10px; background: #f5f5f5; border-radius: 4px; overflow-x: auto; font-size: 12px; line-height: 1.5;">${JSON.stringify(data, null, 2)}</pre>`;
-    html += `</details>`;
+
+    // Try to render data intelligently based on structure
+    const rendered = renderDataIntelligently(data);
+    if (rendered) {
+        html += rendered;
+    } else {
+        // Fallback to JSON view
+        html += `<details style="cursor: pointer;">`;
+        html += `<summary style="font-weight: 500; color: #1976D2; padding: 8px; background: #f5f5f5; border-radius: 4px;">📦 View detailed results</summary>`;
+        html += `<pre style="margin: 10px 0 0 0; padding: 10px; background: #f5f5f5; border-radius: 4px; overflow-x: auto; font-size: 12px; line-height: 1.5;">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
+        html += `</details>`;
+    }
+
     html += `</div>`;
     return html;
+}
+
+// Intelligently render data based on its structure
+function renderDataIntelligently(data) {
+    if (data === null || data === undefined) return null;
+
+    // If it's a primitive, just show it
+    if (typeof data !== 'object') {
+        return `<div style="padding: 10px; background: #f5f5f5; border-radius: 4px;">${escapeHtml(String(data))}</div>`;
+    }
+
+    // Find array fields to render as table
+    const arrayFields = Object.entries(data).filter(([_, v]) => Array.isArray(v) && v.length > 0);
+
+    if (arrayFields.length > 0) {
+        let html = '';
+
+        // Show non-array fields first as summary
+        const nonArrayFields = Object.entries(data).filter(([_, v]) => !Array.isArray(v));
+        if (nonArrayFields.length > 0) {
+            html += `<div style="margin-bottom: 10px; padding: 8px; background: #e8f5e9; border-radius: 4px;">`;
+            nonArrayFields.forEach(([key, value]) => {
+                if (value !== null && value !== undefined && typeof value !== 'object') {
+                    html += `<span style="margin-right: 15px;"><strong>${escapeHtml(formatFieldName(key))}:</strong> ${escapeHtml(String(value))}</span>`;
+                }
+            });
+            html += `</div>`;
+        }
+
+        // Render each array as a table
+        arrayFields.forEach(([fieldName, items]) => {
+            html += renderArrayAsTable(fieldName, items);
+        });
+
+        return html;
+    }
+
+    // If it's a flat object, render as key-value pairs
+    const entries = Object.entries(data);
+    if (entries.length > 0 && entries.every(([_, v]) => typeof v !== 'object' || v === null)) {
+        let html = `<div style="padding: 10px; background: #f5f5f5; border-radius: 4px;">`;
+        entries.forEach(([key, value]) => {
+            html += `<div style="margin-bottom: 5px;"><strong>${escapeHtml(formatFieldName(key))}:</strong> ${escapeHtml(String(value ?? 'N/A'))}</div>`;
+        });
+        html += `</div>`;
+        return html;
+    }
+
+    return null; // Fall back to JSON view
+}
+
+// Render array as HTML table
+function renderArrayAsTable(fieldName, items) {
+    if (!items || items.length === 0) return '';
+
+    // Get all unique keys from items
+    const allKeys = [...new Set(items.flatMap(item => Object.keys(item || {})))];
+    // Filter out complex nested objects and limit columns
+    const columns = allKeys.filter(key => {
+        const sampleValue = items.find(i => i && i[key] !== undefined)?.[key];
+        return typeof sampleValue !== 'object' || sampleValue === null;
+    }).slice(0, 6); // Limit to 6 columns for readability
+
+    if (columns.length === 0) return '';
+
+    let html = `<div style="margin-bottom: 15px;">`;
+    html += `<div style="font-weight: 500; margin-bottom: 8px; color: #1976D2;">📋 ${escapeHtml(formatFieldName(fieldName))} (${items.length})</div>`;
+    html += `<div style="overflow-x: auto;">`;
+    html += `<table style="width: 100%; border-collapse: collapse; font-size: 13px;">`;
+
+    // Header
+    html += `<thead><tr style="background: #e3f2fd;">`;
+    columns.forEach(col => {
+        html += `<th style="padding: 8px; text-align: left; border-bottom: 2px solid #1976D2;">${escapeHtml(formatFieldName(col))}</th>`;
+    });
+    html += `</tr></thead>`;
+
+    // Body
+    html += `<tbody>`;
+    items.slice(0, 20).forEach((item, idx) => { // Limit to 20 rows
+        html += `<tr style="background: ${idx % 2 === 0 ? '#fff' : '#f9f9f9'};">`;
+        columns.forEach(col => {
+            const value = item?.[col];
+            let displayValue = value ?? '';
+            // Format dates
+            if (typeof displayValue === 'string' && displayValue.match(/^\d{4}-\d{2}-\d{2}T/)) {
+                displayValue = formatDate(displayValue);
+            }
+            html += `<td style="padding: 8px; border-bottom: 1px solid #eee;">${escapeHtml(String(displayValue))}</td>`;
+        });
+        html += `</tr>`;
+    });
+    if (items.length > 20) {
+        html += `<tr><td colspan="${columns.length}" style="padding: 8px; text-align: center; color: #666;">... and ${items.length - 20} more items</td></tr>`;
+    }
+    html += `</tbody></table></div></div>`;
+
+    return html;
+}
+
+// Format field name for display (snake_case -> Title Case)
+function formatFieldName(name) {
+    return name
+        .replace(/_/g, ' ')
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/\b\w/g, c => c.toUpperCase());
 }
 
 // Get priority color
