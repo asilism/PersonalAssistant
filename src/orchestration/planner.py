@@ -1930,15 +1930,12 @@ Remember: Your response must start with {{ "type": not with anything else!
 
         if results.failed_steps:
             lines.append("")
-            lines.append("⚠️ FAILED STEPS (ANALYZE ERRORS CAREFULLY):")
+            lines.append("⚠️ FAILED STEPS:")
             for step_result in results.failed_steps:
                 lines.append(f"  - {step_result.step_id}: {step_result.error}")
             lines.append("")
-            lines.append("🔍 ERROR ANALYSIS INSTRUCTIONS:")
-            lines.append("  - If error mentions 'Missing required argument': You forgot a required parameter")
-            lines.append("  - If error mentions 'Unexpected keyword argument': You used a parameter that doesn't exist in the schema")
-            lines.append("  - SOLUTION: Check the tool's input_schema above and use ONLY the defined parameters")
-            lines.append("  - When retrying, FIX the parameters based on the actual schema, don't repeat the same mistake!")
+            lines.append("🔍 RETRY INSTRUCTION: Read the error message above carefully. ")
+            lines.append("   Understand WHY it failed, then fix the issue when creating nextSteps.")
 
         # Add pending steps (not yet executed)
         if plan:

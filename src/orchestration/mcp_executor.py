@@ -258,6 +258,11 @@ class MCPExecutor:
         Returns:
             Error message if validation fails, None if valid
         """
+        # Schema-based validation
+        schema_error = self._validate_against_schema(tool_name, tool_input)
+        if schema_error:
+            return schema_error
+
         # Email validation for send_email tool
         if tool_name == "send_email":
             to_field = tool_input.get("to", "")
@@ -284,6 +289,60 @@ class MCPExecutor:
                     return f"Email validation failed: {error_msg}"
 
         # Add more validations for other tools as needed
+
+        return None
+
+    def _validate_against_schema(self, tool_name: str, tool_input: dict) -> Optional[str]:
+        """
+        Validate tool input against the tool's input_schema.
+
+        Checks:
+        1. Required parameters are present
+        2. No unexpected parameters are provided
+
+        Args:
+            tool_name: Name of the tool
+            tool_input: Input parameters for the tool
+
+        Returns:
+            Error message if validation fails, None if valid
+        """
+        # Get tool definition
+        tool_def = self._available_tools.get(tool_name)
+        if not tool_def or not tool_def.input_schema:
+            # No schema available, skip validation
+            return None
+
+        schema = tool_def.input_schema
+        properties = schema.get("properties", {})
+        required = schema.get("required", [])
+
+        # Check for missing required parameters
+        missing_params = []
+        for param in required:
+            if param not in tool_input:
+                missing_params.append(param)
+
+        if missing_params:
+            return (
+                f"Schema validation failed for '{tool_name}': "
+                f"Missing required parameter(s): {missing_params}. "
+                f"Required: {required}. Provided: {list(tool_input.keys())}"
+            )
+
+        # Check for unexpected parameters (not in schema properties)
+        if properties:
+            unexpected_params = []
+            for param in tool_input.keys():
+                if param not in properties:
+                    unexpected_params.append(param)
+
+            if unexpected_params:
+                return (
+                    f"Schema validation failed for '{tool_name}': "
+                    f"Unexpected parameter(s): {unexpected_params}. "
+                    f"Valid parameters: {list(properties.keys())}"
+                )
 
         return None
 
