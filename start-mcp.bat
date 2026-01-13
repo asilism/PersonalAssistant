@@ -60,8 +60,23 @@ echo   [OK] youtube-music starting on port 8011
 
 :: Start Weather server (port 8012)
 echo Starting weather server...
-start /b "" python "%SCRIPT_DIR%mcp_servers\weather\server.py" > "%LOG_DIR%\weather-music.log" 2>&1
+start /b "" python "%SCRIPT_DIR%mcp_servers\weather\server.py" > "%LOG_DIR%\weather.log" 2>&1
 echo   [OK] weather starting on port 8012
+
+:: Start Browser server (port 8013)
+echo Starting browser server...
+start /b "" python "%SCRIPT_DIR%mcp_servers\browser\server.py" > "%LOG_DIR%\browser.log" 2>&1
+echo   [OK] browser starting on port 8013
+
+:: Start Computer server (port 8014)
+echo Starting computer server...
+start /b "" python "%SCRIPT_DIR%mcp_servers\computer\server.py" > "%LOG_DIR%\computer.log" 2>&1
+echo   [OK] computer starting on port 8014
+
+:: Start Filesystem server (port 8015)
+echo Starting filesystem server...
+start /b "" python "%SCRIPT_DIR%mcp_servers\filesystem\server.py" > "%LOG_DIR%\filesystem.log" 2>&1
+echo   [OK] filesystem starting on port 8015
 
 :: Wait a moment for servers to start
 timeout /t 2 /nobreak >nul
@@ -75,6 +90,9 @@ echo Server URLs:
 echo   - google-calendar: http://localhost:8010
 echo   - youtube-music:   http://localhost:8011
 echo   - weather:         http://localhost:8012
+echo   - browser:         http://localhost:8013
+echo   - computer:        http://localhost:8014
+echo   - filesystem:      http://localhost:8015
 echo.
 echo Log files: %LOG_DIR%\
 echo.
@@ -89,7 +107,7 @@ echo.
 echo Stopping MCP servers...
 
 :: Kill Python processes on MCP ports
-for %%p in (8010 8011 8012) do (
+for %%p in (8010 8011 8012 8013 8014 8015) do (
     for /f "tokens=5" %%a in ('netstat -ano ^| findstr :%%p ^| findstr LISTENING 2^>nul') do (
         taskkill /PID %%a /F >nul 2>&1
         echo   Stopped process on port %%p
@@ -126,6 +144,30 @@ if %errorlevel% equ 0 (
     echo   [RUNNING] weather - http://localhost:8012
 ) else (
     echo   [STOPPED] weather - port 8012
+)
+
+:: Check Browser (8013)
+netstat -ano | findstr :8013 | findstr LISTENING >nul 2>&1
+if %errorlevel% equ 0 (
+    echo   [RUNNING] browser - http://localhost:8013
+) else (
+    echo   [STOPPED] browser - port 8013
+)
+
+:: Check Computer (8014)
+netstat -ano | findstr :8014 | findstr LISTENING >nul 2>&1
+if %errorlevel% equ 0 (
+    echo   [RUNNING] computer - http://localhost:8014
+) else (
+    echo   [STOPPED] computer - port 8014
+)
+
+:: Check Filesystem (8015)
+netstat -ano | findstr :8015 | findstr LISTENING >nul 2>&1
+if %errorlevel% equ 0 (
+    echo   [RUNNING] filesystem - http://localhost:8015
+) else (
+    echo   [STOPPED] filesystem - port 8015
 )
 
 echo ----------------------------------------
