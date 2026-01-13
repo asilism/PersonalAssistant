@@ -1261,7 +1261,20 @@ User request: {state.request_text}
 Context:
 {context_str}
 
-CRITICAL: You MUST use ONLY the exact tool names listed above. DO NOT create variations or guess tool names.
+🚨 CRITICAL - TOOL PARAMETER SCHEMA COMPLIANCE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. You MUST use ONLY the exact tool names listed above
+2. You MUST use ONLY the parameters defined in each tool's "input_schema"
+3. DO NOT invent, guess, or add parameters that are not in the schema
+4. Check the "required" fields - these parameters MUST be provided
+5. Check the "properties" for all valid parameter names
+
+Example - If tool schema is:
+  "input_schema": {{"type": "object", "properties": {{"query": {{"type": "string"}}}}, "required": ["query"]}}
+
+✅ CORRECT: {{"query": "search term"}}
+❌ WRONG: {{"artist": "name", "genre": "rock"}}  ← These parameters don't exist!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 FOLLOW-UP REQUESTS: When the user references previous results, check PREVIOUS EXECUTION RESULTS in Context, extract actual values, and create an execution plan. Do not ask for clarification if the information is already available.
 
@@ -1361,6 +1374,21 @@ CONTEXT:
 
 AVAILABLE TOOLS (use these exact names):
 {tools_list_detailed}
+
+🚨 CRITICAL - TOOL PARAMETER SCHEMA COMPLIANCE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Use ONLY the exact tool names listed above
+2. Use ONLY the parameters defined in each tool's "input_schema"
+3. DO NOT invent or guess parameters - check the schema!
+4. Check "required" fields - these MUST be provided
+5. Check "properties" for all valid parameter names
+
+Example - If tool schema is:
+  "input_schema": {{"properties": {{"query": {{"type": "string"}}}}, "required": ["query"]}}
+
+✅ CORRECT: {{"query": "search term"}}
+❌ WRONG: {{"artist": "name", "genre": "rock"}}  ← These don't exist in schema!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ⚠️ MANDATORY RESPONSE FORMAT - Choose ONE:
 
@@ -1528,7 +1556,20 @@ Context:
 Available tools (you MUST use these exact tool names):
 {tools_list_detailed}
 
-CRITICAL: You MUST use ONLY the exact tool names listed above. DO NOT create variations or guess tool names.
+🚨 CRITICAL - TOOL PARAMETER SCHEMA COMPLIANCE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. You MUST use ONLY the exact tool names listed above
+2. You MUST use ONLY the parameters defined in each tool's "input_schema"
+3. DO NOT invent, guess, or add parameters that are not in the schema
+4. Check the "required" fields in input_schema - these MUST be provided
+5. Check the "properties" in input_schema for valid parameter names
+
+Example - If tool schema is:
+  "input_schema": {{"type": "object", "properties": {{"query": {{"type": "string"}}}}, "required": ["query"]}}
+
+✅ CORRECT: {{"query": "search term"}}
+❌ WRONG: {{"artist": "name", "genre": "rock"}}  ← These parameters don't exist!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Execution results (all steps have been executed):
 {results_summary}
@@ -1731,6 +1772,23 @@ CONTEXT INFORMATION:
 - Current time: {current_time_str}
 - Original user request: {state.request_text}
 
+AVAILABLE TOOLS (use ONLY these):
+{tools_list_detailed}
+
+🚨 CRITICAL - TOOL PARAMETER SCHEMA COMPLIANCE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Use ONLY the exact tool names listed above
+2. Use ONLY the parameters defined in each tool's "input_schema"
+3. DO NOT invent or guess parameters - check the schema!
+4. If a step failed with "Unexpected keyword argument" - you used wrong parameters!
+
+Example - If tool schema is:
+  "input_schema": {{"properties": {{"query": {{"type": "string"}}}}, "required": ["query"]}}
+
+✅ CORRECT: {{"query": "search term"}}
+❌ WRONG: {{"artist": "name", "genre": "rock"}}  ← These don't exist in schema!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 EXECUTION RESULTS:
 {results_summary}
 
@@ -1872,9 +1930,12 @@ Remember: Your response must start with {{ "type": not with anything else!
 
         if results.failed_steps:
             lines.append("")
-            lines.append("Failed steps:")
+            lines.append("⚠️ FAILED STEPS:")
             for step_result in results.failed_steps:
                 lines.append(f"  - {step_result.step_id}: {step_result.error}")
+            lines.append("")
+            lines.append("🔍 RETRY INSTRUCTION: Read the error message above carefully. ")
+            lines.append("   Understand WHY it failed, then fix the issue when creating nextSteps.")
 
         # Add pending steps (not yet executed)
         if plan:
