@@ -10,7 +10,21 @@ import os
 import sys
 from datetime import datetime, timedelta
 from typing import Optional
-from zoneinfo import ZoneInfo
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    # Python < 3.9 fallback
+    from backports.zoneinfo import ZoneInfo
+
+# Ensure tzdata is available for zoneinfo
+try:
+    ZoneInfo("Asia/Seoul")
+except KeyError:
+    raise ImportError(
+        "Timezone data not found. Please install the 'tzdata' package: "
+        "pip install tzdata"
+    )
 
 from fastmcp import FastMCP
 from googleapiclient.discovery import build
