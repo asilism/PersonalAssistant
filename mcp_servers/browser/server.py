@@ -407,7 +407,8 @@ async def browse_with_javascript(
     url: str,
     wait_for_selector: Optional[str] = None,
     execute_script: Optional[str] = None,
-    extract_selector: Optional[str] = None
+    extract_selector: Optional[str] = None,
+    wait_until: str = "load"
 ) -> dict:
     """
     JavaScript가 필요한 동적 페이지를 브라우징합니다. (Playwright 필요)
@@ -417,6 +418,9 @@ async def browse_with_javascript(
         wait_for_selector: 이 셀렉터가 나타날 때까지 대기
         execute_script: 실행할 JavaScript 코드
         extract_selector: 이 셀렉터의 내용을 추출
+        wait_until: 페이지 로딩 대기 조건 ("load", "domcontentloaded", "networkidle", "commit")
+                   기본값: "load" - 기본 리소스 로딩 완료 대기
+                   "networkidle" - 500ms 동안 네트워크 요청 없음 (복잡한 페이지에서 timeout 가능)
 
     Returns:
         페이지 내용 또는 스크립트 실행 결과
@@ -431,7 +435,16 @@ async def browse_with_javascript(
         browser = await get_browser()
         page = await browser.new_page()
 
-        await page.goto(url, wait_until="networkidle", timeout=30000)
+        # Validate wait_until parameter
+        valid_wait_until = ["load", "domcontentloaded", "networkidle", "commit"]
+        if wait_until not in valid_wait_until:
+            return {
+                "success": False,
+                "error": f"Invalid wait_until value: '{wait_until}'. Must be one of: {valid_wait_until}",
+                "url": url
+            }
+
+        await page.goto(url, wait_until=wait_until, timeout=30000)
 
         # 특정 셀렉터 대기
         if wait_for_selector:
