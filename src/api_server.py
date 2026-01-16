@@ -27,6 +27,9 @@ from orchestration.event_emitter import get_event_emitter
 from orchestration.mcp_executor import MCPExecutor
 from orchestration.types import ToolDefinition
 
+# Manus system imports
+from manus.coordinator import ManusCoordinator
+
 
 # Configure logging
 logging.basicConfig(
@@ -171,6 +174,15 @@ async def lifespan(app: FastAPI):
             logger.error(f"Error cleaning up orchestrator {key}: {e}")
     orchestrators.clear()
 
+    # Cleanup Manus coordinators
+    for key, coordinator in manus_coordinators.items():
+        try:
+            await coordinator.cleanup()
+            logger.info(f"Cleaned up Manus coordinator: {key}")
+        except Exception as e:
+            logger.error(f"Error cleaning up Manus coordinator {key}: {e}")
+    manus_coordinators.clear()
+
 
 # Create FastAPI app with lifespan
 app = FastAPI(
@@ -200,6 +212,9 @@ else:
 # Store orchestrator instances per user
 orchestrators = {}
 
+# Store Manus coordinator instances per user
+manus_coordinators = {}
+
 # Settings manager
 settings_manager = SettingsManager()
 
@@ -215,6 +230,17 @@ def get_orchestrator(user_id: str, tenant: str) -> Orchestrator:
             preloaded_tool_server_map=global_tool_server_map
         )
     return orchestrators[key]
+
+
+def get_manus_coordinator(user_id: str, tenant: str) -> ManusCoordinator:
+    """Get or create a Manus coordinator for a user"""
+    key = f"{tenant}:{user_id}"
+    if key not in manus_coordinators:
+        manus_coordinators[key] = ManusCoordinator(
+            user_id=user_id,
+            tenant=tenant
+        )
+    return manus_coordinators[key]
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -750,6 +776,154 @@ async def delete_chat_history(session_id: str):
     except Exception as e:
         logger.error(f"Error deleting chat history for session_id={session_id}: {str(e)}")
         logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== Manus Endpoints ====================
+
+class ManusRequest(BaseModel):
+    request_text: str
+    user_id: Optional[str] = "test_user"
+    tenant: Optional[str] = "test_tenant"
+    session_id: Optional[str] = None
+    max_wait_time: Optional[int] = 60
+
+
+@app.post("/api/manus/run")
+async def manus_run(request: ManusRequest):
+    """
+    Execute a request using Manus-style multi-agent system
+
+    This endpoint uses a supervisor agent to coordinate multiple specialized agents
+    that work asynchronously via Markdown file communication.
+    """
+    try:
+        start_time = datetime.now()
+        coordinator = get_manus_coordinator(request.user_id, request.tenant)
+
+        logger.info(f"[Manus] Processing request: {request.request_text[:100]}...")
+
+        result = await coordinator.run(
+            request=request.request_text,
+            session_id=request.session_id,
+            max_wait_time=request.max_wait_time
+        )
+
+        end_time = datetime.now()
+        execution_time = (end_time - start_time).total_seconds()
+
+        logger.info(f"[Manus] Request completed in {execution_time:.2f}s")
+
+        return {
+            "success": result.get("success", False),
+            "message": result.get("message", ""),
+            "final_response": result.get("final_response", ""),
+            "results": result.get("results", {}),
+            "session_id": result.get("session_id"),
+            "workspace_path": result.get("workspace_path"),
+            "execution_time": execution_time
+        }
+
+    except Exception as e:
+        logger.error(f"[Manus] Error executing request: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/manus/session/{session_id}/info")
+async def manus_session_info(
+    session_id: str,
+    user_id: str = "test_user",
+    tenant: str = "test_tenant"
+):
+    """Get information about a Manus session"""
+    try:
+        coordinator = get_manus_coordinator(user_id, tenant)
+
+        # Check if this is the active session
+        if coordinator.session_id != session_id:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Session {session_id} not found or not active"
+            )
+
+        info = coordinator.get_session_info()
+        return info
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Manus] Error getting session info: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/manus/session/{session_id}/plan")
+async def manus_get_plan(
+    session_id: str,
+    user_id: str = "test_user",
+    tenant: str = "test_tenant"
+):
+    """Get the execution plan for a Manus session"""
+    try:
+        coordinator = get_manus_coordinator(user_id, tenant)
+
+        # Check if this is the active session
+        if coordinator.session_id != session_id:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Session {session_id} not found or not active"
+            )
+
+        plan = await coordinator.get_plan_status()
+
+        if plan is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No plan found for session {session_id}"
+            )
+
+        return {
+            "success": True,
+            "session_id": session_id,
+            "plan": plan
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Manus] Error getting plan: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/manus/session/{session_id}/agents")
+async def manus_get_agent_statuses(
+    session_id: str,
+    user_id: str = "test_user",
+    tenant: str = "test_tenant"
+):
+    """Get status of all agents in a Manus session"""
+    try:
+        coordinator = get_manus_coordinator(user_id, tenant)
+
+        # Check if this is the active session
+        if coordinator.session_id != session_id:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Session {session_id} not found or not active"
+            )
+
+        statuses = await coordinator.get_agent_statuses()
+
+        return {
+            "success": True,
+            "session_id": session_id,
+            "agent_statuses": statuses
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Manus] Error getting agent statuses: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
