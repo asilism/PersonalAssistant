@@ -1187,3 +1187,76 @@ body {
     font-size: 11px;
     color: var(--text-tertiary);
 }
+
+/* Execution Mode Selector */
+.execution-mode-selector {
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.mode-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.mode-options {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+}
+
+.mode-option {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px;
+    background: var(--bg-primary);
+    border: 1.5px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+}
+
+.mode-option:hover {
+    border-color: var(--accent-color);
+    background: var(--bg-primary);
+}
+
+.mode-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.mode-option input[type="radio"]:checked + .mode-name {
+    color: var(--accent-color);
+    font-weight: 600;
+}
+
+.mode-option:has(input[type="radio"]:checked) {
+    border-color: var(--accent-color);
+    border-width: 2px;
+    padding: 9px 11px; /* Compensate for thicker border */
+    background: var(--bg-primary);
+}
+
+.mode-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+    transition: all 0.15s ease;
+}
+
+.mode-desc {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    line-height: 1.3;
+}
