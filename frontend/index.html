@@ -44,6 +44,23 @@
                             </div>
                         </div>
 
+                        <!-- Execution Mode Selector -->
+                        <div class="execution-mode-selector">
+                            <div class="mode-label">Execution Mode:</div>
+                            <div class="mode-options">
+                                <label class="mode-option">
+                                    <input type="radio" name="executionMode" value="langgraph" checked>
+                                    <span class="mode-name">LangGraph</span>
+                                    <span class="mode-desc">Sequential with streaming</span>
+                                </label>
+                                <label class="mode-option">
+                                    <input type="radio" name="executionMode" value="manus">
+                                    <span class="mode-name">Manus</span>
+                                    <span class="mode-desc">Multi-agent parallel</span>
+                                </label>
+                            </div>
+                        </div>
+
                         <!-- Chat Input (Fixed at bottom) -->
                         <div class="chat-input-wrapper">
                             <form id="requestForm" class="chat-input-form">

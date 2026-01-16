@@ -90,6 +90,35 @@ function getOrCreateSessionId() {
     return sessionId;
 }
 
+// Execution mode management
+function getExecutionMode() {
+    // Try to get from localStorage, default to 'langgraph'
+    const mode = localStorage.getItem('executionMode');
+    return mode || 'langgraph';
+}
+
+function saveExecutionMode(mode) {
+    localStorage.setItem('executionMode', mode);
+}
+
+function loadExecutionMode() {
+    const mode = getExecutionMode();
+    const radioBtn = document.querySelector(`input[name="executionMode"][value="${mode}"]`);
+    if (radioBtn) {
+        radioBtn.checked = true;
+    }
+}
+
+function setupExecutionModeListeners() {
+    const radios = document.querySelectorAll('input[name="executionMode"]');
+    radios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            saveExecutionMode(e.target.value);
+            console.log('Execution mode changed to:', e.target.value);
+        });
+    });
+}
+
 // Load chat history
 async function loadChatHistory() {
     const sessionId = getOrCreateSessionId();
@@ -156,6 +185,8 @@ document.addEventListener('DOMContentLoaded', () => {
     updateModelOptions();
     loadCurrentSettings();
     loadChatHistory();
+    loadExecutionMode();
+    setupExecutionModeListeners();
 
     // Set up form submission
     document.getElementById('requestForm').addEventListener('submit', async (e) => {
@@ -164,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Execute orchestration request with SSE streaming
+// Execute orchestration request - supports both LangGraph and Manus modes
 async function executeRequest() {
     const requestText = document.getElementById('requestText').value;
     const userId = document.getElementById('userId').value;
@@ -174,8 +205,9 @@ async function executeRequest() {
 
     if (!requestText.trim()) return;
 
-    // Get session ID
+    // Get session ID and execution mode
     const currentSessionId = getOrCreateSessionId();
+    const executionMode = getExecutionMode();
 
     // Remove placeholder or welcome message if exists
     const placeholder = chatMessages.querySelector('.placeholder');
@@ -200,85 +232,13 @@ async function executeRequest() {
     clearExecutionLogs();
 
     try {
-        // Use fetch to initiate SSE stream
-        const response = await fetch('/api/orchestrate/stream', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                request_text: requestText,
-                user_id: userId,
-                tenant: tenant,
-                session_id: currentSessionId
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        // Process SSE stream
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let finalMessage = '';
-        let executionCompleted = false;
-
-        while (true) {
-            const { done, value } = await reader.read();
-
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n\n');
-            buffer = lines.pop(); // Keep incomplete line in buffer
-
-            for (const line of lines) {
-                if (!line.trim() || line.startsWith(':')) continue;
-
-                const dataMatch = line.match(/^data: (.+)$/);
-                if (!dataMatch) continue;
-
-                try {
-                    const eventData = JSON.parse(dataMatch[1]);
-
-                    // Check for done signal
-                    if (eventData.done) {
-                        executionCompleted = true;
-                        break;
-                    }
-
-                    // Add execution log entry
-                    addExecutionLogEntry(eventData);
-
-                    // Store final message and data if execution completed
-                    if (eventData.event_type === 'execution_completed') {
-                        finalMessage = eventData.message;
-                        // Check if there's structured data to display
-                        if (eventData.data && eventData.data.results) {
-                            const dataType = eventData.data.data_type;
-                            finalMessage = formatExecutionResults(eventData.message, eventData.data.results, dataType);
-                        }
-                    }
-                } catch (e) {
-                    console.error('Error parsing SSE data:', e);
-                }
-            }
-
-            if (executionCompleted) break;
-        }
-
-        // Remove loading bubble
-        removeMessageBubble(loadingId);
-
-        // Add assistant response bubble with final message
-        if (finalMessage) {
-            addMessageBubble('assistant', finalMessage);
+        if (executionMode === 'manus') {
+            // Manus mode - non-streaming
+            await executeManusMode(requestText, userId, tenant, currentSessionId, loadingId);
         } else {
-            addMessageBubble('assistant', 'Execution completed');
+            // LangGraph mode - SSE streaming (default)
+            await executeLangGraphMode(requestText, userId, tenant, currentSessionId, loadingId);
         }
-
     } catch (error) {
         removeMessageBubble(loadingId);
         addMessageBubble('error', `Network error: ${error.message}`);
@@ -290,6 +250,175 @@ async function executeRequest() {
     } finally {
         submitBtn.disabled = false;
     }
+}
+
+// Execute in LangGraph mode (original SSE streaming)
+async function executeLangGraphMode(requestText, userId, tenant, sessionId, loadingId) {
+    addExecutionLogEntry({
+        event_type: 'execution_started',
+        message: 'LangGraph mode: Starting execution with SSE streaming',
+        timestamp: new Date().toISOString()
+    });
+
+    // Use fetch to initiate SSE stream
+    const response = await fetch('/api/orchestrate/stream', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            request_text: requestText,
+            user_id: userId,
+            tenant: tenant,
+            session_id: sessionId
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    // Process SSE stream
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalMessage = '';
+    let executionCompleted = false;
+
+    while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop(); // Keep incomplete line in buffer
+
+        for (const line of lines) {
+            if (!line.trim() || line.startsWith(':')) continue;
+
+            const dataMatch = line.match(/^data: (.+)$/);
+            if (!dataMatch) continue;
+
+            try {
+                const eventData = JSON.parse(dataMatch[1]);
+
+                // Check for done signal
+                if (eventData.done) {
+                    executionCompleted = true;
+                    break;
+                }
+
+                // Add execution log entry
+                addExecutionLogEntry(eventData);
+
+                // Store final message and data if execution completed
+                if (eventData.event_type === 'execution_completed') {
+                    finalMessage = eventData.message;
+                    // Check if there's structured data to display
+                    if (eventData.data && eventData.data.results) {
+                        const dataType = eventData.data.data_type;
+                        finalMessage = formatExecutionResults(eventData.message, eventData.data.results, dataType);
+                    }
+                }
+            } catch (e) {
+                console.error('Error parsing SSE data:', e);
+            }
+        }
+
+        if (executionCompleted) break;
+    }
+
+    // Remove loading bubble
+    removeMessageBubble(loadingId);
+
+    // Add assistant response bubble with final message
+    if (finalMessage) {
+        addMessageBubble('assistant', finalMessage);
+    } else {
+        addMessageBubble('assistant', 'Execution completed');
+    }
+}
+
+// Execute in Manus mode (multi-agent non-streaming)
+async function executeManusMode(requestText, userId, tenant, sessionId, loadingId) {
+    addExecutionLogEntry({
+        event_type: 'execution_started',
+        message: 'Manus mode: Starting multi-agent execution',
+        timestamp: new Date().toISOString()
+    });
+
+    const response = await fetch('/api/manus/run', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            request_text: requestText,
+            user_id: userId,
+            tenant: tenant,
+            session_id: sessionId,
+            max_wait_time: 60
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Add log entries for Manus execution
+    addExecutionLogEntry({
+        event_type: 'plan_created',
+        message: 'Supervisor created execution plan',
+        timestamp: new Date().toISOString(),
+        data: {
+            session_id: data.session_id,
+            workspace_path: data.workspace_path
+        }
+    });
+
+    // Add entries for each agent result
+    if (data.results) {
+        for (const [agentName, result] of Object.entries(data.results)) {
+            const status = result.status === 'completed' ? 'step_completed' : 'step_failed';
+            addExecutionLogEntry({
+                event_type: status,
+                message: `Agent "${agentName}": ${result.summary || 'Executed task'}`,
+                timestamp: result.executed_at || new Date().toISOString(),
+                data: {
+                    agent: agentName,
+                    status: result.status,
+                    summary: result.summary
+                }
+            });
+        }
+    }
+
+    addExecutionLogEntry({
+        event_type: 'execution_completed',
+        message: data.message || 'Manus execution completed',
+        timestamp: new Date().toISOString()
+    });
+
+    // Remove loading bubble
+    removeMessageBubble(loadingId);
+
+    // Add assistant response bubble
+    const finalMessage = data.final_response || data.message || 'Task completed';
+
+    // Format the response with workspace info
+    let formattedMessage = `<div class="message-text">${escapeHtml(finalMessage)}</div>`;
+
+    if (data.workspace_path) {
+        formattedMessage += `<div style="margin-top: 10px; padding: 8px; background: #f3f4f6; border-radius: 4px; font-size: 12px; color: #6b7280;">`;
+        formattedMessage += `<strong>📁 Workspace:</strong> <code>${escapeHtml(data.workspace_path)}</code><br>`;
+        formattedMessage += `<strong>⏱️ Execution time:</strong> ${data.execution_time?.toFixed(2)}s`;
+        formattedMessage += `</div>`;
+    }
+
+    addMessageBubble('assistant', formattedMessage);
 }
 
 // Add message bubble
