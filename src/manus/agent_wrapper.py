@@ -9,6 +9,7 @@ from datetime import datetime
 
 from orchestration.mcp_executor import MCPExecutor
 from orchestration.types import Step, StepResult
+from orchestration.placeholder_resolver import PlaceholderResolver
 from .md_communicator import MDCommunicator
 
 
@@ -28,6 +29,7 @@ class MCPAgentWrapper:
         agent_name: str,
         mcp_executor: MCPExecutor,
         md_communicator: MDCommunicator,
+        placeholder_resolver: Optional[PlaceholderResolver] = None,
         poll_interval: float = 1.0
     ):
         """
@@ -37,18 +39,20 @@ class MCPAgentWrapper:
             agent_name: Name of this agent (e.g., 'browser', 'filesystem')
             mcp_executor: MCP executor for calling MCP tools
             md_communicator: MD file communication manager
+            placeholder_resolver: Resolver for cross-task placeholders (optional)
             poll_interval: How often to check for new tasks (seconds)
         """
         self.agent_name = agent_name
         self.mcp_executor = mcp_executor
         self.md_comm = md_communicator
+        self.resolver = placeholder_resolver  # Shared resolver for cross-task references
         self.poll_interval = poll_interval
 
         self._running = False
         self._monitor_task: Optional[asyncio.Task] = None
         self._current_task_id: Optional[str] = None
 
-        print(f"[MCPAgentWrapper:{agent_name}] Initialized")
+        print(f"[MCPAgentWrapper:{agent_name}] Initialized with{'out' if not placeholder_resolver else ''} placeholder resolver")
 
     async def start_monitoring(self):
         """Start monitoring for tasks"""
@@ -143,8 +147,6 @@ class MCPAgentWrapper:
             params = call.get('params', {})
 
             try:
-                print(f"[MCPAgentWrapper:{self.agent_name}] Calling tool {tool_name} with params: {params}")
-
                 # Create Step object for MCP executor
                 step = Step(
                     step_id=f"{task_id}_call_{i+1}",
@@ -153,8 +155,17 @@ class MCPAgentWrapper:
                     description=f"Execute {tool_name} for task {task_id}"
                 )
 
+                # Resolve placeholders if resolver is available
+                if self.resolver:
+                    print(f"[MCPAgentWrapper:{self.agent_name}] Resolving placeholders for {tool_name}")
+                    resolved_step = self.resolver.resolve_step_input(step)
+                    print(f"[MCPAgentWrapper:{self.agent_name}] Resolved params: {resolved_step.input}")
+                else:
+                    resolved_step = step
+                    print(f"[MCPAgentWrapper:{self.agent_name}] Calling tool {tool_name} with params: {params}")
+
                 # Execute via MCP executor
-                step_result: StepResult = await self.mcp_executor.execute_step(step)
+                step_result: StepResult = await self.mcp_executor.execute_step(resolved_step)
 
                 # Record result
                 if step_result.status == "success":
@@ -163,6 +174,11 @@ class MCPAgentWrapper:
                         'output': step_result.output
                     })
                     print(f"[MCPAgentWrapper:{self.agent_name}] Tool {tool_name} succeeded")
+
+                    # Register successful step output for future placeholder resolution
+                    if self.resolver and step_result.output is not None:
+                        self.resolver.register_step_result(step.step_id, step_result.output)
+                        print(f"[MCPAgentWrapper:{self.agent_name}] Registered result for {step.step_id}")
                 else:
                     all_success = False
                     error_msg = step_result.error or "Unknown error"
