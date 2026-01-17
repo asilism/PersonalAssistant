@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-from ..orchestration.mcp_executor import MCPExecutor
-from ..orchestration.settings_manager import SettingsManager
-from ..orchestration.types import OrchestrationSettings, ToolDefinition
+from orchestration.mcp_executor import MCPExecutor
+from orchestration.settings_manager import SettingsManager
+from orchestration.types import OrchestrationSettings, ToolDefinition
 
 from .md_communicator import MDCommunicator
 from .supervisor import SupervisorAgent

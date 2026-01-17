@@ -8,8 +8,8 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pathlib import Path
 
-from ..orchestration.llm_client import create_llm_client, LLMClient
-from ..orchestration.types import OrchestrationSettings, ToolDefinition
+from orchestration.llm_client import create_llm_client, LLMClient
+from orchestration.types import OrchestrationSettings, ToolDefinition
 from .md_communicator import MDCommunicator
 
 
