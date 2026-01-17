@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
-from ..orchestration.mcp_executor import MCPExecutor
-from ..orchestration.types import Step, StepResult
+from orchestration.mcp_executor import MCPExecutor
+from orchestration.types import Step, StepResult
 from .md_communicator import MDCommunicator
 
 
