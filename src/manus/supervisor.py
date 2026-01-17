@@ -442,6 +442,30 @@ You MUST create a plan that is FUNDAMENTALLY DIFFERENT from what failed.
    - ✅ Review available tools and pick the correct one
    - ✅ Check tool descriptions and parameter schemas
 
+   **Placeholder Resolution Errors** (e.g., "Field 'xyz' not found"):
+   ⚠️ **CRITICAL**: The field you're trying to access is probably NESTED inside an object!
+
+   Common mistake - trying to access nested fields at top level:
+   ❌ `{{{{task_1_call_1.field}}}}` - WRONG if 'field' is inside a parent object
+
+   Solution - check the tool's Output Fields section:
+   - Look for "⚠️ NESTED OBJECT" warnings
+   - The warning shows EXACTLY how to access the field
+   - Use the full path shown in the schema
+
+   Example - If you see in Output Fields:
+   ```
+   - result: object
+     ⚠️ NESTED OBJECT - Access fields using: result.field_name
+       - result.field: string
+   ```
+
+   Then use: ✅ `{{{{task_1_call_1.result.field}}}}`
+   NOT:       ❌ `{{{{task_1_call_1.field}}}}`
+
+   **ALWAYS** check the tool's Output Fields section for the exact structure!
+   If you see "⚠️ NESTED OBJECT" warning, you MUST use the full path shown!
+
    **Data Format Errors**:
    - ✅ Add intermediate processing step
    - ✅ Transform data structure before using it
@@ -635,9 +659,34 @@ When a task needs to use the output from a previous task:
    - Reference it as: `{{task_1_search_call_1.field_name}}`
 
 3. **Field Names**: Use EXACT field names from the output schema
-   - Check the "Output Fields" section for each tool
-   - If output is nested, use dot notation: `{{task_id.results.0.name}}`
+   - Check the "Output Fields" section for each tool - it shows the COMPLETE structure
+   - If output is nested, use dot notation: `{{task_id.parent.child}}`
    - Array indexing: `{{task_id.items.0}}` for first item
+
+   **CRITICAL - Accessing Nested Fields**:
+   When you see nested objects in the output schema, you MUST use the full path!
+
+   Look for the "⚠️ NESTED OBJECT" warning in output fields. It tells you exactly how to access nested fields.
+
+   Example - If the Output Fields section shows:
+   ```
+   - success: boolean
+   - data: object
+     ⚠️ NESTED OBJECT - Access fields using: data.field_name
+       - data.name: string
+       - data.value: number
+       - data.metadata: object
+         ⚠️ NESTED OBJECT - Access fields using: data.metadata.field_name
+           - data.metadata.created_at: string
+   ```
+
+   ❌ WRONG: `{{task_1_call_1.name}}` - name is inside 'data' object!
+   ❌ WRONG: `{{task_1_call_1.value}}` - value is inside 'data' object!
+   ❌ WRONG: `{{task_1_call_1.created_at}}` - created_at is inside 'data.metadata'!
+
+   ✅ CORRECT: `{{task_1_call_1.data.name}}` - Full path through parent object
+   ✅ CORRECT: `{{task_1_call_1.data.value}}` - Full path through parent object
+   ✅ CORRECT: `{{task_1_call_1.data.metadata.created_at}}` - Full path through all parent objects
 
 4. **Dependencies**: ALWAYS list prerequisite tasks in the dependencies array
    - If task_2 uses `{{task_1_call_1.result}}`, add `"dependencies": ["task_1"]`
@@ -692,6 +741,8 @@ When a task needs to use the output from a previous task:
             if field_type == 'object':
                 nested_props = field_info.get('properties', {})
                 if nested_props:
+                    # Add explicit note about nested object access
+                    doc_lines.append(f"{indent_str}  ⚠️  NESTED OBJECT - Access fields using: {full_field_name}.field_name")
                     # Show nested fields with increased indentation
                     self._append_schema_fields(
                         doc_lines,

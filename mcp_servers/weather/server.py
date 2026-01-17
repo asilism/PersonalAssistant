@@ -7,8 +7,39 @@ Provides weather information via Open-Meteo API (free, no API key required).
 import httpx
 from typing import Optional
 from fastmcp import FastMCP
+from pydantic import BaseModel, Field
 
 mcp = FastMCP("weather")
+
+
+# Response models for clear output schemas
+class LocationInfo(BaseModel):
+    """Location information"""
+    city: str = Field(description="City name")
+    country: str = Field(description="Country name")
+    region: Optional[str] = Field(description="Region/state name")
+    latitude: float = Field(description="Latitude coordinate")
+    longitude: float = Field(description="Longitude coordinate")
+
+
+class CurrentWeather(BaseModel):
+    """Current weather conditions"""
+    temperature: str = Field(description="Current temperature with unit (e.g., '-3.3°C')")
+    feels_like: str = Field(description="Apparent temperature with unit")
+    humidity: str = Field(description="Relative humidity with unit (e.g., '32%')")
+    precipitation: str = Field(description="Current precipitation with unit")
+    wind_speed: str = Field(description="Wind speed with unit")
+    wind_direction: str = Field(description="Wind direction in degrees")
+    condition: str = Field(description="Weather condition description (e.g., 'Clear sky', 'Cloudy')")
+    time: str = Field(description="Observation time (ISO 8601 format)")
+
+
+class CurrentWeatherResponse(BaseModel):
+    """Response for current weather query"""
+    success: bool = Field(description="Whether the request succeeded")
+    location: Optional[LocationInfo] = Field(default=None, description="Location information (only present if success=True)")
+    current: Optional[CurrentWeather] = Field(default=None, description="Current weather data (only present if success=True)")
+    error: Optional[str] = Field(default=None, description="Error message if request failed")
 
 # Open-Meteo API endpoints
 GEOCODING_API = "https://geocoding-api.open-meteo.com/v1/search"
@@ -78,7 +109,7 @@ def get_weather_description(code: int) -> str:
 
 
 @mcp.tool()
-async def get_current_weather(city: str) -> dict:
+async def get_current_weather(city: str) -> CurrentWeatherResponse:
     """
     Get current weather for a city.
 
@@ -86,7 +117,8 @@ async def get_current_weather(city: str) -> dict:
         city: Name of the city (e.g., "Seoul", "New York", "London")
 
     Returns:
-        Current weather information including temperature, wind, and conditions
+        Current weather information including temperature, wind, and conditions.
+        Returns a structured response with 'location' and 'current' objects containing detailed weather data.
     """
     try:
         # Get city coordinates
