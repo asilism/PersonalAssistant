@@ -1014,8 +1014,8 @@ function addLogEntry(data) {
         </div>
     `;
 
-    if (data.execution_time) {
-        html += `<div class="log-detail"><strong>Execution Time:</strong> ${data.execution_time.toFixed(2)}s</div>`;
+    if (data.execution_time !== undefined && data.execution_time !== null) {
+        html += `<div class="log-detail"><strong>Execution Time:</strong> ${Number(data.execution_time).toFixed(2)}s</div>`;
     }
 
     if (data.trace_id) {
@@ -1088,7 +1088,9 @@ function addExecutionLogEntry(eventData) {
             html += `</div>`;
         } else if (eventData.event_type === 'step_completed') {
             html += `<div class="execution-log-details">`;
-            html += `<div class="execution-log-detail"><strong>Duration:</strong> ${eventData.data.duration.toFixed(2)}ms</div>`;
+            if (eventData.data.duration !== undefined && eventData.data.duration !== null) {
+                html += `<div class="execution-log-detail"><strong>Duration:</strong> ${Number(eventData.data.duration).toFixed(2)}ms</div>`;
+            }
             if (eventData.data.output) {
                 html += `<div class="execution-log-detail"><strong>Output:</strong> <pre style="margin: 5px 0; white-space: pre-wrap; font-size: 11px;">${JSON.stringify(eventData.data.output, null, 2).substring(0, 200)}${JSON.stringify(eventData.data.output, null, 2).length > 200 ? '...' : ''}</pre></div>`;
             }
@@ -1096,7 +1098,9 @@ function addExecutionLogEntry(eventData) {
         } else if (eventData.event_type === 'step_failed') {
             html += `<div class="execution-log-details">`;
             html += `<div class="execution-log-detail" style="color: #f44336;"><strong>Error:</strong> ${escapeHtml(eventData.data.error)}</div>`;
-            html += `<div class="execution-log-detail"><strong>Duration:</strong> ${eventData.data.duration.toFixed(2)}ms</div>`;
+            if (eventData.data.duration !== undefined && eventData.data.duration !== null) {
+                html += `<div class="execution-log-detail"><strong>Duration:</strong> ${Number(eventData.data.duration).toFixed(2)}ms</div>`;
+            }
             html += `</div>`;
         } else if (eventData.event_type === 'decision_made') {
             html += `<div class="execution-log-details">`;
