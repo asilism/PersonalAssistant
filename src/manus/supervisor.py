@@ -442,6 +442,22 @@ You MUST create a plan that is FUNDAMENTALLY DIFFERENT from what failed.
    - ✅ Review available tools and pick the correct one
    - ✅ Check tool descriptions and parameter schemas
 
+   **Placeholder Resolution Errors** (e.g., "Field 'temperature' not found"):
+   ⚠️ **CRITICAL**: Check if the field is NESTED inside another object!
+
+   Common mistake - trying to access nested fields at top level:
+   ❌ `{{{{task_1_call_1.temperature}}}}` - WRONG if temperature is inside 'current' object
+   ❌ `{{{{task_1_call_1.humidity}}}}` - WRONG if humidity is inside 'current' object
+   ❌ `{{{{task_1_call_1.description}}}}` - WRONG field name (might be 'condition' inside 'current')
+
+   Correct - use full path to nested fields:
+   ✅ `{{{{task_1_call_1.current.temperature}}}}` - Accesses temperature inside current object
+   ✅ `{{{{task_1_call_1.current.humidity}}}}` - Accesses humidity inside current object
+   ✅ `{{{{task_1_call_1.current.condition}}}}` - Accesses condition inside current object
+
+   **ALWAYS** check the tool's Output Fields section for the exact structure!
+   If you see `current: object` in the output, you MUST access its fields using `current.field_name`!
+
    **Data Format Errors**:
    - ✅ Add intermediate processing step
    - ✅ Transform data structure before using it
@@ -639,6 +655,30 @@ When a task needs to use the output from a previous task:
    - If output is nested, use dot notation: `{{task_id.results.0.name}}`
    - Array indexing: `{{task_id.items.0}}` for first item
 
+   **CRITICAL - Accessing Nested Fields**:
+   When you see nested objects in the output schema, you MUST use the full path!
+
+   Example - Weather API returns:
+   ```
+   {
+     "success": true,
+     "location": {...},
+     "current": {
+       "temperature": "-3.3°C",
+       "humidity": "32%",
+       "condition": "Clear sky"
+     }
+   }
+   ```
+
+   ❌ WRONG: `{{task_weather_call_1.temperature}}` - temperature is NOT at top level!
+   ❌ WRONG: `{{task_weather_call_1.humidity}}` - humidity is NOT at top level!
+   ❌ WRONG: `{{task_weather_call_1.description}}` - field doesn't exist (it's 'condition')!
+
+   ✅ CORRECT: `{{task_weather_call_1.current.temperature}}` - Full path to nested field
+   ✅ CORRECT: `{{task_weather_call_1.current.humidity}}` - Full path to nested field
+   ✅ CORRECT: `{{task_weather_call_1.current.condition}}` - Correct field name + full path
+
 4. **Dependencies**: ALWAYS list prerequisite tasks in the dependencies array
    - If task_2 uses `{{task_1_call_1.result}}`, add `"dependencies": ["task_1"]`
 
@@ -692,6 +732,8 @@ When a task needs to use the output from a previous task:
             if field_type == 'object':
                 nested_props = field_info.get('properties', {})
                 if nested_props:
+                    # Add explicit note about nested object access
+                    doc_lines.append(f"{indent_str}  ⚠️  NESTED OBJECT - Access fields using: {full_field_name}.field_name")
                     # Show nested fields with increased indentation
                     self._append_schema_fields(
                         doc_lines,
