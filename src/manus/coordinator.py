@@ -425,6 +425,9 @@ class ManusCoordinator:
 
             print(f"\n[ManusCoordinator] === Assigning task {task_id} to agent {agent_name} ===")
 
+            # Clear any previous task files for this agent to avoid stale task detection
+            await self.md_comm.clear_agent_task(agent_name)
+
             # Assign this task to its agent
             await self.supervisor.assign_tasks({'tasks': [task]})
 

@@ -592,12 +592,7 @@ Return the same JSON structure as the original plan:
                     output_props = tool.output_schema.get('properties', {})
 
                     if output_props:
-                        for field_name, field_info in output_props.items():
-                            field_type = field_info.get('type', 'any')
-                            field_desc = field_info.get('description', '')
-                            doc_lines.append(f"  - `{field_name}`: {field_type}")
-                            if field_desc:
-                                doc_lines.append(f"    {field_desc}")
+                        self._append_schema_fields(doc_lines, output_props, indent=1)
                     else:
                         # Output schema exists but no properties defined
                         # Try to infer structure from example or type
@@ -664,6 +659,62 @@ When a task needs to use the output from a previous task:
    - Get item then update it: get_event → update_event
    - List items then process each: list_files → read_file
 """
+
+    def _append_schema_fields(
+        self,
+        doc_lines: List[str],
+        properties: Dict[str, Any],
+        indent: int = 1,
+        prefix: str = ""
+    ) -> None:
+        """
+        Recursively append schema fields to documentation with nested structure
+
+        Args:
+            doc_lines: List to append formatted field descriptions to
+            properties: Schema properties dictionary
+            indent: Current indentation level
+            prefix: Field path prefix (e.g., "current." for nested fields)
+        """
+        indent_str = "  " * indent
+
+        for field_name, field_info in properties.items():
+            field_type = field_info.get('type', 'any')
+            field_desc = field_info.get('description', '')
+            full_field_name = f"{prefix}{field_name}"
+
+            # Format the field line
+            doc_lines.append(f"{indent_str}- `{full_field_name}`: {field_type}")
+            if field_desc:
+                doc_lines.append(f"{indent_str}  {field_desc}")
+
+            # Recursively process nested objects
+            if field_type == 'object':
+                nested_props = field_info.get('properties', {})
+                if nested_props:
+                    # Show nested fields with increased indentation
+                    self._append_schema_fields(
+                        doc_lines,
+                        nested_props,
+                        indent=indent + 1,
+                        prefix=f"{full_field_name}."
+                    )
+
+            # Handle arrays with object items
+            elif field_type == 'array':
+                items_schema = field_info.get('items', {})
+                if isinstance(items_schema, dict):
+                    items_type = items_schema.get('type')
+                    if items_type == 'object':
+                        items_props = items_schema.get('properties', {})
+                        if items_props:
+                            doc_lines.append(f"{indent_str}  Array items have fields:")
+                            self._append_schema_fields(
+                                doc_lines,
+                                items_props,
+                                indent=indent + 2,
+                                prefix=f"{full_field_name}.0."
+                            )
 
     def _generate_example_from_schema(self, tool: ToolDefinition) -> Optional[Dict[str, Any]]:
         """
