@@ -118,30 +118,7 @@ async def get_current_weather(city: str) -> CurrentWeatherResponse:
 
     Returns:
         Current weather information including temperature, wind, and conditions.
-
-        IMPORTANT - Output structure (use these exact paths in placeholders):
-        {
-          "success": true,
-          "location": {
-            "city": "Seoul",
-            "country": "South Korea",
-            "region": "Seoul",
-            "latitude": 37.566,
-            "longitude": 126.9784
-          },
-          "current": {
-            "temperature": "-3.3°C",
-            "feels_like": "-7.6°C",
-            "humidity": "32%",
-            "precipitation": "0.0mm",
-            "wind_speed": "3.9km/h",
-            "wind_direction": "338°",
-            "condition": "Clear sky",
-            "time": "2026-01-17T21:45"
-          }
-        }
-
-        To reference fields use: current.temperature, current.humidity, current.condition, etc.
+        Returns a structured response with 'location' and 'current' objects containing detailed weather data.
     """
     try:
         # Get city coordinates

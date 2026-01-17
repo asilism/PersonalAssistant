@@ -442,21 +442,29 @@ You MUST create a plan that is FUNDAMENTALLY DIFFERENT from what failed.
    - ✅ Review available tools and pick the correct one
    - ✅ Check tool descriptions and parameter schemas
 
-   **Placeholder Resolution Errors** (e.g., "Field 'temperature' not found"):
-   ⚠️ **CRITICAL**: Check if the field is NESTED inside another object!
+   **Placeholder Resolution Errors** (e.g., "Field 'xyz' not found"):
+   ⚠️ **CRITICAL**: The field you're trying to access is probably NESTED inside an object!
 
    Common mistake - trying to access nested fields at top level:
-   ❌ `{{{{task_1_call_1.temperature}}}}` - WRONG if temperature is inside 'current' object
-   ❌ `{{{{task_1_call_1.humidity}}}}` - WRONG if humidity is inside 'current' object
-   ❌ `{{{{task_1_call_1.description}}}}` - WRONG field name (might be 'condition' inside 'current')
+   ❌ `{{{{task_1_call_1.field}}}}` - WRONG if 'field' is inside a parent object
 
-   Correct - use full path to nested fields:
-   ✅ `{{{{task_1_call_1.current.temperature}}}}` - Accesses temperature inside current object
-   ✅ `{{{{task_1_call_1.current.humidity}}}}` - Accesses humidity inside current object
-   ✅ `{{{{task_1_call_1.current.condition}}}}` - Accesses condition inside current object
+   Solution - check the tool's Output Fields section:
+   - Look for "⚠️ NESTED OBJECT" warnings
+   - The warning shows EXACTLY how to access the field
+   - Use the full path shown in the schema
+
+   Example - If you see in Output Fields:
+   ```
+   - result: object
+     ⚠️ NESTED OBJECT - Access fields using: result.field_name
+       - result.field: string
+   ```
+
+   Then use: ✅ `{{{{task_1_call_1.result.field}}}}`
+   NOT:       ❌ `{{{{task_1_call_1.field}}}}`
 
    **ALWAYS** check the tool's Output Fields section for the exact structure!
-   If you see `current: object` in the output, you MUST access its fields using `current.field_name`!
+   If you see "⚠️ NESTED OBJECT" warning, you MUST use the full path shown!
 
    **Data Format Errors**:
    - ✅ Add intermediate processing step
@@ -651,33 +659,34 @@ When a task needs to use the output from a previous task:
    - Reference it as: `{{task_1_search_call_1.field_name}}`
 
 3. **Field Names**: Use EXACT field names from the output schema
-   - Check the "Output Fields" section for each tool
-   - If output is nested, use dot notation: `{{task_id.results.0.name}}`
+   - Check the "Output Fields" section for each tool - it shows the COMPLETE structure
+   - If output is nested, use dot notation: `{{task_id.parent.child}}`
    - Array indexing: `{{task_id.items.0}}` for first item
 
    **CRITICAL - Accessing Nested Fields**:
    When you see nested objects in the output schema, you MUST use the full path!
 
-   Example - Weather API returns:
+   Look for the "⚠️ NESTED OBJECT" warning in output fields. It tells you exactly how to access nested fields.
+
+   Example - If the Output Fields section shows:
    ```
-   {
-     "success": true,
-     "location": {...},
-     "current": {
-       "temperature": "-3.3°C",
-       "humidity": "32%",
-       "condition": "Clear sky"
-     }
-   }
+   - success: boolean
+   - data: object
+     ⚠️ NESTED OBJECT - Access fields using: data.field_name
+       - data.name: string
+       - data.value: number
+       - data.metadata: object
+         ⚠️ NESTED OBJECT - Access fields using: data.metadata.field_name
+           - data.metadata.created_at: string
    ```
 
-   ❌ WRONG: `{{task_weather_call_1.temperature}}` - temperature is NOT at top level!
-   ❌ WRONG: `{{task_weather_call_1.humidity}}` - humidity is NOT at top level!
-   ❌ WRONG: `{{task_weather_call_1.description}}` - field doesn't exist (it's 'condition')!
+   ❌ WRONG: `{{task_1_call_1.name}}` - name is inside 'data' object!
+   ❌ WRONG: `{{task_1_call_1.value}}` - value is inside 'data' object!
+   ❌ WRONG: `{{task_1_call_1.created_at}}` - created_at is inside 'data.metadata'!
 
-   ✅ CORRECT: `{{task_weather_call_1.current.temperature}}` - Full path to nested field
-   ✅ CORRECT: `{{task_weather_call_1.current.humidity}}` - Full path to nested field
-   ✅ CORRECT: `{{task_weather_call_1.current.condition}}` - Correct field name + full path
+   ✅ CORRECT: `{{task_1_call_1.data.name}}` - Full path through parent object
+   ✅ CORRECT: `{{task_1_call_1.data.value}}` - Full path through parent object
+   ✅ CORRECT: `{{task_1_call_1.data.metadata.created_at}}` - Full path through all parent objects
 
 4. **Dependencies**: ALWAYS list prerequisite tasks in the dependencies array
    - If task_2 uses `{{task_1_call_1.result}}`, add `"dependencies": ["task_1"]`

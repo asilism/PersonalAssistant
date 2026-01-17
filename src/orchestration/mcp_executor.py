@@ -129,6 +129,12 @@ class MCPExecutor:
                         # Get outputSchema from FastMCP if available
                         output_schema = getattr(tool, 'outputSchema', None)
 
+                        # Debug: Log output schema availability
+                        if output_schema:
+                            print(f"[MCPExecutor] Tool {tool.name} has output_schema with {len(output_schema.get('properties', {}))} properties")
+                        else:
+                            print(f"[MCPExecutor] WARNING: Tool {tool.name} has NO output_schema!")
+
                         tool_def = ToolDefinition(
                             name=tool.name,
                             description=tool.description or "",
