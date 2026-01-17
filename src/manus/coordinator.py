@@ -16,6 +16,7 @@ from orchestration.placeholder_resolver import PlaceholderResolver
 from .md_communicator import MDCommunicator
 from .supervisor import SupervisorAgent
 from .agent_wrapper import MCPAgentWrapper, AgentPool
+from .retry_history import RetryHistory
 
 
 class ManusCoordinator:
@@ -75,16 +76,16 @@ class ManusCoordinator:
         self,
         request: str,
         session_id: Optional[str] = None,
-        max_iterations: int = 3,
+        max_retries: int = 3,
         max_wait_time: int = 60
     ) -> Dict[str, Any]:
         """
-        Execute a user request using Manus-style multi-agent system
+        Execute a user request using Manus-style multi-agent system with automatic retry
 
         Args:
             request: User request text
             session_id: Optional session ID (generates new if not provided)
-            max_iterations: Maximum replanning iterations on failure
+            max_retries: Maximum number of retries on failure (default: 3)
             max_wait_time: Maximum time to wait for agents (seconds)
 
         Returns:
@@ -94,6 +95,7 @@ class ManusCoordinator:
                 - results: dict (agent results)
                 - final_response: str
                 - session_id: str
+                - retry_count: int (number of retries performed)
         """
         # Initialize session
         await self._initialize_session(session_id)
@@ -117,7 +119,7 @@ class ManusCoordinator:
                     'session_id': self.session_id
                 }
 
-            # Write plan to plan.md
+            # Write initial plan to plan.md
             await self.md_comm.write_plan({
                 'request': request,
                 'analysis': analysis,
@@ -135,21 +137,120 @@ class ManusCoordinator:
             print("[ManusCoordinator] Step 3: Starting agent pool")
             await self.agent_pool.start_all()
 
-            # Step 4: Execute tasks in dependency order
-            print("[ManusCoordinator] Step 4: Executing tasks in dependency order")
-            completed, results = await self._execute_tasks_with_dependencies(
-                plan_data,
-                max_wait_time=max_wait_time
-            )
+            # Initialize retry tracking
+            retry_history = RetryHistory()
+            completed = False
+            results = {}
+            retry_count = 0
 
-            # Step 6: Handle failures and replanning
-            if not completed:
-                print("[ManusCoordinator] Some tasks failed, considering replanning...")
-                # TODO: Implement replanning logic
-                # For now, just collect whatever results we have
+            # Step 4: Retry loop
+            for attempt in range(max_retries + 1):  # 0, 1, 2, 3 (total 4 attempts)
+                if attempt > 0:
+                    retry_count = attempt
+                    print(f"\n[ManusCoordinator] 🔄 Retry attempt {attempt}/{max_retries}")
 
-            # Step 7: Supervisor synthesizes final response
-            print("[ManusCoordinator] Step 7: Synthesizing final response")
+                # Execute tasks in dependency order
+                attempt_label = f"Attempt {attempt + 1}/{max_retries + 1}"
+                print(f"[ManusCoordinator] Step 4: Executing tasks ({attempt_label})")
+                completed, results = await self._execute_tasks_with_dependencies(
+                    plan_data,
+                    max_wait_time=max_wait_time
+                )
+
+                # Check if all tasks completed successfully
+                if completed:
+                    print(f"[ManusCoordinator] ✅ All tasks completed successfully!")
+                    break
+
+                # Collect failed tasks and errors
+                print(f"[ManusCoordinator] ⚠️  Some tasks failed")
+                failed_task_ids = []
+                error_info = {}
+
+                for agent_name, result in results.items():
+                    if result.get('status') == 'failed':
+                        task_id = result.get('task_id', agent_name)
+                        error = result.get('errors', 'Unknown error')
+
+                        failed_task_ids.append(task_id)
+                        error_info[task_id] = error
+
+                        print(f"[ManusCoordinator]   ❌ Task {task_id}: {error[:100]}...")
+
+                        # Check for duplicate errors
+                        if retry_history.is_duplicate_error(task_id, error):
+                            print(f"[ManusCoordinator] 🛑 Task {task_id} has DUPLICATE error - same error as previous attempt")
+                            print(f"[ManusCoordinator] 🛑 Stopping retries to prevent infinite loop")
+
+                            # Build failure response
+                            final_response = await self.supervisor.synthesize_final_response(
+                                request, plan_data, results
+                            )
+
+                            await self.agent_pool.stop_all()
+
+                            return {
+                                'success': False,
+                                'message': f'Task {task_id} failed with duplicate error after {attempt + 1} attempts',
+                                'results': results,
+                                'final_response': final_response,
+                                'session_id': self.session_id,
+                                'workspace_path': str(self.workspace_path),
+                                'retry_count': retry_count,
+                                'failure_reason': 'duplicate_error'
+                            }
+
+                        # Record this attempt in history
+                        task_tool_calls = None
+                        for task in plan_data.get('tasks', []):
+                            if task.get('task_id') == task_id:
+                                task_tool_calls = task.get('tool_calls', [])
+                                break
+
+                        retry_history.add_attempt(task_id, error, plan_data, task_tool_calls)
+
+                # Check if we've exhausted retries
+                if attempt >= max_retries:
+                    print(f"[ManusCoordinator] 🛑 Maximum retries ({max_retries}) reached")
+                    break
+
+                # Step 5: Replan with error history
+                print(f"[ManusCoordinator] Step 5: Replanning failed tasks with history awareness")
+                print(f"[ManusCoordinator] Failed tasks: {failed_task_ids}")
+
+                new_plan = await self.supervisor.replan(
+                    original_request=request,
+                    original_plan=plan_data,
+                    failed_tasks=failed_task_ids,
+                    error_info=error_info,
+                    retry_history=retry_history
+                )
+
+                if 'error' in new_plan:
+                    print(f"[ManusCoordinator] ⚠️  Replanning failed: {new_plan['error']}")
+                    break
+
+                # Update plan for next iteration
+                plan_data = new_plan
+                print(f"[ManusCoordinator] 📝 New plan created with {len(new_plan.get('tasks', []))} tasks")
+
+                # Update plan.md with retry information
+                await self.md_comm.write_plan({
+                    'request': request,
+                    'analysis': analysis,
+                    'tasks': plan_data.get('tasks', []),
+                    'progress': {
+                        'total': len(plan_data.get('tasks', [])),
+                        'completed': 0,
+                        'in_progress': 0,
+                        'pending': len(plan_data.get('tasks', [])),
+                        'failed': 0
+                    },
+                    'retry_attempt': attempt + 1
+                })
+
+            # Step 6: Supervisor synthesizes final response
+            print("[ManusCoordinator] Step 6: Synthesizing final response")
             final_response = await self.supervisor.synthesize_final_response(
                 request, plan_data, results
             )
@@ -166,19 +267,27 @@ class ManusCoordinator:
                     'pending': 0,
                     'failed': sum(1 for r in results.values() if r.get('status') == 'failed')
                 },
-                'results': final_response
+                'results': final_response,
+                'retry_count': retry_count
             })
 
             # Stop agents
             await self.agent_pool.stop_all()
 
+            success_message = 'Request completed'
+            if retry_count > 0:
+                success_message += f' after {retry_count} retry attempts'
+            elif not completed:
+                success_message = 'Request partially completed'
+
             return {
                 'success': completed,
-                'message': 'Request completed' if completed else 'Request partially completed',
+                'message': success_message,
                 'results': results,
                 'final_response': final_response,
                 'session_id': self.session_id,
-                'workspace_path': str(self.workspace_path)
+                'workspace_path': str(self.workspace_path),
+                'retry_count': retry_count
             }
 
         except Exception as e:

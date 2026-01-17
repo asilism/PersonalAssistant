@@ -350,43 +350,121 @@ Final Response:"""
         original_request: str,
         original_plan: Dict[str, Any],
         failed_tasks: List[str],
-        error_info: Dict[str, str]
+        error_info: Dict[str, str],
+        retry_history: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
-        Create a new plan to handle failed tasks
+        Create a new plan to handle failed tasks with awareness of previous attempts
 
         Args:
             original_request: Original user request
             original_plan: Original plan data
             failed_tasks: List of failed task IDs
             error_info: Dictionary mapping task IDs to error messages
+            retry_history: RetryHistory object with previous attempt information
 
         Returns:
-            New plan dictionary
+            New plan dictionary with improved strategy
         """
+        # Build error summary
         error_summary = "\n".join([
             f"- Task {task_id}: {error_info.get(task_id, 'Unknown error')}"
             for task_id in failed_tasks
         ])
 
-        prompt = f"""You are a supervisor agent. Some tasks failed during execution and need replanning.
+        # Build history summary if available
+        history_section = ""
+        if retry_history:
+            history_lines = ["\n## Previous Attempt History\n"]
 
-Original Request: {original_request}
+            for task_id in failed_tasks:
+                task_history = retry_history.format_history_for_prompt(task_id)
+                if task_history:
+                    history_lines.append(task_history)
+                    history_lines.append("")  # Blank line
 
-Failed Tasks:
+            if len(history_lines) > 1:  # More than just header
+                history_section = "\n".join(history_lines)
+
+        # Build comprehensive replanning prompt
+        prompt = f"""You are a supervisor agent. Some tasks failed during execution and need intelligent replanning.
+
+## Original Request
+{original_request}
+
+## Current Failures
 {error_summary}
-
-Original Plan:
+{history_section}
+## Original Plan
 {json.dumps(original_plan, indent=2)}
 
-Create a new plan to complete the request, taking into account the failures.
-You can:
-1. Retry failed tasks with different parameters
-2. Use alternative tools/agents
-3. Break down tasks differently
-4. Adjust the strategy
+## Your Mission
+Analyze WHY the tasks failed and create a NEW plan that addresses the root causes.
 
-Return the same JSON structure as before.
+## Critical Replanning Rules
+
+1. **DO NOT REPEAT FAILED APPROACHES**
+   - If you see duplicate errors in the history, the approach is fundamentally wrong
+   - You MUST try a completely different strategy
+
+2. **Common Error Patterns and Solutions**
+
+   **Type Mismatch Errors** (e.g., "Input should be a valid string" but got dict):
+   - ✅ Convert data: Use JSON serialization for complex objects
+   - ✅ Extract specific fields: Use placeholders with field access
+   - Example: If `content` expects string but gets dict:
+     - Wrong: `{{"content": "{{{{task_1_call_1}}}}"}}`  (this passes whole dict)
+     - Right: `{{"content": "{{{{task_1_call_1.current.temperature}}}}"}}` (extract field)
+     - Right: Add intermediate task to format data as string
+
+   **Missing Parameter Errors**:
+   - ✅ Check tool schema and add ALL required parameters
+   - ✅ Use placeholders to pass data from previous tasks
+
+   **Wrong Tool Selection**:
+   - ✅ Review available tools and pick the correct one
+   - ✅ Check tool descriptions and parameter schemas
+
+   **Data Format Errors**:
+   - ✅ Add intermediate processing step
+   - ✅ Transform data structure before using it
+   - ✅ Use different output fields from previous task
+
+3. **Replanning Strategies** (Try in order)
+
+   Strategy A - **Fix Parameters**:
+   - Correct parameter types (add JSON conversion if needed)
+   - Fix parameter names to match tool schema exactly
+   - Add missing required parameters
+
+   Strategy B - **Add Intermediate Step**:
+   - Insert data transformation task between steps
+   - Example: Extract specific fields, format data, convert types
+
+   Strategy C - **Different Tool**:
+   - Use alternative tool that accepts the data format you have
+   - Switch to a tool with more flexible parameters
+
+   Strategy D - **Break Down Task**:
+   - Split complex task into smaller atomic steps
+   - Each step does one simple thing
+
+4. **What Success Looks Like**
+   - Parameter types match tool schema EXACTLY
+   - All required parameters are provided
+   - Placeholders reference valid output fields
+   - Dependencies are correctly specified
+
+## Output Format
+Return the same JSON structure as the original plan:
+{{
+  "tasks": [...],
+  "execution_strategy": "sequential|parallel|mixed",
+  "estimated_steps": N
+}}
+
+**IMPORTANT**: Return ONLY valid JSON, no markdown code blocks or explanations.
+**REMEMBER**: The new plan MUST be different from what failed before!
 """
 
         try:
