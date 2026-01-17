@@ -100,6 +100,27 @@ class ExecutionEventEmitter:
         )
         await self.emit(event)
 
+    async def emit_plan_updated(
+        self,
+        trace_id: str,
+        plan_data: dict[str, Any]
+    ):
+        """Emit plan updated event"""
+        tasks = plan_data.get('tasks', [])
+        progress = plan_data.get('progress', {})
+
+        event = ExecutionEvent(
+            event_type=ExecutionEventType.PLAN_UPDATED,
+            trace_id=trace_id,
+            message=f"Plan updated: {progress.get('completed', 0)}/{progress.get('total', 0)} tasks completed",
+            data={
+                "tasks": tasks,
+                "progress": progress,
+                "plan_content": plan_data
+            }
+        )
+        await self.emit(event)
+
     async def emit_step_started(
         self,
         trace_id: str,

@@ -169,6 +169,7 @@ class ExecutionEventType(str, Enum):
     """Execution event types for streaming"""
     EXECUTION_STARTED = "execution_started"
     PLAN_CREATED = "plan_created"
+    PLAN_UPDATED = "plan_updated"
     STEP_STARTED = "step_started"
     STEP_COMPLETED = "step_completed"
     STEP_FAILED = "step_failed"

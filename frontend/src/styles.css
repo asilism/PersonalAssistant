@@ -451,6 +451,100 @@ body {
     color: var(--text-primary);
 }
 
+/* Plan Progress Section */
+.plan-progress-section {
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-primary);
+}
+
+.plan-progress-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.plan-collapse-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px;
+    transition: transform 0.2s;
+}
+
+.plan-collapse-btn:hover {
+    color: var(--text-primary);
+}
+
+.plan-collapsed .plan-collapse-btn {
+    transform: rotate(-90deg);
+}
+
+.plan-progress-content {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 12px;
+    font-size: 13px;
+}
+
+.plan-empty {
+    text-align: center;
+    color: var(--text-tertiary);
+    font-size: 12px;
+    padding: 20px;
+}
+
+/* Markdown styling for plan content */
+.plan-progress-content h2 {
+    font-size: 16px;
+    margin: 16px 0 8px 0;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 4px;
+}
+
+.plan-progress-content h3 {
+    font-size: 14px;
+    margin: 12px 0 6px 0;
+    color: var(--text-primary);
+}
+
+.plan-progress-content ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 8px 0;
+}
+
+.plan-progress-content li {
+    padding: 4px 0;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.plan-progress-content input[type="checkbox"] {
+    margin-right: 8px;
+    pointer-events: none;
+}
+
+.plan-progress-content strong {
+    color: var(--text-primary);
+}
+
+.plan-progress-content pre,
+.plan-progress-content code {
+    background: var(--bg-secondary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
 /* Log Entry Types */
 .log-entry {
     background: var(--bg-primary);

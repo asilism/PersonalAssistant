@@ -250,7 +250,7 @@ class MDCommunicator:
 ## Task Breakdown
 
 """
-        # Add tasks
+        # Add tasks with checkbox format
         for i, task in enumerate(tasks, 1):
             task_name = task.get('name', f'Task {i}')
             agent = task.get('agent', 'unknown')
@@ -259,7 +259,21 @@ class MDCommunicator:
             dependencies = task.get('dependencies', [])
             description = task.get('description', '')
 
-            md += f"""### Task {i}: {task_name}
+            # Determine checkbox state based on status
+            if status == 'completed':
+                checkbox = '[x]'
+            else:
+                checkbox = '[ ]'
+
+            # Add status emoji
+            status_emoji = {
+                'pending': '⏳',
+                'in_progress': '🔄',
+                'completed': '✅',
+                'failed': '❌'
+            }.get(status, '📝')
+
+            md += f"""### {checkbox} Task {i}: {task_name} {status_emoji}
 - **Agent**: {agent}
 - **Status**: {status}
 - **Priority**: {priority}
@@ -306,12 +320,15 @@ class MDCommunicator:
         if analysis_match:
             plan_data['analysis'] = analysis_match.group(1).strip()
 
-        # Extract tasks
+        # Extract tasks (with checkbox support)
         tasks_section = re.search(r'## Task Breakdown\n(.*?)## Progress', content, re.DOTALL)
         if tasks_section:
-            task_blocks = re.findall(r'### Task \d+: (.*?)\n(.*?)(?=###|##|\Z)', tasks_section.group(1), re.DOTALL)
-            for task_name, task_content in task_blocks:
-                task = {'name': task_name.strip()}
+            # Updated regex to capture checkbox and emoji
+            task_blocks = re.findall(r'### \[([ x])\] Task \d+: (.*?)\n(.*?)(?=###|##|\Z)', tasks_section.group(1), re.DOTALL)
+            for checkbox, task_name, task_content in task_blocks:
+                # Remove emoji from task name if present
+                task_name_clean = re.sub(r'[⏳🔄✅❌📝]\s*$', '', task_name.strip())
+                task = {'name': task_name_clean}
 
                 # Parse task fields
                 agent_match = re.search(r'- \*\*Agent\*\*: (.*)', task_content)

@@ -1079,6 +1079,17 @@ function addExecutionLogEntry(eventData) {
             });
             html += `</ul>`;
             html += `</div>`;
+        } else if (eventData.event_type === 'plan_updated') {
+            // Update plan progress panel
+            if (eventData.data.plan_content) {
+                updatePlanProgress(eventData.data.plan_content);
+            }
+            // Show progress in log
+            if (eventData.data.progress) {
+                html += `<div class="execution-log-details">`;
+                html += `<div class="execution-log-detail"><strong>Progress:</strong> ${eventData.data.progress.completed}/${eventData.data.progress.total} tasks completed</div>`;
+                html += `</div>`;
+            }
         } else if (eventData.event_type === 'step_started') {
             html += `<div class="execution-log-details">`;
             html += `<div class="execution-log-detail"><strong>Tool:</strong> ${eventData.data.tool_name}</div>`;
@@ -1126,6 +1137,7 @@ function getEventTypeInfo(eventType) {
     const eventTypes = {
         'execution_started': { icon: '🚀', color: '#2196F3', label: 'Execution Started' },
         'plan_created': { icon: '📋', color: '#4CAF50', label: 'Plan Created' },
+        'plan_updated': { icon: '🔄', color: '#2196F3', label: 'Plan Updated' },
         'step_started': { icon: '▶️', color: '#FF9800', label: 'Step Started' },
         'step_completed': { icon: '✅', color: '#4CAF50', label: 'Step Completed' },
         'step_failed': { icon: '❌', color: '#f44336', label: 'Step Failed' },
@@ -2012,8 +2024,102 @@ async function loadMCPTools() {
 }
 
 // Expose functions to global scope for inline onclick handlers (ES modules)
+// Plan Progress Functions
+function togglePlanProgress() {
+    const section = document.getElementById('planProgressSection');
+    const content = document.getElementById('planProgressContent');
+
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        section.classList.remove('plan-collapsed');
+    } else {
+        content.style.display = 'none';
+        section.classList.add('plan-collapsed');
+    }
+}
+
+function updatePlanProgress(planData) {
+    const section = document.getElementById('planProgressSection');
+    const content = document.getElementById('planProgressContent');
+
+    // Show the section if hidden
+    section.style.display = 'block';
+
+    // Render plan content as markdown-like HTML
+    const html = renderPlanMarkdown(planData);
+    content.innerHTML = html;
+}
+
+function renderPlanMarkdown(planData) {
+    let html = '';
+
+    // Request section
+    if (planData.request) {
+        html += `<h2>Request</h2>`;
+        html += `<p>${escapeHtml(planData.request)}</p>`;
+    }
+
+    // Analysis section
+    if (planData.analysis) {
+        html += `<h2>Analysis</h2>`;
+        html += `<p>${escapeHtml(planData.analysis)}</p>`;
+    }
+
+    // Task Breakdown section
+    if (planData.tasks && planData.tasks.length > 0) {
+        html += `<h2>Task Breakdown</h2>`;
+
+        planData.tasks.forEach((task, index) => {
+            const status = task.status || 'pending';
+            const checked = status === 'completed' ? 'checked' : '';
+            const statusEmoji = {
+                'pending': '⏳',
+                'in_progress': '🔄',
+                'completed': '✅',
+                'failed': '❌'
+            }[status] || '📝';
+
+            html += `<h3>`;
+            html += `<input type="checkbox" ${checked} disabled> `;
+            html += `Task ${index + 1}: ${escapeHtml(task.name || 'Unnamed Task')} ${statusEmoji}`;
+            html += `</h3>`;
+
+            html += `<ul>`;
+            html += `<li><strong>Agent:</strong> ${escapeHtml(task.agent || 'unknown')}</li>`;
+            html += `<li><strong>Status:</strong> ${escapeHtml(status)}</li>`;
+            html += `<li><strong>Priority:</strong> ${escapeHtml(task.priority || 'medium')}</li>`;
+            if (task.description) {
+                html += `<li><strong>Description:</strong> ${escapeHtml(task.description)}</li>`;
+            }
+            html += `</ul>`;
+        });
+    }
+
+    // Progress section
+    if (planData.progress) {
+        const progress = planData.progress;
+        html += `<h2>Progress</h2>`;
+        html += `<ul>`;
+        html += `<li><strong>Total Tasks:</strong> ${progress.total || 0}</li>`;
+        html += `<li><strong>Completed:</strong> ${progress.completed || 0}</li>`;
+        html += `<li><strong>In Progress:</strong> ${progress.in_progress || 0}</li>`;
+        html += `<li><strong>Pending:</strong> ${progress.pending || 0}</li>`;
+        html += `<li><strong>Failed:</strong> ${progress.failed || 0}</li>`;
+        html += `</ul>`;
+    }
+
+    // Results section
+    if (planData.results) {
+        html += `<h2>Results Summary</h2>`;
+        html += `<p>${escapeHtml(planData.results)}</p>`;
+    }
+
+    return html || '<p class="plan-empty">No plan data available</p>';
+}
+
 window.switchTab = switchTab;
 window.clearChatHistory = clearChatHistory;
+window.togglePlanProgress = togglePlanProgress;
 window.showAddConfigForm = showAddConfigForm;
 window.cancelConfigForm = cancelConfigForm;
 window.editConfig = editConfig;

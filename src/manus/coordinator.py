@@ -12,6 +12,7 @@ from orchestration.mcp_executor import MCPExecutor
 from orchestration.config import ConfigLoader
 from orchestration.types import OrchestrationSettings, ToolDefinition
 from orchestration.placeholder_resolver import PlaceholderResolver
+from orchestration.event_emitter import get_event_emitter
 
 from .md_communicator import MDCommunicator
 from .supervisor import SupervisorAgent
@@ -67,6 +68,9 @@ class ManusCoordinator:
         self.settings: Optional[OrchestrationSettings] = None
         self.placeholder_resolver: Optional[PlaceholderResolver] = None
 
+        # Event emitter for real-time updates
+        self.event_emitter = get_event_emitter()
+
         # Config loader
         self.config_loader = ConfigLoader()
 
@@ -120,7 +124,7 @@ class ManusCoordinator:
                 }
 
             # Write initial plan to plan.md
-            await self.md_comm.write_plan({
+            plan_content = {
                 'request': request,
                 'analysis': analysis,
                 'tasks': plan_data.get('tasks', []),
@@ -131,7 +135,14 @@ class ManusCoordinator:
                     'pending': len(plan_data.get('tasks', [])),
                     'failed': 0
                 }
-            })
+            }
+            await self.md_comm.write_plan(plan_content)
+
+            # Emit plan created/updated event
+            await self.event_emitter.emit_plan_updated(
+                trace_id=self.session_id,
+                plan_data=plan_content
+            )
 
             # Step 3: Start agent monitoring
             print("[ManusCoordinator] Step 3: Starting agent pool")
@@ -276,7 +287,7 @@ class ManusCoordinator:
                                 print(f"[ManusCoordinator]       {param_name}: {param_value}")
 
                 # Update plan.md with retry information
-                await self.md_comm.write_plan({
+                retry_plan_content = {
                     'request': request,
                     'analysis': analysis,
                     'tasks': plan_data.get('tasks', []),
@@ -288,7 +299,14 @@ class ManusCoordinator:
                         'failed': 0
                     },
                     'retry_attempt': attempt + 1
-                })
+                }
+                await self.md_comm.write_plan(retry_plan_content)
+
+                # Emit plan updated event
+                await self.event_emitter.emit_plan_updated(
+                    trace_id=self.session_id,
+                    plan_data=retry_plan_content
+                )
 
             # Step 6: Supervisor synthesizes final response
             print("[ManusCoordinator] Step 6: Synthesizing final response")
@@ -297,7 +315,7 @@ class ManusCoordinator:
             )
 
             # Update plan with final results
-            await self.md_comm.write_plan({
+            final_plan_content = {
                 'request': request,
                 'analysis': analysis,
                 'tasks': plan_data.get('tasks', []),
@@ -310,7 +328,14 @@ class ManusCoordinator:
                 },
                 'results': final_response,
                 'retry_count': retry_count
-            })
+            }
+            await self.md_comm.write_plan(final_plan_content)
+
+            # Emit final plan updated event
+            await self.event_emitter.emit_plan_updated(
+                trace_id=self.session_id,
+                plan_data=final_plan_content
+            )
 
             # Stop agents
             await self.agent_pool.stop_all()
