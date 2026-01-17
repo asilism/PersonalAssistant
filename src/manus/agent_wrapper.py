@@ -164,6 +164,9 @@ class MCPAgentWrapper:
                     resolved_step = step
                     print(f"[MCPAgentWrapper:{self.agent_name}] Calling tool {tool_name} with params: {params}")
 
+                # Auto-convert parameter types based on tool schema
+                resolved_step = self._auto_convert_param_types(resolved_step)
+
                 # Execute via MCP executor
                 step_result: StepResult = await self.mcp_executor.execute_step(resolved_step)
 
@@ -240,6 +243,94 @@ class MCPAgentWrapper:
             return step_result.output
         else:
             raise Exception(f"Tool {tool_name} failed: {step_result.error}")
+
+    def _auto_convert_param_types(self, step: Step) -> Step:
+        """
+        Automatically convert parameter types to match tool schema
+
+        This method prevents type mismatch errors by:
+        1. Getting the tool's input schema
+        2. Checking if any parameters have wrong types
+        3. Converting dict/list to JSON string when needed
+
+        Args:
+            step: Step with resolved parameters
+
+        Returns:
+            Step with type-corrected parameters
+        """
+        import json
+
+        # Get tool definition from MCP executor
+        tool_def = self.mcp_executor.get_tool_definition(step.tool_name)
+
+        if not tool_def or not tool_def.input_schema:
+            # No schema available, can't do type checking
+            return step
+
+        input_schema = tool_def.input_schema
+        properties = input_schema.get('properties', {})
+
+        if not properties:
+            # No properties defined, skip
+            return step
+
+        # Check each parameter
+        converted_input = {}
+        conversions_made = []
+
+        for param_name, param_value in step.input.items():
+            # Get expected type from schema
+            param_schema = properties.get(param_name)
+
+            if not param_schema:
+                # Parameter not in schema (might be extra), keep as-is
+                converted_input[param_name] = param_value
+                continue
+
+            expected_type = param_schema.get('type')
+
+            # Type conversion logic
+            if expected_type == 'string' and isinstance(param_value, (dict, list)):
+                # Convert dict/list to JSON string
+                converted_value = json.dumps(param_value, ensure_ascii=False, indent=2)
+                converted_input[param_name] = converted_value
+                conversions_made.append(f"{param_name}: {type(param_value).__name__} -> string")
+                print(f"[MCPAgentWrapper:{self.agent_name}] 🔄 Auto-converted {param_name} from {type(param_value).__name__} to JSON string")
+
+            elif expected_type == 'number' and isinstance(param_value, str):
+                # Try to convert string to number
+                try:
+                    converted_value = float(param_value) if '.' in param_value else int(param_value)
+                    converted_input[param_name] = converted_value
+                    conversions_made.append(f"{param_name}: string -> number")
+                    print(f"[MCPAgentWrapper:{self.agent_name}] 🔄 Auto-converted {param_name} from string to number")
+                except ValueError:
+                    # Can't convert, keep as-is
+                    converted_input[param_name] = param_value
+
+            elif expected_type == 'boolean' and isinstance(param_value, str):
+                # Convert string to boolean
+                converted_value = param_value.lower() in ('true', '1', 'yes', 'on')
+                converted_input[param_name] = converted_value
+                conversions_made.append(f"{param_name}: string -> boolean")
+                print(f"[MCPAgentWrapper:{self.agent_name}] 🔄 Auto-converted {param_name} from string to boolean")
+
+            else:
+                # Type matches or no conversion available, keep as-is
+                converted_input[param_name] = param_value
+
+        if conversions_made:
+            print(f"[MCPAgentWrapper:{self.agent_name}] ✅ Type conversions: {', '.join(conversions_made)}")
+
+        # Return new Step with converted input
+        return Step(
+            step_id=step.step_id,
+            tool_name=step.tool_name,
+            input=converted_input,
+            description=step.description,
+            dependencies=step.dependencies
+        )
 
     def _build_summary(
         self,

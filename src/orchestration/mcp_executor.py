@@ -175,6 +175,18 @@ class MCPExecutor:
         self._tool_server_map = tool_server_map.copy()
         print(f"[MCPExecutor] Tool-server map set with {len(self._tool_server_map)} mappings")
 
+    def get_tool_definition(self, tool_name: str) -> Optional[ToolDefinition]:
+        """
+        Get the tool definition for a specific tool
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            ToolDefinition if found, None otherwise
+        """
+        return self._available_tools.get(tool_name)
+
     def get_server_status(self) -> Dict[str, Dict[str, Any]]:
         """Get status of all configured servers"""
         return {
