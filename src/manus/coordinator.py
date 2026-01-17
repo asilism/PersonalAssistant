@@ -9,7 +9,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 from orchestration.mcp_executor import MCPExecutor
-from orchestration.settings_manager import SettingsManager
+from orchestration.config import ConfigLoader
 from orchestration.types import OrchestrationSettings, ToolDefinition
 
 from .md_communicator import MDCommunicator
@@ -64,8 +64,8 @@ class ManusCoordinator:
         self.mcp_executor: Optional[MCPExecutor] = None
         self.settings: Optional[OrchestrationSettings] = None
 
-        # Settings manager
-        self.settings_manager = SettingsManager()
+        # Config loader
+        self.config_loader = ConfigLoader()
 
         print(f"[ManusCoordinator] Initialized for {user_id}@{tenant}")
 
@@ -217,7 +217,7 @@ class ManusCoordinator:
         await self.md_comm.initialize()
 
         # Load settings
-        self.settings = self.settings_manager.get_settings(self.user_id, self.tenant)
+        self.settings = await self.config_loader.get_settings(self.user_id, self.tenant)
 
         # Initialize MCP executor
         self.mcp_executor = MCPExecutor(self.user_id, self.tenant)
