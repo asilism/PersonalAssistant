@@ -172,7 +172,7 @@ CRITICAL RULES:
             print("[SupervisorAgent] Generating execution plan...")
             response = await self.llm_client.generate(
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=4096
+                max_tokens=8192
             )
 
             # Clean response
@@ -211,7 +211,9 @@ CRITICAL RULES:
 
         except json.JSONDecodeError as e:
             print(f"[SupervisorAgent] JSON parsing error: {e}")
-            print(f"[SupervisorAgent] Raw response: {response[:500]}")
+            print(f"[SupervisorAgent] Raw response (first 1000 chars): {response[:1000]}")
+            print(f"[SupervisorAgent] Response length: {len(response)} characters")
+            print(f"[SupervisorAgent] Full response: {response}")
             # Fallback: return empty plan
             return {
                 "tasks": [],
@@ -505,7 +507,7 @@ Return the same JSON structure as the original plan:
         try:
             response = await self.llm_client.generate(
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=4096
+                max_tokens=8192
             )
 
             # Clean and parse
@@ -527,6 +529,16 @@ Return the same JSON structure as the original plan:
 
             return new_plan
 
+        except json.JSONDecodeError as e:
+            print(f"[SupervisorAgent] JSON parsing error during replan: {e}")
+            print(f"[SupervisorAgent] Raw response (first 1000 chars): {response[:1000]}")
+            print(f"[SupervisorAgent] Response length: {len(response)} characters")
+            print(f"[SupervisorAgent] Full response: {response}")
+            return {
+                "tasks": [],
+                "execution_strategy": "sequential",
+                "error": f"Failed to parse replanned tasks: {str(e)}"
+            }
         except Exception as e:
             print(f"[SupervisorAgent] Error during replan: {e}")
             return {
