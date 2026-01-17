@@ -234,6 +234,18 @@ class ManusCoordinator:
                 plan_data = new_plan
                 print(f"[ManusCoordinator] 📝 New plan created with {len(new_plan.get('tasks', []))} tasks")
 
+                # Debug: Log replanned tasks details
+                for i, task in enumerate(new_plan.get('tasks', [])):
+                    print(f"[ManusCoordinator]   Replanned Task {i+1}: {task.get('task_id')}")
+                    for j, call in enumerate(task.get('tool_calls', [])):
+                        print(f"[ManusCoordinator]     Call {j+1}: {call.get('tool')} - params: {list(call.get('params', {}).keys())}")
+                        # Log parameter values for debugging (truncated)
+                        for param_name, param_value in call.get('params', {}).items():
+                            if isinstance(param_value, str) and len(param_value) > 100:
+                                print(f"[ManusCoordinator]       {param_name}: {param_value[:100]}...")
+                            else:
+                                print(f"[ManusCoordinator]       {param_name}: {param_value}")
+
                 # Update plan.md with retry information
                 await self.md_comm.write_plan({
                     'request': request,
