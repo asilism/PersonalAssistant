@@ -10,7 +10,6 @@ from typing import Optional, Dict, Any, Callable, List
 from datetime import datetime
 import aiofiles
 from aiofiles import os as aio_os
-import fcntl
 
 
 class MDCommunicator:
