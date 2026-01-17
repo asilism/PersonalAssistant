@@ -142,6 +142,7 @@ class ManusCoordinator:
             completed = False
             results = {}
             retry_count = 0
+            completed_tasks = {}  # Cache for successfully completed tasks: {task_id: result}
 
             # Step 4: Retry loop
             for attempt in range(max_retries + 1):  # 0, 1, 2, 3 (total 4 attempts)
@@ -154,7 +155,8 @@ class ManusCoordinator:
                 print(f"[ManusCoordinator] Step 4: Executing tasks ({attempt_label})")
                 completed, results = await self._execute_tasks_with_dependencies(
                     plan_data,
-                    max_wait_time=max_wait_time
+                    max_wait_time=max_wait_time,
+                    completed_tasks=completed_tasks
                 )
 
                 # Check if all tasks completed successfully
@@ -176,6 +178,32 @@ class ManusCoordinator:
                         error_info[task_id] = error
 
                         print(f"[ManusCoordinator]   ❌ Task {task_id}: {error[:100]}...")
+
+                        # Classify error type
+                        error_type = self._classify_error_type(error)
+
+                        if error_type == 'non_retryable':
+                            print(f"[ManusCoordinator] 🛑 Task {task_id} has NON-RETRYABLE error - retry won't help")
+                            print(f"[ManusCoordinator] 🛑 Error type: Environmental/system issue")
+                            print(f"[ManusCoordinator] 💡 Suggestion: Check system requirements or use alternative approach")
+
+                            # Build failure response
+                            final_response = await self.supervisor.synthesize_final_response(
+                                request, plan_data, results
+                            )
+
+                            await self.agent_pool.stop_all()
+
+                            return {
+                                'success': False,
+                                'message': f'Task {task_id} failed with non-retryable error: {error[:200]}',
+                                'results': results,
+                                'final_response': final_response,
+                                'session_id': self.session_id,
+                                'workspace_path': str(self.workspace_path),
+                                'retry_count': retry_count,
+                                'failure_reason': 'non_retryable_error'
+                            }
 
                         # Check for duplicate errors
                         if retry_history.is_duplicate_error(task_id, error):
@@ -223,7 +251,8 @@ class ManusCoordinator:
                     original_plan=plan_data,
                     failed_tasks=failed_task_ids,
                     error_info=error_info,
-                    retry_history=retry_history
+                    retry_history=retry_history,
+                    completed_tasks=completed_tasks
                 )
 
                 if 'error' in new_plan:
@@ -388,18 +417,22 @@ class ManusCoordinator:
     async def _execute_tasks_with_dependencies(
         self,
         plan_data: Dict[str, Any],
-        max_wait_time: int = 60
+        max_wait_time: int = 60,
+        completed_tasks: Optional[Dict[str, Any]] = None
     ) -> tuple[bool, Dict[str, Any]]:
         """
-        Execute tasks in dependency order
+        Execute tasks in dependency order, skipping already completed tasks
 
         Args:
             plan_data: Plan data with tasks
             max_wait_time: Maximum time to wait per task (seconds)
+            completed_tasks: Dict of already completed tasks {task_id: result}
 
         Returns:
             Tuple of (all_completed, results)
         """
+        if completed_tasks is None:
+            completed_tasks = {}
         tasks = plan_data.get('tasks', [])
         if not tasks:
             return True, {}
@@ -423,6 +456,14 @@ class ManusCoordinator:
                 all_success = False
                 continue
 
+            # Check if this task was already completed successfully in a previous attempt
+            if task_id in completed_tasks:
+                cached_result = completed_tasks[task_id]
+                all_results[agent_name] = cached_result
+                print(f"\n[ManusCoordinator] ⚡ Task {task_id} already completed - using cached result")
+                print(f"[ManusCoordinator]    Status: {cached_result.get('status')}")
+                continue
+
             print(f"\n[ManusCoordinator] === Assigning task {task_id} to agent {agent_name} ===")
 
             # Clear any previous task files for this agent to avoid stale task detection
@@ -440,7 +481,9 @@ class ManusCoordinator:
 
             if completed and result:
                 all_results[agent_name] = result
-                print(f"[ManusCoordinator] ✓ Task {task_id} completed successfully")
+                # Cache this successful result for future retries
+                completed_tasks[task_id] = result
+                print(f"[ManusCoordinator] ✓ Task {task_id} completed successfully (cached for retries)")
             else:
                 all_success = False
                 if result:
@@ -607,6 +650,37 @@ class ManusCoordinator:
             await self.mcp_executor.cleanup()
 
         print(f"[ManusCoordinator] Cleanup completed")
+
+    def _classify_error_type(self, error_message: str) -> str:
+        """
+        Classify error type to determine if retry is worthwhile
+
+        Args:
+            error_message: Error message from failed task
+
+        Returns:
+            'non_retryable' if error indicates retry won't help,
+            'retryable' otherwise
+        """
+        error_lower = error_message.lower()
+
+        # Non-retryable errors (environmental/system issues)
+        non_retryable_patterns = [
+            'no suitable media player found',
+            'please install mpv or vlc',
+            'no mcp server found for tool',
+            'tool not found',
+            'agent not found',
+            'permission denied',
+            'not authorized',
+        ]
+
+        for pattern in non_retryable_patterns:
+            if pattern in error_lower:
+                return 'non_retryable'
+
+        # Default: assume retryable (network issues, timeouts, etc.)
+        return 'retryable'
 
     # ========== Utility Methods ==========
 

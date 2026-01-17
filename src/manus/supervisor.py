@@ -353,7 +353,8 @@ Final Response:"""
         original_plan: Dict[str, Any],
         failed_tasks: List[str],
         error_info: Dict[str, str],
-        retry_history: Optional[Any] = None
+        retry_history: Optional[Any] = None,
+        completed_tasks: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Create a new plan to handle failed tasks with awareness of previous attempts
@@ -364,10 +365,13 @@ Final Response:"""
             failed_tasks: List of failed task IDs
             error_info: Dictionary mapping task IDs to error messages
             retry_history: RetryHistory object with previous attempt information
+            completed_tasks: Dict of already completed tasks {task_id: result}
 
         Returns:
             New plan dictionary with improved strategy
         """
+        if completed_tasks is None:
+            completed_tasks = {}
         # Build error summary
         error_summary = "\n".join([
             f"- Task {task_id}: {error_info.get(task_id, 'Unknown error')}"
@@ -388,6 +392,22 @@ Final Response:"""
             if len(history_lines) > 1:  # More than just header
                 history_section = "\n".join(history_lines)
 
+        # Build completed tasks summary
+        completed_section = ""
+        if completed_tasks:
+            completed_lines = ["\n## ✅ Already Completed Tasks (DO NOT RE-EXECUTE)\n"]
+            completed_lines.append("These tasks have ALREADY been completed successfully in a previous attempt.")
+            completed_lines.append("You can reference their outputs using placeholders, but DO NOT include them in your new plan.\n")
+
+            for task_id, result in completed_tasks.items():
+                completed_lines.append(f"**Task: {task_id}**")
+                completed_lines.append(f"  Status: {result.get('status', 'completed')}")
+                if 'summary' in result:
+                    completed_lines.append(f"  Summary: {result['summary'][:200]}")
+                completed_lines.append("")
+
+            completed_section = "\n".join(completed_lines)
+
         # Build comprehensive replanning prompt
         prompt = f"""You are a supervisor agent. Some tasks failed during execution and need intelligent replanning.
 
@@ -396,6 +416,7 @@ Final Response:"""
 
 ## Current Failures
 {error_summary}
+{completed_section}
 {history_section}
 ## Original Plan
 {json.dumps(original_plan, indent=2)}
