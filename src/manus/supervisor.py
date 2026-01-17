@@ -170,21 +170,66 @@ CRITICAL RULES:
 
         try:
             print("[SupervisorAgent] Generating execution plan...")
-            response = await self.llm_client.generate(
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=8192
-            )
 
-            # Clean response
-            response = response.strip()
-            if response.startswith("```"):
-                response = response.split("```")[1]
-                if response.startswith("json"):
-                    response = response[4:]
+            # Retry loop for JSON parsing errors
+            max_retries = 2
+            last_error = None
+
+            for attempt in range(max_retries + 1):
+                if attempt > 0:
+                    print(f"[SupervisorAgent] Retry attempt {attempt}/{max_retries} due to JSON parsing error")
+                    # Add error feedback to prompt
+                    retry_prompt = prompt + f"""
+
+PREVIOUS ATTEMPT FAILED:
+The previous response had a JSON parsing error: {last_error}
+
+Please ensure you return ONLY valid JSON with:
+- All property names in double quotes
+- No extra text or comments before/after property names
+- Proper comma separation between properties
+- No trailing commas
+
+Return ONLY the JSON object, nothing else."""
+                    current_prompt = retry_prompt
+                else:
+                    current_prompt = prompt
+
+                response = await self.llm_client.generate(
+                    messages=[{"role": "user", "content": current_prompt}],
+                    max_tokens=8192,
+                    temperature=0.3  # Lower temperature for more deterministic output
+                )
+
+                # Clean response
                 response = response.strip()
+                if response.startswith("```"):
+                    response = response.split("```")[1]
+                    if response.startswith("json"):
+                        response = response[4:]
+                    response = response.strip()
 
-            # Parse JSON
-            plan_data = json.loads(response)
+                # Try to parse JSON
+                try:
+                    plan_data = json.loads(response)
+                    # Success! Break out of retry loop
+                    break
+                except json.JSONDecodeError as e:
+                    last_error = str(e)
+                    print(f"[SupervisorAgent] JSON parsing error (attempt {attempt + 1}): {e}")
+                    print(f"[SupervisorAgent] Raw response (first 500 chars): {response[:500]}")
+
+                    if attempt == max_retries:
+                        # Final attempt failed, log full response and return error
+                        print(f"[SupervisorAgent] All retry attempts exhausted")
+                        print(f"[SupervisorAgent] Full response: {response}")
+                        return {
+                            "tasks": [],
+                            "execution_strategy": "sequential",
+                            "estimated_steps": 0,
+                            "error": f"Failed to parse plan after {max_retries + 1} attempts: {str(e)}"
+                        }
+                    # Continue to next retry attempt
 
             # Assign task IDs if not present
             for i, task in enumerate(plan_data.get('tasks', [])):
@@ -209,18 +254,6 @@ CRITICAL RULES:
 
             return plan_data
 
-        except json.JSONDecodeError as e:
-            print(f"[SupervisorAgent] JSON parsing error: {e}")
-            print(f"[SupervisorAgent] Raw response (first 1000 chars): {response[:1000]}")
-            print(f"[SupervisorAgent] Response length: {len(response)} characters")
-            print(f"[SupervisorAgent] Full response: {response}")
-            # Fallback: return empty plan
-            return {
-                "tasks": [],
-                "execution_strategy": "sequential",
-                "estimated_steps": 0,
-                "error": f"Failed to parse plan: {str(e)}"
-            }
         except Exception as e:
             print(f"[SupervisorAgent] Error creating plan: {e}")
             return {
