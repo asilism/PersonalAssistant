@@ -197,8 +197,7 @@ Return ONLY the JSON object, nothing else."""
 
                 response = await self.llm_client.generate(
                     messages=[{"role": "user", "content": current_prompt}],
-                    max_tokens=8192,
-                    temperature=0.3  # Lower temperature for more deterministic output
+                    max_tokens=8192
                 )
 
                 # Clean response
