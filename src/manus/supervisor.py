@@ -401,21 +401,36 @@ Final Response:"""
 ## Your Mission
 Analyze WHY the tasks failed and create a NEW plan that addresses the root causes.
 
+## ⚠️ CRITICAL: Avoid Infinite Retry Loops ⚠️
+
+If your new plan causes the SAME error again, the system will STOP retrying immediately.
+You MUST create a plan that is FUNDAMENTALLY DIFFERENT from what failed.
+
 ## Critical Replanning Rules
 
 1. **DO NOT REPEAT FAILED APPROACHES**
    - If you see duplicate errors in the history, the approach is fundamentally wrong
    - You MUST try a completely different strategy
+   - Check parameter TYPES carefully - this is the #1 cause of duplicate errors
 
 2. **Common Error Patterns and Solutions**
 
    **Type Mismatch Errors** (e.g., "Input should be a valid string" but got dict):
-   - ✅ Convert data: Use JSON serialization for complex objects
-   - ✅ Extract specific fields: Use placeholders with field access
-   - Example: If `content` expects string but gets dict:
-     - Wrong: `{{"content": "{{{{task_1_call_1}}}}"}}`  (this passes whole dict)
-     - Right: `{{"content": "{{{{task_1_call_1.current.temperature}}}}"}}` (extract field)
-     - Right: Add intermediate task to format data as string
+   ⚠️ **CRITICAL**: NEVER pass a dict/object placeholder to a string parameter!
+
+   Examples of WRONG approaches:
+   ❌ `{{"content": "{{{{task_1_call_1}}}}"}}`  - Passes whole dict to string param
+   ❌ `{{"data": "{{{{task_1_call_1.location}}}}"}}`  - Passes nested dict to string param
+   ❌ `{{"text": "{{{{task_1_call_1}}}}"}}`  - Any dict to any string param is WRONG
+
+   Correct Solutions (pick ONE):
+   ✅ **Extract specific field**: `{{"content": "Temperature: {{{{task_1_call_1.current.temperature}}}}"}}`
+   ✅ **Extract multiple fields**: `{{"content": "Seoul weather: {{{{task_1_call_1.current.temperature}}}}, {{{{task_1_call_1.current.condition}}}}"}}`
+   ✅ **Use array index**: `{{"name": "{{{{task_1_call_1.results.0.name}}}}"}}`
+
+   🔧 **If you need the full dict as string**:
+   The system will automatically convert dicts to JSON strings when needed.
+   However, it's better to extract only what you need!
 
    **Missing Parameter Errors**:
    - ✅ Check tool schema and add ALL required parameters
@@ -449,7 +464,27 @@ Analyze WHY the tasks failed and create a NEW plan that addresses the root cause
    - Split complex task into smaller atomic steps
    - Each step does one simple thing
 
-4. **What Success Looks Like**
+4. **Verification Checklist Before Submitting Plan**
+
+   For EACH tool call, verify:
+
+   ✓ **Type Check**: Does parameter type match schema?
+     - If schema says "string", value MUST be string or field access
+     - If schema says "number", value MUST be number
+     - If schema says "object", value CAN be dict placeholder
+
+   ✓ **Required Params**: Are ALL required parameters provided?
+     - Check tool's input schema
+     - Missing params = guaranteed failure
+
+   ✓ **Placeholder Validity**: Do placeholders reference real output fields?
+     - Check previous task's output schema
+     - Use correct field names and paths
+
+   ✓ **Dependencies**: Are dependencies correctly specified?
+     - If using {{task_X}}, must have "task_X" in dependencies array
+
+5. **What Success Looks Like**
    - Parameter types match tool schema EXACTLY
    - All required parameters are provided
    - Placeholders reference valid output fields
