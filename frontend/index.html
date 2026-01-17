@@ -80,6 +80,18 @@
 
                     <!-- Logs Panel -->
                     <div class="logs-panel" id="logsPanel">
+                        <!-- Plan Progress Section -->
+                        <div class="plan-progress-section" id="planProgressSection" style="display: none;">
+                            <div class="plan-progress-header">
+                                <span>📋 Plan Progress</span>
+                                <button class="plan-collapse-btn" onclick="togglePlanProgress()">▼</button>
+                            </div>
+                            <div class="plan-progress-content" id="planProgressContent">
+                                <p class="plan-empty">No plan yet</p>
+                            </div>
+                        </div>
+
+                        <!-- Execution Logs Section -->
                         <div class="logs-header">
                             <span>Execution Logs</span>
                         </div>
