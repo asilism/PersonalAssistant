@@ -11,6 +11,7 @@ from datetime import datetime
 from orchestration.mcp_executor import MCPExecutor
 from orchestration.config import ConfigLoader
 from orchestration.types import OrchestrationSettings, ToolDefinition
+from orchestration.placeholder_resolver import PlaceholderResolver
 
 from .md_communicator import MDCommunicator
 from .supervisor import SupervisorAgent
@@ -63,6 +64,7 @@ class ManusCoordinator:
         self.agent_pool: Optional[AgentPool] = None
         self.mcp_executor: Optional[MCPExecutor] = None
         self.settings: Optional[OrchestrationSettings] = None
+        self.placeholder_resolver: Optional[PlaceholderResolver] = None
 
         # Config loader
         self.config_loader = ConfigLoader()
@@ -133,13 +135,9 @@ class ManusCoordinator:
             print("[ManusCoordinator] Step 3: Starting agent pool")
             await self.agent_pool.start_all()
 
-            # Step 4: Assign tasks to agents
-            print("[ManusCoordinator] Step 4: Assigning tasks to agents")
-            await self.supervisor.assign_tasks(plan_data)
-
-            # Step 5: Monitor progress and wait for completion
-            print("[ManusCoordinator] Step 5: Monitoring agent progress")
-            completed, results = await self._wait_for_completion(
+            # Step 4: Execute tasks in dependency order
+            print("[ManusCoordinator] Step 4: Executing tasks in dependency order")
+            completed, results = await self._execute_tasks_with_dependencies(
                 plan_data,
                 max_wait_time=max_wait_time
             )
@@ -240,6 +238,10 @@ class ManusCoordinator:
 
         print(f"[ManusCoordinator] Organized tools into {len(agent_tools)} agents")
 
+        # Create shared placeholder resolver for cross-task references
+        self.placeholder_resolver = PlaceholderResolver()
+        print("[ManusCoordinator] Created shared PlaceholderResolver for cross-task references")
+
         # Create supervisor
         self.supervisor = SupervisorAgent(
             settings=self.settings,
@@ -247,7 +249,7 @@ class ManusCoordinator:
             available_agents=agent_tools
         )
 
-        # Create agent pool with wrappers
+        # Create agent pool with wrappers (all sharing the same resolver)
         self.agent_pool = AgentPool()
 
         for agent_name in agent_tools.keys():
@@ -255,11 +257,160 @@ class ManusCoordinator:
                 agent_name=agent_name,
                 mcp_executor=self.mcp_executor,
                 md_communicator=self.md_comm,
+                placeholder_resolver=self.placeholder_resolver,  # Shared resolver!
                 poll_interval=0.5  # Check every 0.5 seconds
             )
             self.agent_pool.add_agent(agent_wrapper)
 
-        print(f"[ManusCoordinator] Session initialized with {len(agent_tools)} agents")
+        print(f"[ManusCoordinator] Session initialized with {len(agent_tools)} agents (shared resolver)")
+
+    async def _execute_tasks_with_dependencies(
+        self,
+        plan_data: Dict[str, Any],
+        max_wait_time: int = 60
+    ) -> tuple[bool, Dict[str, Any]]:
+        """
+        Execute tasks in dependency order
+
+        Args:
+            plan_data: Plan data with tasks
+            max_wait_time: Maximum time to wait per task (seconds)
+
+        Returns:
+            Tuple of (all_completed, results)
+        """
+        tasks = plan_data.get('tasks', [])
+        if not tasks:
+            return True, {}
+
+        # Sort tasks by dependencies (topological sort)
+        sorted_tasks = self._topological_sort_tasks(tasks)
+
+        print(f"[ManusCoordinator] Executing {len(sorted_tasks)} tasks in dependency order")
+        for i, task in enumerate(sorted_tasks):
+            print(f"  {i+1}. {task['task_id']} (agent: {task.get('agent')}, deps: {task.get('dependencies', [])})")
+
+        all_results = {}
+        all_success = True
+
+        for task in sorted_tasks:
+            task_id = task['task_id']
+            agent_name = task.get('agent')
+
+            if not agent_name:
+                print(f"[ManusCoordinator] Warning: Task {task_id} has no agent assigned, skipping")
+                all_success = False
+                continue
+
+            print(f"\n[ManusCoordinator] === Assigning task {task_id} to agent {agent_name} ===")
+
+            # Assign this task to its agent
+            await self.supervisor.assign_tasks({'tasks': [task]})
+
+            # Wait for this specific agent to complete
+            completed, result = await self._wait_for_agent(
+                agent_name,
+                task_id,
+                max_wait_time=max_wait_time
+            )
+
+            if completed and result:
+                all_results[agent_name] = result
+                print(f"[ManusCoordinator] ✓ Task {task_id} completed successfully")
+            else:
+                all_success = False
+                if result:
+                    all_results[agent_name] = result
+                print(f"[ManusCoordinator] ✗ Task {task_id} failed or timed out")
+
+        return all_success, all_results
+
+    def _topological_sort_tasks(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Sort tasks in dependency order using topological sort
+
+        Args:
+            tasks: List of task dictionaries
+
+        Returns:
+            Sorted list of tasks
+        """
+        # Build task ID to task mapping
+        task_map = {task['task_id']: task for task in tasks}
+
+        # Build dependency graph
+        in_degree = {task['task_id']: 0 for task in tasks}
+        adjacency = {task['task_id']: [] for task in tasks}
+
+        for task in tasks:
+            task_id = task['task_id']
+            dependencies = task.get('dependencies', [])
+            in_degree[task_id] = len(dependencies)
+
+            for dep in dependencies:
+                if dep in adjacency:
+                    adjacency[dep].append(task_id)
+
+        # Kahn's algorithm for topological sort
+        queue = [task_id for task_id, degree in in_degree.items() if degree == 0]
+        sorted_task_ids = []
+
+        while queue:
+            current = queue.pop(0)
+            sorted_task_ids.append(current)
+
+            for neighbor in adjacency[current]:
+                in_degree[neighbor] -= 1
+                if in_degree[neighbor] == 0:
+                    queue.append(neighbor)
+
+        # Check for cycles
+        if len(sorted_task_ids) != len(tasks):
+            print("[ManusCoordinator] Warning: Circular dependency detected in tasks!")
+            # Return original order as fallback
+            return tasks
+
+        # Convert task IDs back to task objects
+        return [task_map[task_id] for task_id in sorted_task_ids]
+
+    async def _wait_for_agent(
+        self,
+        agent_name: str,
+        task_id: str,
+        max_wait_time: int = 60,
+        check_interval: float = 0.5
+    ) -> tuple[bool, Optional[Dict[str, Any]]]:
+        """
+        Wait for a specific agent to complete its current task
+
+        Args:
+            agent_name: Name of the agent
+            task_id: Task ID being executed
+            max_wait_time: Maximum time to wait (seconds)
+            check_interval: How often to check progress (seconds)
+
+        Returns:
+            Tuple of (completed, result)
+        """
+        elapsed = 0.0
+
+        while elapsed < max_wait_time:
+            # Check if agent has result
+            result = await self.md_comm.read_result(agent_name)
+
+            if result and result.get('task_id') == task_id:
+                status = result.get('status')
+                if status in ('completed', 'failed'):
+                    return status == 'completed', result
+
+            # Wait before next check
+            await asyncio.sleep(check_interval)
+            elapsed += check_interval
+
+        # Timeout
+        print(f"[ManusCoordinator] Timeout waiting for agent {agent_name} (task {task_id})")
+        result = await self.md_comm.read_result(agent_name)
+        return False, result
 
     async def _wait_for_completion(
         self,
@@ -268,7 +419,7 @@ class ManusCoordinator:
         check_interval: float = 1.0
     ) -> tuple[bool, Dict[str, Any]]:
         """
-        Wait for all agents to complete their tasks
+        Wait for all agents to complete their tasks (legacy method)
 
         Args:
             plan_data: Plan data with tasks

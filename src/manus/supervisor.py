@@ -96,8 +96,9 @@ Analysis:"""
         Returns:
             Plan dictionary with tasks
         """
-        # Build agent capabilities summary
-        agent_capabilities = self._build_agent_capabilities_summary()
+        # Build dynamic tool documentation
+        tool_schemas_doc = self._build_tool_schemas_documentation()
+        placeholder_rules = self._format_placeholder_rules()
 
         prompt = f"""You are a supervisor agent coordinating multiple specialized agents.
 
@@ -105,41 +106,66 @@ User Request: {request}
 
 Analysis: {analysis}
 
-Available Agents and Their Capabilities:
-{agent_capabilities}
+{tool_schemas_doc}
+
+{placeholder_rules}
 
 Create an execution plan by breaking down the request into tasks for specialized agents.
 
 Requirements:
 1. Each task should be assigned to ONE specific agent
 2. Tasks should be atomic and focused
-3. Specify tool calls for each task
-4. Identify dependencies between tasks
-5. Set priority (high/medium/low)
+3. Specify tool calls with EXACT parameter names from the tool's input schema
+4. Use placeholders ({{{{task_id.field}}}}) to reference outputs from previous tasks
+5. Identify dependencies between tasks (tasks with placeholders MUST list the referenced tasks in dependencies)
+6. Set priority (high/medium/low)
 
 Return a JSON object with this structure:
 {{
   "tasks": [
     {{
-      "task_id": "unique_id",
+      "task_id": "task_1_description",
       "name": "Task name",
       "agent": "agent_name",
       "description": "What needs to be done",
       "priority": "high|medium|low",
-      "dependencies": ["task_id1", "task_id2"],
+      "dependencies": [],
       "tool_calls": [
         {{
           "tool": "tool_name",
-          "params": {{}}
+          "params": {{
+            "param_name": "value or {{{{task_X.field}}}}"
+          }}
+        }}
+      ]
+    }},
+    {{
+      "task_id": "task_2_description",
+      "name": "Task using previous result",
+      "agent": "agent_name",
+      "description": "Task that depends on task_1",
+      "priority": "medium",
+      "dependencies": ["task_1_description"],
+      "tool_calls": [
+        {{
+          "tool": "another_tool",
+          "params": {{
+            "input_field": "{{{{task_1_description_call_1.output_field}}}}"
+          }}
         }}
       ]
     }}
   ],
   "execution_strategy": "sequential|parallel|mixed",
-  "estimated_steps": 3
+  "estimated_steps": 2
 }}
 
-IMPORTANT: Return ONLY valid JSON, no markdown code blocks or explanations.
+CRITICAL RULES:
+1. Use DOUBLE curly braces for placeholders: {{{{task_id.field}}}}
+2. Match parameter names EXACTLY to the tool's input schema
+3. Use output field names from the previous task's output schema
+4. Always add dependencies when using placeholders
+5. Return ONLY valid JSON, no markdown code blocks or explanations
 """
 
         try:
@@ -385,8 +411,201 @@ Return the same JSON structure as before.
 
     # ========== Helper Methods ==========
 
+    def _build_tool_schemas_documentation(self) -> str:
+        """
+        Build comprehensive tool documentation with input/output schemas
+
+        This method dynamically generates documentation for ALL available tools,
+        ensuring any MCP server addition is automatically included.
+
+        Returns:
+            Formatted documentation string for LLM prompt
+        """
+        doc_lines = ["## Available Tools and Their Schemas\n"]
+
+        for agent_name, tools in self.available_agents.items():
+            doc_lines.append(f"### Agent: {agent_name}\n")
+
+            for tool in tools:
+                doc_lines.append(f"**Tool: {tool.name}**")
+                doc_lines.append(f"Description: {tool.description}")
+
+                # Input Schema
+                if tool.input_schema:
+                    doc_lines.append("\nInput Parameters:")
+                    properties = tool.input_schema.get('properties', {})
+                    required = tool.input_schema.get('required', [])
+
+                    for param_name, param_info in properties.items():
+                        param_type = param_info.get('type', 'any')
+                        param_desc = param_info.get('description', '')
+                        is_required = param_name in required
+
+                        req_marker = " (REQUIRED)" if is_required else " (optional)"
+                        doc_lines.append(f"  - `{param_name}`: {param_type}{req_marker}")
+                        if param_desc:
+                            doc_lines.append(f"    {param_desc}")
+                else:
+                    doc_lines.append("\nInput Parameters: (no schema available)")
+
+                # Output Schema
+                if tool.output_schema:
+                    doc_lines.append("\nOutput Fields:")
+                    output_props = tool.output_schema.get('properties', {})
+
+                    if output_props:
+                        for field_name, field_info in output_props.items():
+                            field_type = field_info.get('type', 'any')
+                            field_desc = field_info.get('description', '')
+                            doc_lines.append(f"  - `{field_name}`: {field_type}")
+                            if field_desc:
+                                doc_lines.append(f"    {field_desc}")
+                    else:
+                        # Output schema exists but no properties defined
+                        # Try to infer structure from example or type
+                        output_type = tool.output_schema.get('type', 'object')
+                        doc_lines.append(f"  - Returns: {output_type}")
+                else:
+                    doc_lines.append("\nOutput Fields: (no schema available - check tool documentation)")
+
+                # Add example usage
+                example = self._generate_example_from_schema(tool)
+                if example:
+                    doc_lines.append(f"\nExample Usage:")
+                    doc_lines.append(f"```json")
+                    doc_lines.append(json.dumps(example, indent=2))
+                    doc_lines.append(f"```")
+
+                doc_lines.append("")  # Blank line between tools
+
+            doc_lines.append("")  # Blank line between agents
+
+        return "\n".join(doc_lines)
+
+    def _format_placeholder_rules(self) -> str:
+        """
+        Format placeholder usage rules
+
+        Returns:
+            Formatted rules string for LLM prompt
+        """
+        return """## Placeholder Reference Rules
+
+When a task needs to use the output from a previous task:
+
+1. **Syntax**: Use DOUBLE curly braces: `{{task_id.field}}`
+   - ✅ Correct: `{{"city": "{{task_1_search_call_1.name}}"}}`
+   - ❌ Wrong: `{{"city": "{result_of_task_1.city_id}"}}`
+
+2. **Task ID Format**: Use the exact task_id from the previous task + "_call_N"
+   - If task has task_id="task_1_search", the step_id will be "task_1_search_call_1"
+   - Reference it as: `{{task_1_search_call_1.field_name}}`
+
+3. **Field Names**: Use EXACT field names from the output schema
+   - Check the "Output Fields" section for each tool
+   - If output is nested, use dot notation: `{{task_id.results.0.name}}`
+   - Array indexing: `{{task_id.items.0}}` for first item
+
+4. **Dependencies**: ALWAYS list prerequisite tasks in the dependencies array
+   - If task_2 uses `{{task_1_call_1.result}}`, add `"dependencies": ["task_1"]`
+
+5. **Common Patterns**:
+   - Search then use result: search_city → get_weather
+     ```json
+     {
+       "task_id": "task_2_weather",
+       "dependencies": ["task_1_search"],
+       "tool_calls": [{
+         "tool": "get_current_weather",
+         "params": {
+           "city": "{{task_1_search_call_1.results.0.name}}"
+         }
+       }]
+     }
+     ```
+   - Get item then update it: get_event → update_event
+   - List items then process each: list_files → read_file
+"""
+
+    def _generate_example_from_schema(self, tool: ToolDefinition) -> Optional[Dict[str, Any]]:
+        """
+        Generate example tool call from schema
+
+        Args:
+            tool: Tool definition with schemas
+
+        Returns:
+            Example dictionary or None
+        """
+        if not tool.input_schema:
+            return None
+
+        properties = tool.input_schema.get('properties', {})
+        required = tool.input_schema.get('required', [])
+
+        if not properties:
+            return None
+
+        example = {
+            "tool": tool.name,
+            "params": {}
+        }
+
+        # Generate example values for required parameters
+        for param_name in required:
+            if param_name in properties:
+                param_info = properties[param_name]
+                example["params"][param_name] = self._generate_example_value(
+                    param_name,
+                    param_info
+                )
+
+        return example
+
+    def _generate_example_value(self, param_name: str, param_info: dict) -> Any:
+        """
+        Generate example value based on parameter schema
+
+        Args:
+            param_name: Parameter name
+            param_info: Parameter schema info
+
+        Returns:
+            Example value
+        """
+        param_type = param_info.get('type', 'string')
+        param_desc = param_info.get('description', '').lower()
+
+        # Type-based examples
+        if param_type == 'string':
+            # Context-aware examples
+            if 'email' in param_name.lower() or 'email' in param_desc:
+                return "user@example.com"
+            elif 'city' in param_name.lower() or 'city' in param_desc:
+                return "Seoul"
+            elif 'date' in param_name.lower() or 'date' in param_desc:
+                return "2024-01-01"
+            elif 'url' in param_name.lower() or 'url' in param_desc:
+                return "https://example.com"
+            else:
+                return f"example_{param_name}"
+        elif param_type == 'number' or param_type == 'integer':
+            return 123
+        elif param_type == 'boolean':
+            return True
+        elif param_type == 'array':
+            items_type = param_info.get('items', {}).get('type', 'string')
+            if items_type == 'string':
+                return ["item1", "item2"]
+            else:
+                return [1, 2, 3]
+        elif param_type == 'object':
+            return {}
+        else:
+            return f"<{param_type}>"
+
     def _build_agent_capabilities_summary(self) -> str:
-        """Build a formatted summary of agent capabilities"""
+        """Build a formatted summary of agent capabilities (legacy - kept for compatibility)"""
         summary_lines = []
 
         for agent_name, tools in self.available_agents.items():
