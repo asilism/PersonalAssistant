@@ -414,7 +414,9 @@ async function executeManusMode(requestText, userId, tenant, sessionId, loadingI
     if (data.workspace_path) {
         formattedMessage += `<div style="margin-top: 10px; padding: 8px; background: #f3f4f6; border-radius: 4px; font-size: 12px; color: #6b7280;">`;
         formattedMessage += `<strong>📁 Workspace:</strong> <code>${escapeHtml(data.workspace_path)}</code><br>`;
-        formattedMessage += `<strong>⏱️ Execution time:</strong> ${data.execution_time?.toFixed(2)}s`;
+        if (data.execution_time !== undefined && data.execution_time !== null) {
+            formattedMessage += `<strong>⏱️ Execution time:</strong> ${Number(data.execution_time).toFixed(2)}s`;
+        }
         formattedMessage += `</div>`;
     }
 
