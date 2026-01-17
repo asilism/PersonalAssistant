@@ -150,7 +150,7 @@ class MCPAgentWrapper:
                     step_id=f"{task_id}_call_{i+1}",
                     tool_name=tool_name,
                     input=params,
-                    group_id=task_id
+                    description=f"Execute {tool_name} for task {task_id}"
                 )
 
                 # Execute via MCP executor
@@ -215,7 +215,7 @@ class MCPAgentWrapper:
             step_id=f"manual_{tool_name}_{datetime.now().timestamp()}",
             tool_name=tool_name,
             input=params,
-            group_id="manual"
+            description=f"Manual execution of {tool_name}"
         )
 
         step_result = await self.mcp_executor.execute_step(step)
