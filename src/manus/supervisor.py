@@ -193,7 +193,20 @@ CRITICAL RULES:
                 if 'status' not in task:
                     task['status'] = 'pending'
 
+            # Validate and fix plan
+            plan_data = self._validate_and_fix_plan(plan_data)
+
             print(f"[SupervisorAgent] Plan created with {len(plan_data.get('tasks', []))} tasks")
+
+            # Debug: Log plan details
+            for i, task in enumerate(plan_data.get('tasks', [])):
+                print(f"[SupervisorAgent] Task {i+1}: {task.get('task_id')}")
+                print(f"  Agent: {task.get('agent')}")
+                print(f"  Tool calls: {len(task.get('tool_calls', []))}")
+                for j, call in enumerate(task.get('tool_calls', [])):
+                    tool_name = call.get('tool', 'MISSING')
+                    print(f"    Call {j+1}: tool='{tool_name}' params={list(call.get('params', {}).keys())}")
+
             return plan_data
 
         except json.JSONDecodeError as e:
@@ -603,6 +616,69 @@ When a task needs to use the output from a previous task:
             return {}
         else:
             return f"<{param_type}>"
+
+    def _validate_and_fix_plan(self, plan_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate and fix plan data, especially tool names in tool_calls
+
+        Args:
+            plan_data: Plan data from LLM
+
+        Returns:
+            Fixed plan data
+        """
+        tasks = plan_data.get('tasks', [])
+
+        for task_idx, task in enumerate(tasks):
+            agent_name = task.get('agent')
+            tool_calls = task.get('tool_calls', [])
+
+            if not agent_name:
+                print(f"[SupervisorAgent] WARNING: Task {task.get('task_id')} has no agent assigned")
+                continue
+
+            if not tool_calls:
+                print(f"[SupervisorAgent] WARNING: Task {task.get('task_id')} has no tool calls")
+                continue
+
+            # Get available tools for this agent
+            agent_tools = self.available_agents.get(agent_name, [])
+            tool_names = [tool.name for tool in agent_tools]
+
+            # Validate each tool call
+            for call_idx, call in enumerate(tool_calls):
+                tool_name = call.get('tool', '').strip()
+
+                # Check if tool name is missing or empty
+                if not tool_name:
+                    print(f"[SupervisorAgent] ERROR: Task {task.get('task_id')} call {call_idx+1} has missing/empty tool name")
+
+                    # Try to auto-fix if agent has only one tool
+                    if len(tool_names) == 1:
+                        fixed_tool_name = tool_names[0]
+                        call['tool'] = fixed_tool_name
+                        print(f"[SupervisorAgent] AUTO-FIX: Set tool name to '{fixed_tool_name}' (only tool for agent '{agent_name}')")
+                    else:
+                        print(f"[SupervisorAgent] ERROR: Cannot auto-fix - agent '{agent_name}' has {len(tool_names)} tools: {tool_names}")
+                        print(f"[SupervisorAgent] LLM must specify which tool to use!")
+                        # Set to first tool as fallback
+                        if tool_names:
+                            call['tool'] = tool_names[0]
+                            print(f"[SupervisorAgent] FALLBACK: Using first available tool '{tool_names[0]}'")
+
+                # Check if tool name is valid for this agent
+                elif tool_name not in tool_names:
+                    print(f"[SupervisorAgent] WARNING: Task {task.get('task_id')} references unknown tool '{tool_name}'")
+                    print(f"[SupervisorAgent] Available tools for agent '{agent_name}': {tool_names}")
+
+                    # Try to find a close match
+                    for available_tool in tool_names:
+                        if tool_name.lower() in available_tool.lower() or available_tool.lower() in tool_name.lower():
+                            print(f"[SupervisorAgent] AUTO-FIX: Changing '{tool_name}' to '{available_tool}'")
+                            call['tool'] = available_tool
+                            break
+
+        return plan_data
 
     def _build_agent_capabilities_summary(self) -> str:
         """Build a formatted summary of agent capabilities (legacy - kept for compatibility)"""
