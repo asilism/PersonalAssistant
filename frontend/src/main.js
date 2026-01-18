@@ -348,6 +348,9 @@ async function executeManusMode(requestText, userId, tenant, sessionId, loadingI
         timestamp: new Date().toISOString()
     });
 
+    // Add planning indicator message to chat
+    showPlanningIndicator();
+
     // Use fetch to initiate SSE stream
     const response = await fetch('/api/manus/stream', {
         method: 'POST',
@@ -408,9 +411,10 @@ async function executeManusMode(requestText, userId, tenant, sessionId, loadingI
                     workspacePath = eventData.data?.workspace_path || '';
                 }
 
-                // Update plan panel if plan_created or plan_updated
+                // Update plan panel and chat if plan_created or plan_updated
                 if ((eventData.event_type === 'plan_created' || eventData.event_type === 'plan_updated') && eventData.data) {
                     updatePlanProgress(eventData.data);
+                    updatePlanMessageInChat(eventData.data);
                 }
             } catch (e) {
                 console.error('Error parsing SSE data:', e);
@@ -2067,6 +2071,75 @@ function updatePlanProgress(planData) {
     content.innerHTML = html;
 }
 
+// Show planning indicator in chat
+function showPlanningIndicator() {
+    const planMessageId = 'plan-message';
+    const chatMessages = document.getElementById('chatMessages');
+
+    // Remove existing plan message if any
+    const existingMessage = document.getElementById(planMessageId);
+    if (existingMessage) {
+        existingMessage.remove();
+    }
+
+    const messageDiv = document.createElement('div');
+    messageDiv.id = planMessageId;
+    messageDiv.className = 'message-bubble assistant-message plan-message planning-indicator';
+
+    messageDiv.innerHTML = `
+        <div class="message-icon">📋</div>
+        <div class="message-content">
+            <div class="planning-indicator-container">
+                <div class="planning-spinner"></div>
+                <div class="planning-text">
+                    <strong>플래닝 중...</strong>
+                    <p>실행 계획을 수립하고 있습니다.</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Update or add plan message in chat
+function updatePlanMessageInChat(planData) {
+    const planMessageId = 'plan-message';
+    const existingMessage = document.getElementById(planMessageId);
+
+    const planHtml = renderPlanMarkdown(planData);
+    const messageContent = `
+        <div class="plan-message-container">
+            ${planHtml}
+        </div>
+    `;
+
+    if (existingMessage) {
+        // Update existing plan message (replace planning indicator or update plan)
+        const contentDiv = existingMessage.querySelector('.message-content');
+        if (contentDiv) {
+            contentDiv.innerHTML = messageContent;
+        }
+        // Remove planning indicator class if it exists
+        existingMessage.classList.remove('planning-indicator');
+    } else {
+        // Add new plan message
+        const chatMessages = document.getElementById('chatMessages');
+        const messageDiv = document.createElement('div');
+        messageDiv.id = planMessageId;
+        messageDiv.className = 'message-bubble assistant-message plan-message';
+
+        messageDiv.innerHTML = `
+            <div class="message-icon">📋</div>
+            <div class="message-content">${messageContent}</div>
+        `;
+
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+}
+
 function renderPlanMarkdown(planData) {
     let html = '';
 
@@ -2088,7 +2161,10 @@ function renderPlanMarkdown(planData) {
 
         planData.tasks.forEach((task, index) => {
             const status = task.status || 'pending';
-            const checked = status === 'completed' ? 'checked' : '';
+            // Check checkbox for both completed and failed states
+            const checked = (status === 'completed' || status === 'failed') ? 'checked' : '';
+            const checkboxClass = status === 'completed' ? 'checkbox-completed' :
+                                  status === 'failed' ? 'checkbox-failed' : '';
             const statusEmoji = {
                 'pending': '⏳',
                 'in_progress': '🔄',
@@ -2097,7 +2173,7 @@ function renderPlanMarkdown(planData) {
             }[status] || '📝';
 
             html += `<h3>`;
-            html += `<input type="checkbox" ${checked} disabled> `;
+            html += `<input type="checkbox" ${checked} disabled class="${checkboxClass}"> `;
             html += `Task ${index + 1}: ${escapeHtml(task.name || 'Unnamed Task')} ${statusEmoji}`;
             html += `</h3>`;
 
