@@ -579,6 +579,46 @@ body {
     50% { opacity: 0.85; }
 }
 
+/* Status icon styling */
+.status-icon {
+    display: inline-block;
+    font-size: 16px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+/* Spinner animation for in-progress tasks */
+.status-icon.in-progress .spinner {
+    display: inline-block;
+    animation: spin 1.5s linear infinite;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Status icon state animations */
+.status-icon.pending {
+    animation: bounce 2s ease-in-out infinite;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+}
+
+.status-icon.completed {
+    animation: scale-in 0.3s ease-out;
+}
+
+@keyframes scale-in {
+    from { transform: scale(0); }
+    to { transform: scale(1); }
+}
+
 .plan-message-container h3.task-completed {
     background: #d1fae5;
     border-left: 4px solid var(--success-color);

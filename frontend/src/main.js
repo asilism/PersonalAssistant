@@ -2197,12 +2197,14 @@ function renderPlanMarkdown(planData) {
             const checked = (status === 'completed' || status === 'failed') ? 'checked' : '';
             const checkboxClass = status === 'completed' ? 'checkbox-completed' :
                                   status === 'failed' ? 'checkbox-failed' : '';
-            const statusEmoji = {
-                'pending': '⏳',
-                'in_progress': '🔄',
-                'completed': '✅',
-                'failed': '❌'
-            }[status] || '📝';
+
+            // Enhanced status icons with dynamic spinner for in_progress
+            const statusIcon = {
+                'pending': '<span class="status-icon pending">⏳</span>',
+                'in_progress': '<span class="status-icon in-progress"><span class="spinner">⟳</span></span>',
+                'completed': '<span class="status-icon completed">✅</span>',
+                'failed': '<span class="status-icon failed">❌</span>'
+            }[status] || '<span class="status-icon">📝</span>';
 
             // Status text for badge
             const statusText = {
@@ -2214,6 +2216,7 @@ function renderPlanMarkdown(planData) {
 
             html += `<h3 class="task-${status}">`;
             html += `<input type="checkbox" ${checked} disabled class="${checkboxClass}"> `;
+            html += `${statusIcon} `;
             html += `Task ${index + 1}: ${escapeHtml(task.name || 'Unnamed Task')} `;
             html += `<span class="status-badge-inline ${status}">${statusText}</span>`;
             html += `</h3>`;
@@ -2227,19 +2230,6 @@ function renderPlanMarkdown(planData) {
             }
             html += `</ul>`;
         });
-    }
-
-    // Progress section
-    if (planData.progress) {
-        const progress = planData.progress;
-        html += `<h2>Progress</h2>`;
-        html += `<ul>`;
-        html += `<li><strong>Total Tasks:</strong> ${progress.total || 0}</li>`;
-        html += `<li><strong>Completed:</strong> ${progress.completed || 0}</li>`;
-        html += `<li><strong>In Progress:</strong> ${progress.in_progress || 0}</li>`;
-        html += `<li><strong>Pending:</strong> ${progress.pending || 0}</li>`;
-        html += `<li><strong>Failed:</strong> ${progress.failed || 0}</li>`;
-        html += `</ul>`;
     }
 
     // Results section
