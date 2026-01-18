@@ -106,14 +106,44 @@ class ManusCoordinator:
 
         print(f"[ManusCoordinator] Processing request: {request[:100]}...")
 
+        # Emit execution started event
+        await self.event_emitter.emit_execution_started(
+            trace_id=self.session_id,
+            request=request
+        )
+
         try:
             # Step 1: Supervisor analyzes request
             print("[ManusCoordinator] Step 1: Analyzing request")
+            await self.event_emitter.emit_step_started(
+                trace_id=self.session_id,
+                step_name="analyze_request",
+                message="Analyzing request and identifying required capabilities"
+            )
             analysis = await self.supervisor.analyze_request(request)
+            await self.event_emitter.emit_step_completed(
+                trace_id=self.session_id,
+                step_name="analyze_request",
+                message="Request analysis completed",
+                result={"analysis": analysis}
+            )
 
             # Step 2: Supervisor creates execution plan
             print("[ManusCoordinator] Step 2: Creating execution plan")
+            await self.event_emitter.emit_step_started(
+                trace_id=self.session_id,
+                step_name="create_plan",
+                message="Creating execution plan with task breakdown"
+            )
             plan_data = await self.supervisor.create_plan(request, analysis)
+
+            if 'error' not in plan_data:
+                await self.event_emitter.emit_step_completed(
+                    trace_id=self.session_id,
+                    step_name="create_plan",
+                    message=f"Execution plan created with {len(plan_data.get('tasks', []))} tasks",
+                    result={"task_count": len(plan_data.get('tasks', []))}
+                )
 
             if 'error' in plan_data:
                 return {
@@ -139,14 +169,24 @@ class ManusCoordinator:
             await self.md_comm.write_plan(plan_content)
 
             # Emit plan created/updated event
-            await self.event_emitter.emit_plan_updated(
+            await self.event_emitter.emit_plan_created(
                 trace_id=self.session_id,
                 plan_data=plan_content
             )
 
             # Step 3: Start agent monitoring
             print("[ManusCoordinator] Step 3: Starting agent pool")
+            await self.event_emitter.emit_step_started(
+                trace_id=self.session_id,
+                step_name="start_agents",
+                message="Starting agent pool for task execution"
+            )
             await self.agent_pool.start_all()
+            await self.event_emitter.emit_step_completed(
+                trace_id=self.session_id,
+                step_name="start_agents",
+                message=f"Agent pool started with {len(self.agent_pool.agents)} agents"
+            )
 
             # Initialize retry tracking
             retry_history = RetryHistory()
@@ -164,6 +204,11 @@ class ManusCoordinator:
                 # Execute tasks in dependency order
                 attempt_label = f"Attempt {attempt + 1}/{max_retries + 1}"
                 print(f"[ManusCoordinator] Step 4: Executing tasks ({attempt_label})")
+                await self.event_emitter.emit_step_started(
+                    trace_id=self.session_id,
+                    step_name="execute_tasks",
+                    message=f"Executing tasks in dependency order ({attempt_label})"
+                )
                 completed, results = await self._execute_tasks_with_dependencies(
                     plan_data,
                     max_wait_time=max_wait_time,
@@ -173,6 +218,12 @@ class ManusCoordinator:
                 # Check if all tasks completed successfully
                 if completed:
                     print(f"[ManusCoordinator] ✅ All tasks completed successfully!")
+                    await self.event_emitter.emit_step_completed(
+                        trace_id=self.session_id,
+                        step_name="execute_tasks",
+                        message="All tasks completed successfully",
+                        result={"status": "success", "task_count": len(results)}
+                    )
                     break
 
                 # Collect failed tasks and errors
@@ -257,6 +308,12 @@ class ManusCoordinator:
                 print(f"[ManusCoordinator] Step 5: Replanning failed tasks with history awareness")
                 print(f"[ManusCoordinator] Failed tasks: {failed_task_ids}")
 
+                await self.event_emitter.emit_step_started(
+                    trace_id=self.session_id,
+                    step_name="replan",
+                    message=f"Replanning {len(failed_task_ids)} failed tasks with error history"
+                )
+
                 new_plan = await self.supervisor.replan(
                     original_request=request,
                     original_plan=plan_data,
@@ -268,11 +325,23 @@ class ManusCoordinator:
 
                 if 'error' in new_plan:
                     print(f"[ManusCoordinator] ⚠️  Replanning failed: {new_plan['error']}")
+                    await self.event_emitter.emit_step_failed(
+                        trace_id=self.session_id,
+                        step_name="replan",
+                        error=new_plan['error']
+                    )
                     break
 
                 # Update plan for next iteration
                 plan_data = new_plan
                 print(f"[ManusCoordinator] 📝 New plan created with {len(new_plan.get('tasks', []))} tasks")
+
+                await self.event_emitter.emit_step_completed(
+                    trace_id=self.session_id,
+                    step_name="replan",
+                    message=f"New plan created with {len(new_plan.get('tasks', []))} tasks",
+                    result={"task_count": len(new_plan.get('tasks', []))}
+                )
 
                 # Debug: Log replanned tasks details
                 for i, task in enumerate(new_plan.get('tasks', [])):
@@ -310,8 +379,18 @@ class ManusCoordinator:
 
             # Step 6: Supervisor synthesizes final response
             print("[ManusCoordinator] Step 6: Synthesizing final response")
+            await self.event_emitter.emit_step_started(
+                trace_id=self.session_id,
+                step_name="synthesize_response",
+                message="Synthesizing final response from agent results"
+            )
             final_response = await self.supervisor.synthesize_final_response(
                 request, plan_data, results
+            )
+            await self.event_emitter.emit_step_completed(
+                trace_id=self.session_id,
+                step_name="synthesize_response",
+                message="Final response synthesized"
             )
 
             # Update plan with final results
@@ -346,6 +425,19 @@ class ManusCoordinator:
             elif not completed:
                 success_message = 'Request partially completed'
 
+            # Emit execution completed event
+            await self.event_emitter.emit_execution_completed(
+                trace_id=self.session_id,
+                message=success_message,
+                data={
+                    "results": results,
+                    "final_response": final_response,
+                    "workspace_path": str(self.workspace_path),
+                    "retry_count": retry_count,
+                    "success": completed
+                }
+            )
+
             return {
                 'success': completed,
                 'message': success_message,
@@ -360,6 +452,13 @@ class ManusCoordinator:
             print(f"[ManusCoordinator] Error during execution: {e}")
             import traceback
             traceback.print_exc()
+
+            # Emit execution error event
+            await self.event_emitter.emit_execution_error(
+                trace_id=self.session_id,
+                error=str(e),
+                error_type=type(e).__name__
+            )
 
             # Stop agents on error
             if self.agent_pool:

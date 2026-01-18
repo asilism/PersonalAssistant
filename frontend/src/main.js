@@ -340,15 +340,16 @@ async function executeLangGraphMode(requestText, userId, tenant, sessionId, load
     }
 }
 
-// Execute in Manus mode (multi-agent non-streaming)
+// Execute in Manus mode (multi-agent SSE streaming)
 async function executeManusMode(requestText, userId, tenant, sessionId, loadingId) {
     addExecutionLogEntry({
         event_type: 'execution_started',
-        message: 'Manus mode: Starting multi-agent execution',
+        message: 'Manus mode: Starting multi-agent execution with real-time streaming',
         timestamp: new Date().toISOString()
     });
 
-    const response = await fetch('/api/manus/run', {
+    // Use fetch to initiate SSE stream
+    const response = await fetch('/api/manus/stream', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -366,61 +367,77 @@ async function executeManusMode(requestText, userId, tenant, sessionId, loadingI
         throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const data = await response.json();
+    // Process SSE stream
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalMessage = '';
+    let workspacePath = '';
+    let executionCompleted = false;
 
-    // Add log entries for Manus execution
-    addExecutionLogEntry({
-        event_type: 'plan_created',
-        message: 'Supervisor created execution plan',
-        timestamp: new Date().toISOString(),
-        data: {
-            session_id: data.session_id,
-            workspace_path: data.workspace_path
-        }
-    });
+    while (true) {
+        const { done, value } = await reader.read();
 
-    // Add entries for each agent result
-    if (data.results) {
-        for (const [agentName, result] of Object.entries(data.results)) {
-            const status = result.status === 'completed' ? 'step_completed' : 'step_failed';
-            addExecutionLogEntry({
-                event_type: status,
-                message: `Agent "${agentName}": ${result.summary || 'Executed task'}`,
-                timestamp: result.executed_at || new Date().toISOString(),
-                data: {
-                    agent: agentName,
-                    status: result.status,
-                    summary: result.summary
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop(); // Keep incomplete line in buffer
+
+        for (const line of lines) {
+            if (!line.trim() || line.startsWith(':')) continue;
+
+            const dataMatch = line.match(/^data: (.+)$/);
+            if (!dataMatch) continue;
+
+            try {
+                const eventData = JSON.parse(dataMatch[1]);
+
+                // Check for done signal
+                if (eventData.done) {
+                    executionCompleted = true;
+                    break;
                 }
-            });
-        }
-    }
 
-    addExecutionLogEntry({
-        event_type: 'execution_completed',
-        message: data.message || 'Manus execution completed',
-        timestamp: new Date().toISOString()
-    });
+                // Add execution log entry
+                addExecutionLogEntry(eventData);
+
+                // Store final message and workspace info if execution completed
+                if (eventData.event_type === 'execution_completed') {
+                    finalMessage = eventData.data?.final_response || eventData.message;
+                    workspacePath = eventData.data?.workspace_path || '';
+                }
+
+                // Update plan panel if plan_created or plan_updated
+                if ((eventData.event_type === 'plan_created' || eventData.event_type === 'plan_updated') && eventData.data) {
+                    updatePlanProgress(eventData.data);
+                }
+            } catch (e) {
+                console.error('Error parsing SSE data:', e);
+            }
+        }
+
+        if (executionCompleted) break;
+    }
 
     // Remove loading bubble
     removeMessageBubble(loadingId);
 
-    // Add assistant response bubble
-    const finalMessage = data.final_response || data.message || 'Task completed';
+    // Add assistant response bubble with final message
+    if (finalMessage) {
+        // Format the response with workspace info
+        let formattedMessage = `<div class="message-text">${escapeHtml(finalMessage)}</div>`;
 
-    // Format the response with workspace info
-    let formattedMessage = `<div class="message-text">${escapeHtml(finalMessage)}</div>`;
-
-    if (data.workspace_path) {
-        formattedMessage += `<div style="margin-top: 10px; padding: 8px; background: #f3f4f6; border-radius: 4px; font-size: 12px; color: #6b7280;">`;
-        formattedMessage += `<strong>📁 Workspace:</strong> <code>${escapeHtml(data.workspace_path)}</code><br>`;
-        if (data.execution_time !== undefined && data.execution_time !== null) {
-            formattedMessage += `<strong>⏱️ Execution time:</strong> ${Number(data.execution_time).toFixed(2)}s`;
+        if (workspacePath) {
+            formattedMessage += `<div style="margin-top: 10px; padding: 8px; background: #f3f4f6; border-radius: 4px; font-size: 12px; color: #6b7280;">`;
+            formattedMessage += `<strong>📁 Workspace:</strong> <code>${escapeHtml(workspacePath)}</code>`;
+            formattedMessage += `</div>`;
         }
-        formattedMessage += `</div>`;
-    }
 
-    addMessageBubble('assistant', formattedMessage);
+        addMessageBubble('assistant', formattedMessage);
+    } else {
+        addMessageBubble('assistant', 'Execution completed');
+    }
 }
 
 // Add message bubble
