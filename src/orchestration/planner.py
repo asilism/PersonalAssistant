@@ -66,18 +66,53 @@ class Planner:
             return state
 
     async def _create_initial_plan(self, state: State) -> State:
-        """Create initial execution plan from user request"""
+        """Create initial execution plan from user request with streaming"""
 
         # Build prompt for LLM (provider-specific)
         prompt = self._get_initial_plan_prompt(state)
 
         try:
-            # Call LLM
+            # Call LLM with streaming
             print(f"[Planner] Generating initial plan for request: {state.request_text[:100]}...")
-            content = await self.llm_client.generate(
+
+            # Emit initial plan update to show streaming has started
+            await self.event_emitter.emit_plan_updated(
+                trace_id=state.trace.trace_id,
+                plan_data={
+                    "request": state.request_text,
+                    "status": "generating",
+                    "tasks": [],
+                    "progress": {"total": 0, "completed": 0, "in_progress": 0, "pending": 0, "failed": 0}
+                }
+            )
+
+            content = ""
+            last_update_length = 0
+            previous_steps_count = 0
+
+            # Stream the response
+            async for chunk in self.llm_client.generate_stream(
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=4096
-            )
+            ):
+                content += chunk
+
+                # Try to parse and emit updates periodically (every 500 chars or when we detect step completion)
+                if len(content) - last_update_length >= 500 or '}' in chunk:
+                    last_update_length = len(content)
+
+                    # Try to parse partial JSON
+                    partial_plan = self._try_parse_partial_plan(content, state.request_text)
+                    if partial_plan and len(partial_plan.get("tasks", [])) > previous_steps_count:
+                        previous_steps_count = len(partial_plan.get("tasks", []))
+                        print(f"[Planner] Streaming update: {previous_steps_count} steps detected")
+
+                        # Emit plan update with partial data
+                        await self.event_emitter.emit_plan_updated(
+                            trace_id=state.trace.trace_id,
+                            plan_data=partial_plan
+                        )
+
             content = content.strip()
 
             print(f"[Planner] LLM response received, length: {len(content)} chars")
@@ -903,6 +938,99 @@ Return ONLY the JSON, no other text."""
             lines.append(f"  Output: {json.dumps(step_result.output, indent=4)}")
 
         return "\n".join(lines) if lines else "No previous steps"
+
+    def _try_parse_partial_plan(self, content: str, request_text: str) -> Optional[dict]:
+        """
+        Try to parse partial JSON content during streaming.
+        Returns a plan_data dict if parsing is successful, None otherwise.
+        """
+        try:
+            # Remove markdown code blocks if present
+            clean_content = content.strip()
+            if clean_content.startswith("```"):
+                parts = clean_content.split("```")
+                if len(parts) >= 2:
+                    clean_content = parts[1]
+                    if clean_content.startswith("json"):
+                        clean_content = clean_content[4:]
+                    clean_content = clean_content.strip()
+
+            # Try to parse JSON
+            try:
+                response_data = json.loads(clean_content)
+            except json.JSONDecodeError:
+                # If parsing fails, try to fix common issues
+                # Try to find complete JSON objects in the content
+                # Look for pattern: { ... } or [ ... ]
+                if clean_content.startswith('['):
+                    # Try to find complete array elements
+                    brace_count = 0
+                    last_complete_idx = -1
+                    for i, char in enumerate(clean_content):
+                        if char == '{':
+                            brace_count += 1
+                        elif char == '}':
+                            brace_count -= 1
+                            if brace_count == 0:
+                                last_complete_idx = i
+
+                    if last_complete_idx > 0:
+                        # Try to parse up to last complete object
+                        partial_content = clean_content[:last_complete_idx + 1]
+                        if not partial_content.endswith(']'):
+                            partial_content += ']'
+                        try:
+                            response_data = json.loads(partial_content)
+                        except json.JSONDecodeError:
+                            return None
+                    else:
+                        return None
+                else:
+                    return None
+
+            # Handle OpenRouter-specific wrapping
+            if self.settings.llm_provider.lower() == "openrouter":
+                if isinstance(response_data, dict) and not response_data.get("type"):
+                    for key, value in response_data.items():
+                        if isinstance(value, str) and (value.strip().startswith('[') or value.strip().startswith('{')):
+                            try:
+                                response_data = json.loads(value)
+                                break
+                            except json.JSONDecodeError:
+                                continue
+
+            # Extract steps
+            steps_data = response_data if isinstance(response_data, list) else response_data.get("steps", [])
+
+            # Build plan_data for emit_plan_updated
+            tasks = []
+            for i, step_data in enumerate(steps_data):
+                tasks.append({
+                    "name": step_data.get("description", f"Task {i + 1}"),
+                    "agent": step_data.get("tool_name", "unknown"),
+                    "status": "pending",
+                    "priority": "medium",
+                    "description": step_data.get("description", "")
+                })
+
+            plan_data = {
+                "request": request_text,
+                "status": "generating",
+                "tasks": tasks,
+                "progress": {
+                    "total": len(tasks),
+                    "completed": 0,
+                    "in_progress": 0,
+                    "pending": len(tasks),
+                    "failed": 0
+                }
+            }
+
+            return plan_data
+
+        except Exception as e:
+            # Silently fail for partial parsing
+            return None
 
     def _fix_placeholders_in_json(self, content: str) -> str:
         """
