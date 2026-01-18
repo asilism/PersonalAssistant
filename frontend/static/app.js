@@ -197,8 +197,8 @@ async function executeRequest() {
     clearExecutionLogs();
 
     try {
-        // Use fetch to initiate SSE stream
-        const response = await fetch('/api/orchestrate/stream', {
+        // Use fetch to initiate SSE stream (using Manus mode for better planning)
+        const response = await fetch('/api/manus/stream', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -221,6 +221,8 @@ async function executeRequest() {
         let buffer = '';
         let finalMessage = '';
         let executionCompleted = false;
+        let currentStep = null; // Track current step (analyze_request or create_plan)
+        let stepContent = {}; // Store content for each step
 
         while (true) {
             const { done, value } = await reader.read();
@@ -246,8 +248,30 @@ async function executeRequest() {
                         break;
                     }
 
-                    // Add execution log entry
-                    addExecutionLogEntry(eventData);
+                    // Handle plan generation progress - show in chat window
+                    if (eventData.event_type === 'plan_generation_progress') {
+                        const step = eventData.data.step || 'create_plan';
+                        const content = eventData.data.content || '';
+                        const isComplete = eventData.data.is_complete || false;
+
+                        // Update chat bubble with streaming content
+                        let displayContent = '';
+                        if (step === 'analyze_request') {
+                            displayContent = `📘 Step 1: Analyzing Request...\n\n${content}`;
+                        } else if (step === 'create_plan') {
+                            displayContent = `📙 Step 2: Creating Execution Plan...\n\n${content}`;
+                        } else {
+                            displayContent = content;
+                        }
+
+                        updateMessageBubble(loadingId, displayContent, false);
+
+                        // Add simplified log entry
+                        addExecutionLogEntry(eventData);
+                    } else {
+                        // Add execution log entry for other events
+                        addExecutionLogEntry(eventData);
+                    }
 
                     // Store final message and data if execution completed
                     if (eventData.event_type === 'execution_completed') {
@@ -339,6 +363,34 @@ function removeMessageBubble(messageId) {
     if (element) {
         element.remove();
     }
+}
+
+// Update message bubble content (for streaming)
+function updateMessageBubble(messageId, content, isComplete = false) {
+    const element = document.getElementById(messageId);
+    if (!element) return;
+
+    if (isComplete) {
+        // Final message
+        element.innerHTML = `
+            <div class="message-icon">🤖</div>
+            <div class="message-content">${content}</div>
+        `;
+        const timestamp = document.createElement('div');
+        timestamp.className = 'message-timestamp';
+        timestamp.textContent = new Date().toLocaleTimeString();
+        element.appendChild(timestamp);
+    } else {
+        // Streaming content
+        element.innerHTML = `
+            <div class="message-icon">⚡</div>
+            <div class="message-content streaming-content" style="font-family: monospace; white-space: pre-wrap; font-size: 13px; color: #555;">${escapeHtml(content)}</div>
+        `;
+    }
+
+    // Auto-scroll
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 // Format results for display
@@ -936,7 +988,7 @@ function addExecutionLogEntry(eventData) {
     // Add specific data based on event type
     if (eventData.data) {
         if (eventData.event_type === 'plan_generation_progress') {
-            // Handle real-time plan generation streaming
+            // Simplified log entry - main streaming happens in chat window
             const step = eventData.data.step || 'create_plan';
             const entryId = `plan-generation-progress-${step}`;
             const existingProgressEntry = document.getElementById(entryId);
@@ -957,19 +1009,7 @@ function addExecutionLogEntry(eventData) {
             }
 
             if (existingProgressEntry) {
-                // Update existing entry with new content
-                const contentDiv = existingProgressEntry.querySelector('.plan-generation-content');
-                if (contentDiv) {
-                    contentDiv.textContent = eventData.data.content || '';
-                }
-
-                // Update content length indicator
-                const lengthDiv = existingProgressEntry.querySelector('.content-length');
-                if (lengthDiv) {
-                    lengthDiv.textContent = `Content length: ${eventData.data.content_length || 0} characters`;
-                }
-
-                // Update status if complete
+                // Update existing entry status
                 if (eventData.data.is_complete) {
                     const headerDiv = existingProgressEntry.querySelector('.execution-log-header');
                     if (headerDiv) {
@@ -979,34 +1019,21 @@ function addExecutionLogEntry(eventData) {
                         if (iconSpan) iconSpan.textContent = '✅';
                         if (labelSpan) labelSpan.textContent = completedLabel;
                     }
-
-                    // Update border color
-                    const contentBox = existingProgressEntry.querySelector('.plan-generation-content');
-                    if (contentBox) {
-                        contentBox.style.borderLeft = '3px solid #4CAF50';
-                    }
                 }
-
-                // Auto-scroll to bottom
-                logsContent.scrollTop = logsContent.scrollHeight;
                 return; // Don't create new entry
             } else {
-                // Create new entry with ID for updates
+                // Create minimal log entry (streaming shown in chat window)
                 logEntry.id = entryId;
-                // Update label in header
-                const eventInfo = getEventTypeInfo(eventData.event_type);
                 html = `
                     <div class="execution-log-header" style="color: ${borderColor};">
-                        <span class="execution-log-icon">${eventInfo.icon}</span>
+                        <span class="execution-log-icon">⚡</span>
                         <span class="execution-log-type">${stepLabel}</span>
                         <span class="execution-log-time">${timestamp}</span>
                     </div>
+                    <div class="execution-log-details">
+                        <div class="execution-log-detail" style="font-size: 11px; color: #666;">Streaming in chat window...</div>
+                    </div>
                 `;
-                html += `<div class="execution-log-details">`;
-                html += `<div class="execution-log-detail"><strong>Status:</strong> Streaming LLM response in real-time...</div>`;
-                html += `<div class="plan-generation-content" style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px; font-family: monospace; font-size: 11px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; border-left: 3px solid ${borderColor};">${escapeHtml(eventData.data.content || '')}</div>`;
-                html += `<div class="execution-log-detail content-length" style="font-size: 11px; color: #666;">Content length: ${eventData.data.content_length || 0} characters</div>`;
-                html += `</div>`;
             }
         } else if (eventData.event_type === 'plan_created' && eventData.data.steps) {
             html += `<div class="execution-log-details">`;
