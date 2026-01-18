@@ -438,19 +438,26 @@ class ManusCoordinator:
             # Stop agents
             await self.agent_pool.stop_all()
 
-            # Build comprehensive success message
+            # Build task summary
             total_tasks = len(plan_data.get('tasks', []))
             completed_tasks = sum(1 for r in results.values() if r.get('status') == 'completed')
             failed_tasks = sum(1 for r in results.values() if r.get('status') == 'failed')
 
-            if completed:
-                success_message = f'✅ 모든 작업이 성공적으로 완료되었습니다! ({completed_tasks}/{total_tasks} 태스크 완료)'
-                if retry_count > 0:
-                    success_message += f' (재시도 {retry_count}회)'
+            # Build status summary message
+            status_summary = f'({completed_tasks}/{total_tasks} 태스크 완료)'
+            if retry_count > 0:
+                status_summary += f' (재시도 {retry_count}회)'
+
+            # Use final_response as the main message if available, otherwise use generic status message
+            if completed and final_response and final_response.strip():
+                # Use AI-synthesized response as main message
+                user_message = final_response
+            elif completed:
+                user_message = f'✅ 모든 작업이 성공적으로 완료되었습니다! {status_summary}'
             elif completed_tasks > 0:
-                success_message = f'⚠️ 일부 작업만 완료되었습니다. ({completed_tasks}/{total_tasks} 태스크 완료, {failed_tasks}개 실패)'
+                user_message = f'⚠️ 일부 작업만 완료되었습니다. {status_summary}\n\n{final_response if final_response else ""}'.strip()
             else:
-                success_message = f'❌ 작업 실행이 완료되지 못했습니다. ({failed_tasks}/{total_tasks} 태스크 실패)'
+                user_message = f'❌ 작업 실행이 완료되지 못했습니다. ({failed_tasks}/{total_tasks} 태스크 실패)'
 
             # Calculate execution time
             execution_time = (datetime.now() - start_time).total_seconds() * 1000  # milliseconds
@@ -459,7 +466,7 @@ class ManusCoordinator:
             await self.event_emitter.emit_execution_completed(
                 trace_id=self.session_id,
                 success=completed,
-                message=success_message,
+                message=user_message,
                 execution_time=execution_time,
                 results={
                     "results": results,
@@ -476,7 +483,7 @@ class ManusCoordinator:
 
             return {
                 'success': completed,
-                'message': success_message,
+                'message': user_message,
                 'results': results,
                 'final_response': final_response,
                 'session_id': self.session_id,
