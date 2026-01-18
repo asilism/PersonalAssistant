@@ -222,12 +222,50 @@ class MDCommunicator:
             task_file = agent_dir / "task.md"
             result_file = agent_dir / "result.md"
 
-            if task_file.exists():
-                task_file.unlink()
-            if result_file.exists():
-                result_file.unlink()
+            # Use async file deletion with retry logic for Windows file locking
+            await self._safe_delete_file(task_file)
+            await self._safe_delete_file(result_file)
 
             print(f"[MDCommunicator] Cleared task files for {agent_name}")
+
+    async def _safe_delete_file(self, file_path: Path, max_retries: int = 5) -> None:
+        """
+        Safely delete a file with retry logic for Windows file locking issues
+
+        Args:
+            file_path: Path to file to delete
+            max_retries: Maximum number of retry attempts (default: 5)
+        """
+        if not file_path.exists():
+            return
+
+        # Get lock for this file
+        lock = self._get_lock(str(file_path))
+
+        for attempt in range(max_retries):
+            try:
+                async with lock:
+                    # Double-check file still exists
+                    if file_path.exists():
+                        # Use async file removal
+                        await aio_os.remove(str(file_path))
+                        return
+                    else:
+                        return  # Already deleted
+            except PermissionError as e:
+                if attempt < max_retries - 1:
+                    # Wait with exponential backoff before retry
+                    wait_time = 0.1 * (2 ** attempt)  # 0.1s, 0.2s, 0.4s, 0.8s, 1.6s
+                    print(f"[MDCommunicator] File locked: {file_path.name}, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(wait_time)
+                else:
+                    # Last attempt failed - log warning but don't crash
+                    print(f"[MDCommunicator] Warning: Could not delete {file_path.name} after {max_retries} attempts: {e}")
+                    print(f"[MDCommunicator] File may be locked by another process. Continuing anyway...")
+            except Exception as e:
+                # Other errors - log and continue
+                print(f"[MDCommunicator] Warning: Error deleting {file_path.name}: {e}")
+                return
 
     # ========== MD Formatting Methods ==========
 
