@@ -937,13 +937,36 @@ function addExecutionLogEntry(eventData) {
     if (eventData.data) {
         if (eventData.event_type === 'plan_generation_progress') {
             // Handle real-time plan generation streaming
-            const existingProgressEntry = document.getElementById('plan-generation-progress');
+            const step = eventData.data.step || 'create_plan';
+            const entryId = `plan-generation-progress-${step}`;
+            const existingProgressEntry = document.getElementById(entryId);
+
+            // Determine step label
+            let stepLabel = 'Generating Plan...';
+            let completedLabel = 'Plan Generation Complete';
+            let borderColor = '#FF9800';
+
+            if (step === 'analyze_request') {
+                stepLabel = 'Step 1: Analyzing Request...';
+                completedLabel = 'Step 1: Analysis Complete ✅';
+                borderColor = '#2196F3';
+            } else if (step === 'create_plan') {
+                stepLabel = 'Step 2: Creating Execution Plan...';
+                completedLabel = 'Step 2: Plan Creation Complete ✅';
+                borderColor = '#FF9800';
+            }
 
             if (existingProgressEntry) {
                 // Update existing entry with new content
                 const contentDiv = existingProgressEntry.querySelector('.plan-generation-content');
                 if (contentDiv) {
                     contentDiv.textContent = eventData.data.content || '';
+                }
+
+                // Update content length indicator
+                const lengthDiv = existingProgressEntry.querySelector('.content-length');
+                if (lengthDiv) {
+                    lengthDiv.textContent = `Content length: ${eventData.data.content_length || 0} characters`;
                 }
 
                 // Update status if complete
@@ -954,7 +977,13 @@ function addExecutionLogEntry(eventData) {
                         const iconSpan = headerDiv.querySelector('.execution-log-icon');
                         const labelSpan = headerDiv.querySelector('.execution-log-type');
                         if (iconSpan) iconSpan.textContent = '✅';
-                        if (labelSpan) labelSpan.textContent = 'Plan Generation Complete';
+                        if (labelSpan) labelSpan.textContent = completedLabel;
+                    }
+
+                    // Update border color
+                    const contentBox = existingProgressEntry.querySelector('.plan-generation-content');
+                    if (contentBox) {
+                        contentBox.style.borderLeft = '3px solid #4CAF50';
                     }
                 }
 
@@ -963,11 +992,20 @@ function addExecutionLogEntry(eventData) {
                 return; // Don't create new entry
             } else {
                 // Create new entry with ID for updates
-                logEntry.id = 'plan-generation-progress';
+                logEntry.id = entryId;
+                // Update label in header
+                const eventInfo = getEventTypeInfo(eventData.event_type);
+                html = `
+                    <div class="execution-log-header" style="color: ${borderColor};">
+                        <span class="execution-log-icon">${eventInfo.icon}</span>
+                        <span class="execution-log-type">${stepLabel}</span>
+                        <span class="execution-log-time">${timestamp}</span>
+                    </div>
+                `;
                 html += `<div class="execution-log-details">`;
-                html += `<div class="execution-log-detail"><strong>Status:</strong> Streaming LLM response...</div>`;
-                html += `<div class="plan-generation-content" style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px; font-family: monospace; font-size: 11px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; border-left: 3px solid #FF9800;">${escapeHtml(eventData.data.content || '')}</div>`;
-                html += `<div class="execution-log-detail" style="font-size: 11px; color: #666;">Content length: ${eventData.data.content_length || 0} characters</div>`;
+                html += `<div class="execution-log-detail"><strong>Status:</strong> Streaming LLM response in real-time...</div>`;
+                html += `<div class="plan-generation-content" style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px; font-family: monospace; font-size: 11px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; border-left: 3px solid ${borderColor};">${escapeHtml(eventData.data.content || '')}</div>`;
+                html += `<div class="execution-log-detail content-length" style="font-size: 11px; color: #666;">Content length: ${eventData.data.content_length || 0} characters</div>`;
                 html += `</div>`;
             }
         } else if (eventData.event_type === 'plan_created' && eventData.data.steps) {

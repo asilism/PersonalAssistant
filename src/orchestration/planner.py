@@ -89,7 +89,6 @@ class Planner:
             content = ""
             last_update_length = 0
             previous_steps_count = 0
-            chunk_count = 0
 
             # Stream the response
             async for chunk in self.llm_client.generate_stream(
@@ -97,14 +96,6 @@ class Planner:
                 max_tokens=4096
             ):
                 content += chunk
-                chunk_count += 1
-
-                # Emit real-time progress for every chunk (token-level streaming)
-                await self.event_emitter.emit_plan_generation_progress(
-                    trace_id=state.trace.trace_id,
-                    content=content,
-                    is_complete=False
-                )
 
                 # Try to parse and emit updates periodically (every 500 chars or when we detect step completion)
                 if len(content) - last_update_length >= 500 or '}' in chunk:
@@ -123,13 +114,6 @@ class Planner:
                         )
 
             content = content.strip()
-
-            # Emit final progress event
-            await self.event_emitter.emit_plan_generation_progress(
-                trace_id=state.trace.trace_id,
-                content=content,
-                is_complete=True
-            )
 
             print(f"[Planner] LLM response received, length: {len(content)} chars")
 

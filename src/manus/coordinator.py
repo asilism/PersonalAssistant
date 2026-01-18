@@ -127,7 +127,7 @@ class ManusCoordinator:
                 message="Analyzing request and identifying required capabilities",
                 data={"step": "analyze_request"}
             ))
-            analysis = await self.supervisor.analyze_request(request)
+            analysis = await self.supervisor.analyze_request(request, session_id=self.session_id)
             await self.event_emitter.emit(ExecutionEvent(
                 event_type=ExecutionEventType.STEP_COMPLETED,
                 trace_id=self.session_id,
@@ -143,7 +143,7 @@ class ManusCoordinator:
                 message="Creating execution plan with task breakdown",
                 data={"step": "create_plan"}
             ))
-            plan_data = await self.supervisor.create_plan(request, analysis)
+            plan_data = await self.supervisor.create_plan(request, analysis, session_id=self.session_id)
 
             if 'error' not in plan_data:
                 await self.event_emitter.emit(ExecutionEvent(

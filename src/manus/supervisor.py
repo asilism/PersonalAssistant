@@ -10,6 +10,7 @@ from pathlib import Path
 
 from orchestration.llm_client import create_llm_client, LLMClient
 from orchestration.types import OrchestrationSettings, ToolDefinition
+from orchestration.event_emitter import get_event_emitter
 from .md_communicator import MDCommunicator
 
 
@@ -54,12 +55,13 @@ class SupervisorAgent:
         print(f"[SupervisorAgent] Initialized with {len(available_agents)} agents")
         print(f"[SupervisorAgent] Using LLM: {settings.llm_provider}/{settings.llm_model}")
 
-    async def analyze_request(self, request: str) -> str:
+    async def analyze_request(self, request: str, session_id: Optional[str] = None) -> str:
         """
         Analyze user request and generate high-level understanding
 
         Args:
             request: User request text
+            session_id: Optional session ID for event streaming
 
         Returns:
             Analysis text
@@ -76,22 +78,60 @@ Provide a brief analysis (2-3 sentences) covering:
 Analysis:"""
 
         try:
-            analysis = await self.llm_client.generate(
+            # Get event emitter if session_id provided
+            event_emitter = get_event_emitter() if session_id else None
+
+            # Stream the response with real-time progress
+            content = ""
+            async for chunk in self.llm_client.generate_stream(
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=500
-            )
-            return analysis.strip()
+            ):
+                content += chunk
+
+                # Emit real-time progress (using plan_generation_progress for now)
+                if event_emitter:
+                    await event_emitter.emit(ExecutionEvent(
+                        event_type=ExecutionEventType.PLAN_GENERATION_PROGRESS,
+                        trace_id=session_id,
+                        message="Analyzing request...",
+                        data={
+                            "content": content,
+                            "is_complete": False,
+                            "content_length": len(content),
+                            "step": "analyze_request"
+                        }
+                    ))
+
+            analysis = content.strip()
+
+            # Emit final progress
+            if event_emitter:
+                await event_emitter.emit(ExecutionEvent(
+                    event_type=ExecutionEventType.PLAN_GENERATION_PROGRESS,
+                    trace_id=session_id,
+                    message="Request analysis complete",
+                    data={
+                        "content": analysis,
+                        "is_complete": True,
+                        "content_length": len(analysis),
+                        "step": "analyze_request"
+                    }
+                ))
+
+            return analysis
         except Exception as e:
             print(f"[SupervisorAgent] Error during analysis: {e}")
             return f"Error analyzing request: {str(e)}"
 
-    async def create_plan(self, request: str, analysis: str) -> Dict[str, Any]:
+    async def create_plan(self, request: str, analysis: str, session_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Create execution plan with task breakdown
 
         Args:
             request: User request text
             analysis: Analysis from analyze_request()
+            session_id: Optional session ID for event streaming
 
         Returns:
             Plan dictionary with tasks
@@ -171,6 +211,9 @@ CRITICAL RULES:
         try:
             print("[SupervisorAgent] Generating execution plan...")
 
+            # Get event emitter if session_id provided
+            event_emitter = get_event_emitter() if session_id else None
+
             # Retry loop for JSON parsing errors
             max_retries = 2
             last_error = None
@@ -195,10 +238,31 @@ Return ONLY the JSON object, nothing else."""
                 else:
                     current_prompt = prompt
 
-                response = await self.llm_client.generate(
+                # Stream the response with real-time progress updates
+                content = ""
+                async for chunk in self.llm_client.generate_stream(
                     messages=[{"role": "user", "content": current_prompt}],
                     max_tokens=8192
-                )
+                ):
+                    content += chunk
+
+                    # Emit real-time progress for every chunk (token-level streaming)
+                    if event_emitter:
+                        await event_emitter.emit_plan_generation_progress(
+                            trace_id=session_id,
+                            content=content,
+                            is_complete=False
+                        )
+
+                response = content.strip()
+
+                # Emit final progress event
+                if event_emitter:
+                    await event_emitter.emit_plan_generation_progress(
+                        trace_id=session_id,
+                        content=response,
+                        is_complete=True
+                    )
 
                 # Clean response
                 response = response.strip()
