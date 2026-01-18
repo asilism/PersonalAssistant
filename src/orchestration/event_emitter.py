@@ -125,7 +125,8 @@ class ExecutionEventEmitter:
         self,
         trace_id: str,
         content: str,
-        is_complete: bool = False
+        is_complete: bool = False,
+        step: str = "create_plan"
     ):
         """Emit real-time plan generation progress with raw content streaming"""
         event = ExecutionEvent(
@@ -135,7 +136,8 @@ class ExecutionEventEmitter:
             data={
                 "content": content,
                 "is_complete": is_complete,
-                "content_length": len(content)
+                "content_length": len(content),
+                "step": step
             }
         )
         await self.emit(event)

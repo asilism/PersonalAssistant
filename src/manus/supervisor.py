@@ -89,35 +89,25 @@ Analysis:"""
             ):
                 content += chunk
 
-                # Emit real-time progress (using plan_generation_progress for now)
+                # Emit real-time progress
                 if event_emitter:
-                    await event_emitter.emit(ExecutionEvent(
-                        event_type=ExecutionEventType.PLAN_GENERATION_PROGRESS,
+                    await event_emitter.emit_plan_generation_progress(
                         trace_id=session_id,
-                        message="Analyzing request...",
-                        data={
-                            "content": content,
-                            "is_complete": False,
-                            "content_length": len(content),
-                            "step": "analyze_request"
-                        }
-                    ))
+                        content=content,
+                        is_complete=False,
+                        step="analyze_request"
+                    )
 
             analysis = content.strip()
 
             # Emit final progress
             if event_emitter:
-                await event_emitter.emit(ExecutionEvent(
-                    event_type=ExecutionEventType.PLAN_GENERATION_PROGRESS,
+                await event_emitter.emit_plan_generation_progress(
                     trace_id=session_id,
-                    message="Request analysis complete",
-                    data={
-                        "content": analysis,
-                        "is_complete": True,
-                        "content_length": len(analysis),
-                        "step": "analyze_request"
-                    }
-                ))
+                    content=analysis,
+                    is_complete=True,
+                    step="analyze_request"
+                )
 
             return analysis
         except Exception as e:
@@ -251,7 +241,8 @@ Return ONLY the JSON object, nothing else."""
                         await event_emitter.emit_plan_generation_progress(
                             trace_id=session_id,
                             content=content,
-                            is_complete=False
+                            is_complete=False,
+                            step="create_plan"
                         )
 
                 response = content.strip()
@@ -261,7 +252,8 @@ Return ONLY the JSON object, nothing else."""
                     await event_emitter.emit_plan_generation_progress(
                         trace_id=session_id,
                         content=response,
-                        is_complete=True
+                        is_complete=True,
+                        step="create_plan"
                     )
 
                 # Clean response
