@@ -225,8 +225,8 @@ async function executeRequest() {
     // Disable button and show loading
     submitBtn.disabled = true;
 
-    // Add loading bubble
-    const loadingId = addMessageBubble('assistant', '', true);
+    // Add loading bubble (only for LangGraph mode, Manus mode uses planning indicator)
+    const loadingId = executionMode !== 'manus' ? addMessageBubble('assistant', '', true) : null;
 
     // Clear previous logs
     clearExecutionLogs();
@@ -240,7 +240,7 @@ async function executeRequest() {
             await executeLangGraphMode(requestText, userId, tenant, currentSessionId, loadingId);
         }
     } catch (error) {
-        removeMessageBubble(loadingId);
+        if (loadingId) removeMessageBubble(loadingId);
         addMessageBubble('error', `Network error: ${error.message}`);
         addExecutionLogEntry({
             event_type: 'execution_error',
@@ -329,8 +329,8 @@ async function executeLangGraphMode(requestText, userId, tenant, sessionId, load
         if (executionCompleted) break;
     }
 
-    // Remove loading bubble
-    removeMessageBubble(loadingId);
+    // Remove loading bubble (if exists)
+    if (loadingId) removeMessageBubble(loadingId);
 
     // Add assistant response bubble with final message
     if (finalMessage) {
@@ -418,9 +418,8 @@ async function executeManusMode(requestText, userId, tenant, sessionId, loadingI
                     }
                 }
 
-                // Update plan panel and chat if plan_created or plan_updated
+                // Update plan in chat if plan_created or plan_updated
                 if ((eventData.event_type === 'plan_created' || eventData.event_type === 'plan_updated') && eventData.data) {
-                    updatePlanProgress(eventData.data);
                     updatePlanMessageInChat(eventData.data);
                 }
             } catch (e) {
@@ -431,8 +430,8 @@ async function executeManusMode(requestText, userId, tenant, sessionId, loadingI
         if (executionCompleted) break;
     }
 
-    // Remove loading bubble
-    removeMessageBubble(loadingId);
+    // Remove loading bubble (if exists)
+    if (loadingId) removeMessageBubble(loadingId);
 
     // Add assistant response bubble with final message
     if (finalMessage) {
@@ -1163,10 +1162,6 @@ function addExecutionLogEntry(eventData) {
             html += `</ul>`;
             html += `</div>`;
         } else if (eventData.event_type === 'plan_updated') {
-            // Update plan progress panel
-            if (eventData.data.plan_content) {
-                updatePlanProgress(eventData.data.plan_content);
-            }
             // Show progress in log
             if (eventData.data.progress) {
                 html += `<div class="execution-log-details">`;
@@ -2107,31 +2102,6 @@ async function loadMCPTools() {
 }
 
 // Expose functions to global scope for inline onclick handlers (ES modules)
-// Plan Progress Functions
-function togglePlanProgress() {
-    const section = document.getElementById('planProgressSection');
-    const content = document.getElementById('planProgressContent');
-
-    if (content.style.display === 'none') {
-        content.style.display = 'block';
-        section.classList.remove('plan-collapsed');
-    } else {
-        content.style.display = 'none';
-        section.classList.add('plan-collapsed');
-    }
-}
-
-function updatePlanProgress(planData) {
-    const section = document.getElementById('planProgressSection');
-    const content = document.getElementById('planProgressContent');
-
-    // Show the section if hidden
-    section.style.display = 'block';
-
-    // Render plan content as markdown-like HTML
-    const html = renderPlanMarkdown(planData);
-    content.innerHTML = html;
-}
 
 // Show planning indicator in chat
 function showPlanningIndicator() {
@@ -2283,7 +2253,6 @@ function renderPlanMarkdown(planData) {
 
 window.switchTab = switchTab;
 window.clearChatHistory = clearChatHistory;
-window.togglePlanProgress = togglePlanProgress;
 window.showAddConfigForm = showAddConfigForm;
 window.cancelConfigForm = cancelConfigForm;
 window.editConfig = editConfig;
