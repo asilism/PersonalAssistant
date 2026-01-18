@@ -254,6 +254,8 @@ async function executeRequest() {
                         const content = eventData.data.content || '';
                         const isComplete = eventData.data.is_complete || false;
 
+                        console.log('[Chat Streaming]', step, 'length:', content.length, 'complete:', isComplete);
+
                         // Update chat bubble with streaming content
                         let displayContent = '';
                         if (step === 'analyze_request') {
@@ -264,9 +266,9 @@ async function executeRequest() {
                             displayContent = content;
                         }
 
-                        updateMessageBubble(loadingId, displayContent, false);
+                        updateMessageBubble(loadingId, displayContent, isComplete);
 
-                        // Add simplified log entry
+                        // Add simplified log entry (only once per step)
                         addExecutionLogEntry(eventData);
                     } else {
                         // Add execution log entry for other events
@@ -368,13 +370,18 @@ function removeMessageBubble(messageId) {
 // Update message bubble content (for streaming)
 function updateMessageBubble(messageId, content, isComplete = false) {
     const element = document.getElementById(messageId);
-    if (!element) return;
+    if (!element) {
+        console.warn('[updateMessageBubble] Element not found:', messageId);
+        return;
+    }
+
+    console.log('[updateMessageBubble]', 'id:', messageId, 'content length:', content.length, 'complete:', isComplete);
 
     if (isComplete) {
         // Final message
         element.innerHTML = `
             <div class="message-icon">🤖</div>
-            <div class="message-content">${content}</div>
+            <div class="message-content">${escapeHtml(content)}</div>
         `;
         const timestamp = document.createElement('div');
         timestamp.className = 'message-timestamp';
@@ -962,7 +969,63 @@ function clearExecutionLogs() {
 function addExecutionLogEntry(eventData) {
     const logsContent = document.getElementById('logsContent');
 
-    // Create log entry element
+    // Special handling for plan_generation_progress - minimal log entry
+    if (eventData.event_type === 'plan_generation_progress') {
+        const step = eventData.data.step || 'create_plan';
+        const entryId = `plan-generation-progress-${step}`;
+        const existingProgressEntry = document.getElementById(entryId);
+
+        // Determine step label
+        let stepLabel = 'Generating Plan...';
+        let completedLabel = 'Plan Generation Complete';
+        let borderColor = '#FF9800';
+
+        if (step === 'analyze_request') {
+            stepLabel = 'Step 1: Analyzing Request...';
+            completedLabel = 'Step 1: Analysis Complete ✅';
+            borderColor = '#2196F3';
+        } else if (step === 'create_plan') {
+            stepLabel = 'Step 2: Creating Execution Plan...';
+            completedLabel = 'Step 2: Plan Creation Complete ✅';
+            borderColor = '#FF9800';
+        }
+
+        if (existingProgressEntry) {
+            // Update existing entry status only when complete
+            if (eventData.data.is_complete) {
+                const headerDiv = existingProgressEntry.querySelector('.execution-log-header');
+                if (headerDiv) {
+                    headerDiv.style.color = '#4CAF50';
+                    const iconSpan = headerDiv.querySelector('.execution-log-icon');
+                    const labelSpan = headerDiv.querySelector('.execution-log-type');
+                    if (iconSpan) iconSpan.textContent = '✅';
+                    if (labelSpan) labelSpan.textContent = completedLabel;
+                }
+            }
+            return; // Don't create new entry
+        } else {
+            // Create minimal log entry (streaming shown in chat window)
+            const timestamp = new Date(eventData.timestamp).toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.id = entryId;
+            logEntry.className = 'execution-log-entry';
+            logEntry.innerHTML = `
+                <div class="execution-log-header" style="color: ${borderColor};">
+                    <span class="execution-log-icon">⚡</span>
+                    <span class="execution-log-type">${stepLabel}</span>
+                    <span class="execution-log-time">${timestamp}</span>
+                </div>
+                <div class="execution-log-details">
+                    <div class="execution-log-detail" style="font-size: 11px; color: #666;">Streaming in main chat window...</div>
+                </div>
+            `;
+            logsContent.appendChild(logEntry);
+            logsContent.scrollTop = logsContent.scrollHeight;
+            return;
+        }
+    }
+
+    // Create log entry element for other events
     const logEntry = document.createElement('div');
     logEntry.className = 'execution-log-entry';
 
@@ -987,55 +1050,7 @@ function addExecutionLogEntry(eventData) {
 
     // Add specific data based on event type
     if (eventData.data) {
-        if (eventData.event_type === 'plan_generation_progress') {
-            // Simplified log entry - main streaming happens in chat window
-            const step = eventData.data.step || 'create_plan';
-            const entryId = `plan-generation-progress-${step}`;
-            const existingProgressEntry = document.getElementById(entryId);
-
-            // Determine step label
-            let stepLabel = 'Generating Plan...';
-            let completedLabel = 'Plan Generation Complete';
-            let borderColor = '#FF9800';
-
-            if (step === 'analyze_request') {
-                stepLabel = 'Step 1: Analyzing Request...';
-                completedLabel = 'Step 1: Analysis Complete ✅';
-                borderColor = '#2196F3';
-            } else if (step === 'create_plan') {
-                stepLabel = 'Step 2: Creating Execution Plan...';
-                completedLabel = 'Step 2: Plan Creation Complete ✅';
-                borderColor = '#FF9800';
-            }
-
-            if (existingProgressEntry) {
-                // Update existing entry status
-                if (eventData.data.is_complete) {
-                    const headerDiv = existingProgressEntry.querySelector('.execution-log-header');
-                    if (headerDiv) {
-                        headerDiv.style.color = '#4CAF50';
-                        const iconSpan = headerDiv.querySelector('.execution-log-icon');
-                        const labelSpan = headerDiv.querySelector('.execution-log-type');
-                        if (iconSpan) iconSpan.textContent = '✅';
-                        if (labelSpan) labelSpan.textContent = completedLabel;
-                    }
-                }
-                return; // Don't create new entry
-            } else {
-                // Create minimal log entry (streaming shown in chat window)
-                logEntry.id = entryId;
-                html = `
-                    <div class="execution-log-header" style="color: ${borderColor};">
-                        <span class="execution-log-icon">⚡</span>
-                        <span class="execution-log-type">${stepLabel}</span>
-                        <span class="execution-log-time">${timestamp}</span>
-                    </div>
-                    <div class="execution-log-details">
-                        <div class="execution-log-detail" style="font-size: 11px; color: #666;">Streaming in chat window...</div>
-                    </div>
-                `;
-            }
-        } else if (eventData.event_type === 'plan_created' && eventData.data.steps) {
+        if (eventData.event_type === 'plan_created' && eventData.data.steps) {
             html += `<div class="execution-log-details">`;
             html += `<div class="execution-log-detail"><strong>Plan ID:</strong> ${eventData.data.plan_id}</div>`;
             html += `<div class="execution-log-detail"><strong>Steps:</strong></div>`;
