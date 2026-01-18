@@ -242,6 +242,9 @@ async function executeRequest() {
                 try {
                     const eventData = JSON.parse(dataMatch[1]);
 
+                    // DEBUG: Log ALL events
+                    console.log('[SSE Event Received]', eventData.event_type, eventData);
+
                     // Check for done signal
                     if (eventData.done) {
                         executionCompleted = true;
@@ -268,8 +271,8 @@ async function executeRequest() {
 
                         updateMessageBubble(loadingId, displayContent, isComplete);
 
-                        // Add simplified log entry (only once per step)
-                        addExecutionLogEntry(eventData);
+                        // DON'T add to execution log - streaming shown in chat window
+                        // addExecutionLogEntry(eventData);  // COMMENTED OUT
                     } else {
                         // Add execution log entry for other events
                         addExecutionLogEntry(eventData);

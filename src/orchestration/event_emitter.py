@@ -129,6 +129,7 @@ class ExecutionEventEmitter:
         step: str = "create_plan"
     ):
         """Emit real-time plan generation progress with raw content streaming"""
+        print(f"[EventEmitter] 🔥 Emitting plan_generation_progress: step={step}, length={len(content)}, complete={is_complete}")
         event = ExecutionEvent(
             event_type=ExecutionEventType.PLAN_GENERATION_PROGRESS,
             trace_id=trace_id,
