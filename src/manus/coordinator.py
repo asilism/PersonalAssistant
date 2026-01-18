@@ -101,6 +101,9 @@ class ManusCoordinator:
                 - session_id: str
                 - retry_count: int (number of retries performed)
         """
+        # Track execution time
+        start_time = datetime.now()
+
         # Initialize session
         await self._initialize_session(session_id)
 
@@ -221,6 +224,8 @@ class ManusCoordinator:
                 ))
                 completed, results = await self._execute_tasks_with_dependencies(
                     plan_data,
+                    request=request,
+                    analysis=analysis,
                     max_wait_time=max_wait_time,
                     completed_tasks=completed_tasks
                 )
@@ -439,16 +444,20 @@ class ManusCoordinator:
             elif not completed:
                 success_message = 'Request partially completed'
 
+            # Calculate execution time
+            execution_time = (datetime.now() - start_time).total_seconds() * 1000  # milliseconds
+
             # Emit execution completed event
             await self.event_emitter.emit_execution_completed(
                 trace_id=self.session_id,
+                success=completed,
                 message=success_message,
-                data={
+                execution_time=execution_time,
+                results={
                     "results": results,
                     "final_response": final_response,
                     "workspace_path": str(self.workspace_path),
-                    "retry_count": retry_count,
-                    "success": completed
+                    "retry_count": retry_count
                 }
             )
 
@@ -555,6 +564,8 @@ class ManusCoordinator:
     async def _execute_tasks_with_dependencies(
         self,
         plan_data: Dict[str, Any],
+        request: str,
+        analysis: Dict[str, Any],
         max_wait_time: int = 60,
         completed_tasks: Optional[Dict[str, Any]] = None
     ) -> tuple[bool, Dict[str, Any]]:
@@ -563,6 +574,8 @@ class ManusCoordinator:
 
         Args:
             plan_data: Plan data with tasks
+            request: Original user request
+            analysis: Request analysis from supervisor
             max_wait_time: Maximum time to wait per task (seconds)
             completed_tasks: Dict of already completed tasks {task_id: result}
 
@@ -585,6 +598,32 @@ class ManusCoordinator:
         all_results = {}
         all_success = True
 
+        # Helper function to update plan progress
+        async def update_plan_progress():
+            completed_count = sum(1 for r in all_results.values() if r.get('status') == 'completed')
+            failed_count = sum(1 for r in all_results.values() if r.get('status') == 'failed')
+            in_progress_count = len([t for t in sorted_tasks if t['task_id'] in [r.get('task_id') for r in all_results.values() if r.get('status') == 'in_progress']])
+            pending_count = len(tasks) - completed_count - failed_count - in_progress_count
+
+            plan_content = {
+                'request': request,
+                'analysis': analysis,
+                'tasks': tasks,
+                'progress': {
+                    'total': len(tasks),
+                    'completed': completed_count,
+                    'in_progress': in_progress_count,
+                    'pending': pending_count,
+                    'failed': failed_count
+                }
+            }
+
+            # Emit plan updated event
+            await self.event_emitter.emit_plan_updated(
+                trace_id=self.session_id,
+                plan_data=plan_content
+            )
+
         for task in sorted_tasks:
             task_id = task['task_id']
             agent_name = task.get('agent')
@@ -600,6 +639,8 @@ class ManusCoordinator:
                 all_results[agent_name] = cached_result
                 print(f"\n[ManusCoordinator] ⚡ Task {task_id} already completed - using cached result")
                 print(f"[ManusCoordinator]    Status: {cached_result.get('status')}")
+                # Update plan to reflect cached completion
+                await update_plan_progress()
                 continue
 
             print(f"\n[ManusCoordinator] === Assigning task {task_id} to agent {agent_name} ===")
@@ -609,6 +650,10 @@ class ManusCoordinator:
 
             # Assign this task to its agent
             await self.supervisor.assign_tasks({'tasks': [task]})
+
+            # Mark task as in_progress and update plan
+            all_results[agent_name] = {'task_id': task_id, 'status': 'in_progress'}
+            await update_plan_progress()
 
             # Wait for this specific agent to complete
             completed, result = await self._wait_for_agent(
@@ -627,6 +672,9 @@ class ManusCoordinator:
                 if result:
                     all_results[agent_name] = result
                 print(f"[ManusCoordinator] ✗ Task {task_id} failed or timed out")
+
+            # Update plan after task completion/failure
+            await update_plan_progress()
 
         return all_success, all_results
 

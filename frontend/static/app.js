@@ -945,6 +945,26 @@ function addExecutionLogEntry(eventData) {
             });
             html += `</ul>`;
             html += `</div>`;
+        } else if (eventData.event_type === 'plan_updated' && eventData.data.progress) {
+            html += `<div class="execution-log-details">`;
+            const progress = eventData.data.progress;
+            html += `<div class="execution-log-detail"><strong>Progress:</strong></div>`;
+            html += `<div style="margin: 5px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;">`;
+            html += `<div style="display: flex; gap: 15px; font-size: 12px;">`;
+            html += `<span>✅ Completed: <strong>${progress.completed}/${progress.total}</strong></span>`;
+            html += `<span>🔄 In Progress: <strong>${progress.in_progress}</strong></span>`;
+            html += `<span>⏳ Pending: <strong>${progress.pending}</strong></span>`;
+            if (progress.failed > 0) {
+                html += `<span style="color: #f44336;">❌ Failed: <strong>${progress.failed}</strong></span>`;
+            }
+            html += `</div>`;
+            // Progress bar
+            const completedPercent = Math.round((progress.completed / progress.total) * 100);
+            html += `<div style="margin-top: 8px; background: #e0e0e0; border-radius: 4px; height: 8px; overflow: hidden;">`;
+            html += `<div style="width: ${completedPercent}%; background: #4CAF50; height: 100%; transition: width 0.3s;"></div>`;
+            html += `</div>`;
+            html += `</div>`;
+            html += `</div>`;
         } else if (eventData.event_type === 'step_started') {
             html += `<div class="execution-log-details">`;
             html += `<div class="execution-log-detail"><strong>Tool:</strong> ${eventData.data.tool_name}</div>`;
@@ -992,6 +1012,7 @@ function getEventTypeInfo(eventType) {
     const eventTypes = {
         'execution_started': { icon: '🚀', color: '#2196F3', label: 'Execution Started' },
         'plan_created': { icon: '📋', color: '#4CAF50', label: 'Plan Created' },
+        'plan_updated': { icon: '🔄', color: '#2196F3', label: 'Plan Updated' },
         'step_started': { icon: '▶️', color: '#FF9800', label: 'Step Started' },
         'step_completed': { icon: '✅', color: '#4CAF50', label: 'Step Completed' },
         'step_failed': { icon: '❌', color: '#f44336', label: 'Step Failed' },
