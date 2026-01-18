@@ -438,11 +438,19 @@ class ManusCoordinator:
             # Stop agents
             await self.agent_pool.stop_all()
 
-            success_message = 'Request completed'
-            if retry_count > 0:
-                success_message += f' after {retry_count} retry attempts'
-            elif not completed:
-                success_message = 'Request partially completed'
+            # Build comprehensive success message
+            total_tasks = len(plan_data.get('tasks', []))
+            completed_tasks = sum(1 for r in results.values() if r.get('status') == 'completed')
+            failed_tasks = sum(1 for r in results.values() if r.get('status') == 'failed')
+
+            if completed:
+                success_message = f'✅ 모든 작업이 성공적으로 완료되었습니다! ({completed_tasks}/{total_tasks} 태스크 완료)'
+                if retry_count > 0:
+                    success_message += f' (재시도 {retry_count}회)'
+            elif completed_tasks > 0:
+                success_message = f'⚠️ 일부 작업만 완료되었습니다. ({completed_tasks}/{total_tasks} 태스크 완료, {failed_tasks}개 실패)'
+            else:
+                success_message = f'❌ 작업 실행이 완료되지 못했습니다. ({failed_tasks}/{total_tasks} 태스크 실패)'
 
             # Calculate execution time
             execution_time = (datetime.now() - start_time).total_seconds() * 1000  # milliseconds
@@ -457,7 +465,12 @@ class ManusCoordinator:
                     "results": results,
                     "final_response": final_response,
                     "workspace_path": str(self.workspace_path),
-                    "retry_count": retry_count
+                    "retry_count": retry_count,
+                    "task_summary": {
+                        "total": total_tasks,
+                        "completed": completed_tasks,
+                        "failed": failed_tasks
+                    }
                 }
             )
 

@@ -409,6 +409,13 @@ async function executeManusMode(requestText, userId, tenant, sessionId, loadingI
                 if (eventData.event_type === 'execution_completed') {
                     finalMessage = eventData.data?.final_response || eventData.message;
                     workspacePath = eventData.data?.workspace_path || '';
+
+                    // Store task summary for completion message
+                    if (eventData.data?.task_summary) {
+                        window.lastTaskSummary = eventData.data.task_summary;
+                        window.lastExecutionSuccess = eventData.data?.success;
+                        window.lastExecutionTime = eventData.data?.execution_time;
+                    }
                 }
 
                 // Update plan panel and chat if plan_created or plan_updated
@@ -429,8 +436,61 @@ async function executeManusMode(requestText, userId, tenant, sessionId, loadingI
 
     // Add assistant response bubble with final message
     if (finalMessage) {
-        // Format the response with workspace info
-        let formattedMessage = `<div class="message-text">${escapeHtml(finalMessage)}</div>`;
+        // Format the response with completion message
+        let formattedMessage = '';
+
+        // Add completion summary card if task summary is available
+        if (window.lastTaskSummary) {
+            const taskSummary = window.lastTaskSummary;
+            const success = window.lastExecutionSuccess;
+            const executionTime = window.lastExecutionTime;
+
+            let messageClass = 'completion-message';
+            if (!success && taskSummary.completed > 0) {
+                messageClass += ' partial';
+            } else if (!success) {
+                messageClass += ' failed';
+            }
+
+            formattedMessage += `<div class="${messageClass}">`;
+            formattedMessage += `<div class="completion-message-header">`;
+            if (success) {
+                formattedMessage += `<span>🎉</span> <span>모든 작업이 완료되었습니다!</span>`;
+            } else if (taskSummary.completed > 0) {
+                formattedMessage += `<span>⚠️</span> <span>일부 작업만 완료되었습니다</span>`;
+            } else {
+                formattedMessage += `<span>❌</span> <span>작업 실행 실패</span>`;
+            }
+            formattedMessage += `</div>`;
+
+            formattedMessage += `<div class="completion-message-stats">`;
+            formattedMessage += `<div class="completion-stat">`;
+            formattedMessage += `<div class="completion-stat-label">완료된 태스크</div>`;
+            formattedMessage += `<div class="completion-stat-value">${taskSummary.completed}/${taskSummary.total}</div>`;
+            formattedMessage += `</div>`;
+            if (taskSummary.failed > 0) {
+                formattedMessage += `<div class="completion-stat">`;
+                formattedMessage += `<div class="completion-stat-label">실패한 태스크</div>`;
+                formattedMessage += `<div class="completion-stat-value" style="color: var(--error-color);">${taskSummary.failed}</div>`;
+                formattedMessage += `</div>`;
+            }
+            if (executionTime) {
+                formattedMessage += `<div class="completion-stat">`;
+                formattedMessage += `<div class="completion-stat-label">실행 시간</div>`;
+                formattedMessage += `<div class="completion-stat-value">${(executionTime / 1000).toFixed(1)}초</div>`;
+                formattedMessage += `</div>`;
+            }
+            formattedMessage += `</div>`;
+            formattedMessage += `</div>`;
+
+            // Clean up temporary data
+            delete window.lastTaskSummary;
+            delete window.lastExecutionSuccess;
+            delete window.lastExecutionTime;
+        }
+
+        // Add the final response
+        formattedMessage += `<div class="message-text" style="margin-top: 10px;">${escapeHtml(finalMessage)}</div>`;
 
         if (workspacePath) {
             formattedMessage += `<div style="margin-top: 10px; padding: 8px; background: #f3f4f6; border-radius: 4px; font-size: 12px; color: #6b7280;">`;
@@ -2172,9 +2232,18 @@ function renderPlanMarkdown(planData) {
                 'failed': '❌'
             }[status] || '📝';
 
-            html += `<h3>`;
+            // Status text for badge
+            const statusText = {
+                'pending': '대기 중',
+                'in_progress': '진행 중',
+                'completed': '완료',
+                'failed': '실패'
+            }[status] || status;
+
+            html += `<h3 class="task-${status}">`;
             html += `<input type="checkbox" ${checked} disabled class="${checkboxClass}"> `;
-            html += `Task ${index + 1}: ${escapeHtml(task.name || 'Unnamed Task')} ${statusEmoji}`;
+            html += `Task ${index + 1}: ${escapeHtml(task.name || 'Unnamed Task')} `;
+            html += `<span class="status-badge-inline ${status}">${statusText}</span>`;
             html += `</h3>`;
 
             html += `<ul>`;
