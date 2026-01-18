@@ -719,66 +719,78 @@ body {
     font-size: 12px;
 }
 
-/* Completion message styling */
-.completion-message {
-    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-    border: 2px solid var(--success-color);
-    border-radius: 12px;
-    padding: 20px 24px;
-    margin: 16px 0;
+/* Task Summary Compact - Collapsible */
+.task-summary-compact {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0;
+    margin: 0;
 }
 
-.completion-message.partial {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+.task-summary-compact.partial {
     border-color: #f59e0b;
+    background: #fef3c7;
 }
 
-.completion-message.failed {
-    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+.task-summary-compact.failed {
     border-color: var(--error-color);
+    background: #fee2e2;
 }
 
-.completion-message-header {
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 12px;
+.task-summary-header {
+    cursor: pointer;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    user-select: none;
+    list-style: none;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
-.completion-message-body {
-    font-size: 14px;
-    color: var(--text-secondary);
-    line-height: 1.6;
+.task-summary-header::-webkit-details-marker {
+    display: none;
 }
 
-.completion-message-stats {
+.task-summary-header:hover {
+    color: var(--text-primary);
+}
+
+.task-summary-content {
+    padding: 0 14px 10px;
+    border-top: 1px solid var(--border-color);
+}
+
+.task-summary-stats {
     display: flex;
-    gap: 16px;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    gap: 12px;
+    margin-top: 10px;
 }
 
-.completion-stat {
+.task-summary-stat {
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
-.completion-stat-label {
+.task-summary-stat .stat-label {
     font-size: 11px;
     color: var(--text-tertiary);
     text-transform: uppercase;
     font-weight: 500;
 }
 
-.completion-stat-value {
-    font-size: 16px;
+.task-summary-stat .stat-value {
+    font-size: 14px;
     font-weight: 600;
     color: var(--text-primary);
+}
+
+.task-summary-stat .stat-value.stat-error {
+    color: var(--error-color);
 }
 
 .plan-progress-content strong {
