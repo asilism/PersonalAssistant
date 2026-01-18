@@ -225,8 +225,8 @@ async function executeRequest() {
     // Disable button and show loading
     submitBtn.disabled = true;
 
-    // Add loading bubble
-    const loadingId = addMessageBubble('assistant', '', true);
+    // Add loading bubble (only for LangGraph mode, Manus mode uses planning indicator)
+    const loadingId = executionMode !== 'manus' ? addMessageBubble('assistant', '', true) : null;
 
     // Clear previous logs
     clearExecutionLogs();
@@ -240,7 +240,7 @@ async function executeRequest() {
             await executeLangGraphMode(requestText, userId, tenant, currentSessionId, loadingId);
         }
     } catch (error) {
-        removeMessageBubble(loadingId);
+        if (loadingId) removeMessageBubble(loadingId);
         addMessageBubble('error', `Network error: ${error.message}`);
         addExecutionLogEntry({
             event_type: 'execution_error',
@@ -329,8 +329,8 @@ async function executeLangGraphMode(requestText, userId, tenant, sessionId, load
         if (executionCompleted) break;
     }
 
-    // Remove loading bubble
-    removeMessageBubble(loadingId);
+    // Remove loading bubble (if exists)
+    if (loadingId) removeMessageBubble(loadingId);
 
     // Add assistant response bubble with final message
     if (finalMessage) {
@@ -430,8 +430,8 @@ async function executeManusMode(requestText, userId, tenant, sessionId, loadingI
         if (executionCompleted) break;
     }
 
-    // Remove loading bubble
-    removeMessageBubble(loadingId);
+    // Remove loading bubble (if exists)
+    if (loadingId) removeMessageBubble(loadingId);
 
     // Add assistant response bubble with final message
     if (finalMessage) {
