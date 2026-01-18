@@ -789,10 +789,77 @@ class ManusRequest(BaseModel):
     max_wait_time: Optional[int] = 60
 
 
+@app.post("/api/manus/stream")
+async def manus_stream(request: ManusRequest):
+    """
+    Execute a request using Manus-style multi-agent system with streaming logs via SSE
+    """
+    try:
+        coordinator = get_manus_coordinator(request.user_id, request.tenant)
+        session_id = request.session_id or str(uuid.uuid4())
+        trace_id = session_id  # Use session_id as trace_id for Manus
+
+        event_emitter = get_event_emitter()
+
+        async def event_generator():
+            """Generate SSE events"""
+            try:
+                # Start streaming events for this trace_id
+                event_stream = event_emitter.stream_events(trace_id)
+
+                # Run coordinator in background task
+                async def run_coordinator():
+                    try:
+                        await coordinator.run(
+                            request=request.request_text,
+                            session_id=session_id,
+                            max_wait_time=request.max_wait_time
+                        )
+                    except Exception as e:
+                        logger.error(f"Error in coordinator.run: {e}")
+                        await event_emitter.emit_execution_error(
+                            trace_id=trace_id,
+                            error=str(e),
+                            error_type=type(e).__name__
+                        )
+
+                # Start the coordinator task
+                coordinator_task = asyncio.create_task(run_coordinator())
+
+                # Stream events
+                async for event_data in event_stream:
+                    yield event_data
+
+                # Wait for coordinator to complete
+                await coordinator_task
+
+            except Exception as e:
+                logger.error(f"Error in event_generator: {e}")
+                error_data = {
+                    "event_type": "stream_error",
+                    "error": str(e)
+                }
+                yield f"data: {json.dumps(error_data)}\n\n"
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"  # Disable nginx buffering
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error in manus_stream: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/manus/run")
 async def manus_run(request: ManusRequest):
     """
-    Execute a request using Manus-style multi-agent system
+    Execute a request using Manus-style multi-agent system (non-streaming)
 
     This endpoint uses a supervisor agent to coordinate multiple specialized agents
     that work asynchronously via Markdown file communication.
