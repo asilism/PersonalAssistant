@@ -121,6 +121,25 @@ class ExecutionEventEmitter:
         )
         await self.emit(event)
 
+    async def emit_plan_generation_progress(
+        self,
+        trace_id: str,
+        content: str,
+        is_complete: bool = False
+    ):
+        """Emit real-time plan generation progress with raw content streaming"""
+        event = ExecutionEvent(
+            event_type=ExecutionEventType.PLAN_GENERATION_PROGRESS,
+            trace_id=trace_id,
+            message="Generating plan..." if not is_complete else "Plan generation complete",
+            data={
+                "content": content,
+                "is_complete": is_complete,
+                "content_length": len(content)
+            }
+        )
+        await self.emit(event)
+
     async def emit_step_started(
         self,
         trace_id: str,

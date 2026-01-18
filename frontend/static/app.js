@@ -935,7 +935,42 @@ function addExecutionLogEntry(eventData) {
 
     // Add specific data based on event type
     if (eventData.data) {
-        if (eventData.event_type === 'plan_created' && eventData.data.steps) {
+        if (eventData.event_type === 'plan_generation_progress') {
+            // Handle real-time plan generation streaming
+            const existingProgressEntry = document.getElementById('plan-generation-progress');
+
+            if (existingProgressEntry) {
+                // Update existing entry with new content
+                const contentDiv = existingProgressEntry.querySelector('.plan-generation-content');
+                if (contentDiv) {
+                    contentDiv.textContent = eventData.data.content || '';
+                }
+
+                // Update status if complete
+                if (eventData.data.is_complete) {
+                    const headerDiv = existingProgressEntry.querySelector('.execution-log-header');
+                    if (headerDiv) {
+                        headerDiv.style.color = '#4CAF50';
+                        const iconSpan = headerDiv.querySelector('.execution-log-icon');
+                        const labelSpan = headerDiv.querySelector('.execution-log-type');
+                        if (iconSpan) iconSpan.textContent = '✅';
+                        if (labelSpan) labelSpan.textContent = 'Plan Generation Complete';
+                    }
+                }
+
+                // Auto-scroll to bottom
+                logsContent.scrollTop = logsContent.scrollHeight;
+                return; // Don't create new entry
+            } else {
+                // Create new entry with ID for updates
+                logEntry.id = 'plan-generation-progress';
+                html += `<div class="execution-log-details">`;
+                html += `<div class="execution-log-detail"><strong>Status:</strong> Streaming LLM response...</div>`;
+                html += `<div class="plan-generation-content" style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px; font-family: monospace; font-size: 11px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; border-left: 3px solid #FF9800;">${escapeHtml(eventData.data.content || '')}</div>`;
+                html += `<div class="execution-log-detail" style="font-size: 11px; color: #666;">Content length: ${eventData.data.content_length || 0} characters</div>`;
+                html += `</div>`;
+            }
+        } else if (eventData.event_type === 'plan_created' && eventData.data.steps) {
             html += `<div class="execution-log-details">`;
             html += `<div class="execution-log-detail"><strong>Plan ID:</strong> ${eventData.data.plan_id}</div>`;
             html += `<div class="execution-log-detail"><strong>Steps:</strong></div>`;
@@ -1013,6 +1048,7 @@ function getEventTypeInfo(eventType) {
         'execution_started': { icon: '🚀', color: '#2196F3', label: 'Execution Started' },
         'plan_created': { icon: '📋', color: '#4CAF50', label: 'Plan Created' },
         'plan_updated': { icon: '🔄', color: '#2196F3', label: 'Plan Updated' },
+        'plan_generation_progress': { icon: '⚡', color: '#FF9800', label: 'Generating Plan...' },
         'step_started': { icon: '▶️', color: '#FF9800', label: 'Step Started' },
         'step_completed': { icon: '✅', color: '#4CAF50', label: 'Step Completed' },
         'step_failed': { icon: '❌', color: '#f44336', label: 'Step Failed' },
