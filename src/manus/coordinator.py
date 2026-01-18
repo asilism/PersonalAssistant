@@ -109,7 +109,10 @@ class ManusCoordinator:
         # Emit execution started event
         await self.event_emitter.emit_execution_started(
             trace_id=self.session_id,
-            request=request
+            session_id=self.session_id,
+            request_text=request,
+            user_id=self.user_id,
+            tenant=self.tenant
         )
 
         try:
@@ -171,7 +174,9 @@ class ManusCoordinator:
             # Emit plan created/updated event
             await self.event_emitter.emit_plan_created(
                 trace_id=self.session_id,
-                plan_data=plan_content
+                plan_id=self.session_id,
+                steps=plan_data.get('tasks', []),
+                total_steps=len(plan_data.get('tasks', []))
             )
 
             # Step 3: Start agent monitoring
