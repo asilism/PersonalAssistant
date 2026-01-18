@@ -615,8 +615,25 @@ class ManusCoordinator:
         async def update_plan_progress():
             completed_count = sum(1 for r in all_results.values() if r.get('status') == 'completed')
             failed_count = sum(1 for r in all_results.values() if r.get('status') == 'failed')
-            in_progress_count = len([t for t in sorted_tasks if t['task_id'] in [r.get('task_id') for r in all_results.values() if r.get('status') == 'in_progress']])
+            in_progress_count = len([r for r in all_results.values() if r.get('status') == 'in_progress'])
             pending_count = len(tasks) - completed_count - failed_count - in_progress_count
+
+            # Update each task's status based on results
+            for task in tasks:
+                task_id = task['task_id']
+                agent_name = task.get('agent')
+                if agent_name and agent_name in all_results:
+                    task['status'] = all_results[agent_name].get('status', 'pending')
+                elif task_id in completed_tasks:
+                    task['status'] = 'completed'
+                else:
+                    # Check if any result has this task_id
+                    for result in all_results.values():
+                        if result.get('task_id') == task_id:
+                            task['status'] = result.get('status', 'pending')
+                            break
+                    else:
+                        task['status'] = task.get('status', 'pending')
 
             plan_content = {
                 'request': request,

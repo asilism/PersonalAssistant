@@ -436,61 +436,63 @@ async function executeManusMode(requestText, userId, tenant, sessionId, loadingI
 
     // Add assistant response bubble with final message
     if (finalMessage) {
-        // Format the response with completion message
+        // Format the response with final message as main content
         let formattedMessage = '';
 
-        // Add completion summary card if task summary is available
+        // Add the LLM-generated final response as the main message
+        formattedMessage += `<div class="message-text">${escapeHtml(finalMessage)}</div>`;
+
+        // Add collapsible task summary if available
         if (window.lastTaskSummary) {
             const taskSummary = window.lastTaskSummary;
             const success = window.lastExecutionSuccess;
             const executionTime = window.lastExecutionTime;
 
-            let messageClass = 'completion-message';
+            let summaryClass = 'task-summary-compact';
             if (!success && taskSummary.completed > 0) {
-                messageClass += ' partial';
+                summaryClass += ' partial';
             } else if (!success) {
-                messageClass += ' failed';
+                summaryClass += ' failed';
             }
 
-            formattedMessage += `<div class="${messageClass}">`;
-            formattedMessage += `<div class="completion-message-header">`;
+            formattedMessage += `<details class="${summaryClass}" style="margin-top: 12px;" ${success ? '' : 'open'}>`;
+            formattedMessage += `<summary class="task-summary-header">`;
             if (success) {
-                formattedMessage += `<span>🎉</span> <span>모든 작업이 완료되었습니다!</span>`;
+                formattedMessage += `✅ 작업 완료 (${taskSummary.completed}/${taskSummary.total})`;
             } else if (taskSummary.completed > 0) {
-                formattedMessage += `<span>⚠️</span> <span>일부 작업만 완료되었습니다</span>`;
+                formattedMessage += `⚠️ 일부 완료 (${taskSummary.completed}/${taskSummary.total})`;
             } else {
-                formattedMessage += `<span>❌</span> <span>작업 실행 실패</span>`;
+                formattedMessage += `❌ 작업 실패 (${taskSummary.failed}/${taskSummary.total})`;
             }
-            formattedMessage += `</div>`;
+            formattedMessage += `</summary>`;
 
-            formattedMessage += `<div class="completion-message-stats">`;
-            formattedMessage += `<div class="completion-stat">`;
-            formattedMessage += `<div class="completion-stat-label">완료된 태스크</div>`;
-            formattedMessage += `<div class="completion-stat-value">${taskSummary.completed}/${taskSummary.total}</div>`;
+            formattedMessage += `<div class="task-summary-content">`;
+            formattedMessage += `<div class="task-summary-stats">`;
+            formattedMessage += `<div class="task-summary-stat">`;
+            formattedMessage += `<span class="stat-label">완료</span>`;
+            formattedMessage += `<span class="stat-value">${taskSummary.completed}/${taskSummary.total}</span>`;
             formattedMessage += `</div>`;
             if (taskSummary.failed > 0) {
-                formattedMessage += `<div class="completion-stat">`;
-                formattedMessage += `<div class="completion-stat-label">실패한 태스크</div>`;
-                formattedMessage += `<div class="completion-stat-value" style="color: var(--error-color);">${taskSummary.failed}</div>`;
+                formattedMessage += `<div class="task-summary-stat">`;
+                formattedMessage += `<span class="stat-label">실패</span>`;
+                formattedMessage += `<span class="stat-value stat-error">${taskSummary.failed}</span>`;
                 formattedMessage += `</div>`;
             }
             if (executionTime) {
-                formattedMessage += `<div class="completion-stat">`;
-                formattedMessage += `<div class="completion-stat-label">실행 시간</div>`;
-                formattedMessage += `<div class="completion-stat-value">${(executionTime / 1000).toFixed(1)}초</div>`;
+                formattedMessage += `<div class="task-summary-stat">`;
+                formattedMessage += `<span class="stat-label">실행 시간</span>`;
+                formattedMessage += `<span class="stat-value">${(executionTime / 1000).toFixed(1)}초</span>`;
                 formattedMessage += `</div>`;
             }
             formattedMessage += `</div>`;
             formattedMessage += `</div>`;
+            formattedMessage += `</details>`;
 
             // Clean up temporary data
             delete window.lastTaskSummary;
             delete window.lastExecutionSuccess;
             delete window.lastExecutionTime;
         }
-
-        // Add the final response
-        formattedMessage += `<div class="message-text" style="margin-top: 10px;">${escapeHtml(finalMessage)}</div>`;
 
         if (workspacePath) {
             formattedMessage += `<div style="margin-top: 10px; padding: 8px; background: #f3f4f6; border-radius: 4px; font-size: 12px; color: #6b7280;">`;
