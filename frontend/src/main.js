@@ -396,14 +396,41 @@ async function executeManusMode(requestText, userId, tenant, sessionId, loadingI
             try {
                 const eventData = JSON.parse(dataMatch[1]);
 
+                // DEBUG: Log all events
+                console.log('[SSE Event]', eventData.event_type, eventData);
+
                 // Check for done signal
                 if (eventData.done) {
                     executionCompleted = true;
                     break;
                 }
 
-                // Add execution log entry
-                addExecutionLogEntry(eventData);
+                // Handle plan_generation_progress - show in CHAT WINDOW, not execution log
+                if (eventData.event_type === 'plan_generation_progress') {
+                    const step = eventData.data?.step || 'create_plan';
+                    const content = eventData.data?.content || '';
+                    const isComplete = eventData.data?.is_complete || false;
+
+                    console.log('[Chat Streaming]', step, 'length:', content.length, 'complete:', isComplete);
+
+                    // Update loading bubble with streaming content
+                    if (loadingId) {
+                        let displayContent = '';
+                        if (step === 'analyze_request') {
+                            displayContent = `📘 Step 1: Analyzing Request...\n\n${content}`;
+                        } else if (step === 'create_plan') {
+                            displayContent = `📙 Step 2: Creating Execution Plan...\n\n${content}`;
+                        } else {
+                            displayContent = content;
+                        }
+                        updateMessageBubble(loadingId, displayContent, isComplete);
+                    }
+
+                    // DON'T add to execution log - only show in chat
+                } else {
+                    // Add all OTHER events to execution log
+                    addExecutionLogEntry(eventData);
+                }
 
                 // Store final message and workspace info if execution completed
                 if (eventData.event_type === 'execution_completed') {
@@ -554,6 +581,41 @@ function removeMessageBubble(messageId) {
     const element = document.getElementById(messageId);
     if (element) {
         element.remove();
+    }
+}
+
+// Update message bubble content (for streaming)
+function updateMessageBubble(messageId, content, isComplete = false) {
+    const element = document.getElementById(messageId);
+    if (!element) {
+        console.warn('[updateMessageBubble] Element not found:', messageId);
+        return;
+    }
+
+    console.log('[updateMessageBubble]', 'id:', messageId, 'content length:', content.length, 'complete:', isComplete);
+
+    if (isComplete) {
+        // Final message - convert to normal assistant message
+        element.innerHTML = `
+            <div class="message-icon">🤖</div>
+            <div class="message-content">${escapeHtml(content)}</div>
+        `;
+        const timestamp = document.createElement('div');
+        timestamp.className = 'message-timestamp';
+        timestamp.textContent = new Date().toLocaleTimeString();
+        element.appendChild(timestamp);
+    } else {
+        // Streaming content - show with typing indicator
+        element.innerHTML = `
+            <div class="message-icon">⚡</div>
+            <div class="message-content" style="font-family: monospace; white-space: pre-wrap; font-size: 13px; color: #555;">${escapeHtml(content)}</div>
+        `;
+    }
+
+    // Auto-scroll
+    const chatMessages = document.getElementById('chatMessages');
+    if (chatMessages) {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 }
 
