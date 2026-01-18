@@ -225,8 +225,8 @@ async function executeRequest() {
     // Disable button and show loading
     submitBtn.disabled = true;
 
-    // Add loading bubble (only for LangGraph mode, Manus mode uses planning indicator)
-    const loadingId = executionMode !== 'manus' ? addMessageBubble('assistant', '', true) : null;
+    // Add loading bubble for streaming content
+    const loadingId = addMessageBubble('assistant', '', true);
 
     // Clear previous logs
     clearExecutionLogs();
