@@ -170,6 +170,7 @@ class ExecutionEventType(str, Enum):
     EXECUTION_STARTED = "execution_started"
     PLAN_CREATED = "plan_created"
     PLAN_UPDATED = "plan_updated"
+    PLAN_GENERATION_PROGRESS = "plan_generation_progress"  # Real-time plan text streaming
     STEP_STARTED = "step_started"
     STEP_COMPLETED = "step_completed"
     STEP_FAILED = "step_failed"
