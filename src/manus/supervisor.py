@@ -1044,6 +1044,16 @@ When a task needs to use the output from a previous task:
                 summary_lines.append(f"  Summary: {summary}")
             if errors:
                 summary_lines.append(f"  Errors: {errors}")
+
+            # Include actual tool outputs if available
+            if 'results' in result_data and result_data['results']:
+                summary_lines.append(f"  Detailed Results:")
+                for idx, tool_result in enumerate(result_data['results'], 1):
+                    tool_name = tool_result.get('tool', 'unknown')
+                    output = tool_result.get('output', {})
+                    summary_lines.append(f"    Call {idx} ({tool_name}):")
+                    summary_lines.append(f"      {json.dumps(output, ensure_ascii=False, indent=6)}")
+
             summary_lines.append("")
 
         return "\n".join(summary_lines)
