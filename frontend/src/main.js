@@ -556,9 +556,11 @@ function addMessageBubble(type, content, isLoading = false, showTimestamp = true
                 <div class="message-content">${escapeHtml(content)}</div>
             `;
         } else {
+            // Render markdown for assistant messages
+            const renderedContent = window.marked ? window.marked.parse(content) : content;
             messageDiv.innerHTML = `
                 <div class="message-icon">🤖</div>
-                <div class="message-content">${content}</div>
+                <div class="message-content">${renderedContent}</div>
             `;
         }
 
@@ -595,10 +597,11 @@ function updateMessageBubble(messageId, content, isComplete = false) {
     console.log('[updateMessageBubble]', 'id:', messageId, 'content length:', content.length, 'complete:', isComplete);
 
     if (isComplete) {
-        // Final message - convert to normal assistant message
+        // Final message - convert to normal assistant message with markdown rendering
+        const renderedContent = window.marked ? window.marked.parse(content) : escapeHtml(content);
         element.innerHTML = `
             <div class="message-icon">🤖</div>
-            <div class="message-content">${escapeHtml(content)}</div>
+            <div class="message-content">${renderedContent}</div>
         `;
         const timestamp = document.createElement('div');
         timestamp.className = 'message-timestamp';
