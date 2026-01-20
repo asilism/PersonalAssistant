@@ -116,6 +116,7 @@ body {
     transition: all 0.15s ease;
     text-align: left;
     width: 100%;
+    position: relative;
 }
 
 .session-item:hover {
@@ -136,10 +137,21 @@ body {
     white-space: nowrap;
 }
 
-.session-item .session-delete {
+.session-item .session-actions {
+    display: flex;
+    gap: 4px;
     opacity: 0;
-    width: 20px;
-    height: 20px;
+    transition: opacity 0.15s ease;
+}
+
+.session-item:hover .session-actions {
+    opacity: 1;
+}
+
+.session-item .session-edit,
+.session-item .session-delete {
+    width: 24px;
+    height: 24px;
     border: none;
     background: transparent;
     color: var(--text-tertiary);
@@ -150,10 +162,12 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
 }
 
-.session-item:hover .session-delete {
-    opacity: 1;
+.session-item .session-edit:hover {
+    background: var(--accent-color);
+    color: white;
 }
 
 .session-item .session-delete:hover {
@@ -169,6 +183,138 @@ body {
     gap: 2px;
     border-top: 1px solid var(--border-color);
     margin-top: auto;
+}
+
+/* User Profile Menu */
+.user-profile-menu {
+    position: relative;
+}
+
+.user-profile-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    width: 100%;
+    text-align: left;
+}
+
+.user-profile-btn:hover {
+    background: var(--bg-tertiary);
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.user-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.user-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-email {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dropdown-arrow {
+    flex-shrink: 0;
+    color: var(--text-tertiary);
+    transition: transform 0.2s ease;
+}
+
+.user-profile-btn.active .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+/* User Dropdown Menu */
+.user-dropdown-menu {
+    position: absolute;
+    bottom: 100%;
+    left: 8px;
+    right: 8px;
+    margin-bottom: 4px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: all 0.2s ease;
+    z-index: 1000;
+    padding: 4px;
+}
+
+.user-dropdown-menu.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    width: 100%;
+    text-align: left;
+}
+
+.dropdown-item:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.dropdown-item svg {
+    flex-shrink: 0;
+}
+
+.dropdown-item-danger {
+    color: var(--error-color);
+}
+
+.dropdown-item-danger:hover {
+    background: #fef2f2;
+    color: var(--error-color);
+}
+
+.dropdown-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 4px 0;
 }
 
 .sidebar-nav {

@@ -119,6 +119,72 @@ function setupExecutionModeListeners() {
     });
 }
 
+// User profile menu management
+function setupUserProfileMenu() {
+    const profileBtn = document.getElementById('userProfileBtn');
+    const dropdownMenu = document.getElementById('userDropdownMenu');
+
+    if (!profileBtn || !dropdownMenu) return;
+
+    // Toggle dropdown on button click
+    profileBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isActive = dropdownMenu.classList.contains('show');
+
+        if (isActive) {
+            closeUserDropdown();
+        } else {
+            openUserDropdown();
+        }
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!profileBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
+            closeUserDropdown();
+        }
+    });
+
+    // Close dropdown when clicking menu items
+    dropdownMenu.querySelectorAll('.dropdown-item').forEach(item => {
+        item.addEventListener('click', () => {
+            closeUserDropdown();
+        });
+    });
+}
+
+function openUserDropdown() {
+    const profileBtn = document.getElementById('userProfileBtn');
+    const dropdownMenu = document.getElementById('userDropdownMenu');
+
+    if (profileBtn && dropdownMenu) {
+        profileBtn.classList.add('active');
+        dropdownMenu.classList.add('show');
+    }
+}
+
+function closeUserDropdown() {
+    const profileBtn = document.getElementById('userProfileBtn');
+    const dropdownMenu = document.getElementById('userDropdownMenu');
+
+    if (profileBtn && dropdownMenu) {
+        profileBtn.classList.remove('active');
+        dropdownMenu.classList.remove('show');
+    }
+}
+
+function handleLogout() {
+    if (confirm('Are you sure you want to logout?')) {
+        // Clear session data
+        localStorage.clear();
+        sessionStorage.clear();
+
+        // Redirect to login page or reload
+        alert('Logged out successfully. In a real application, you would be redirected to the login page.');
+        // window.location.href = '/login';  // Uncomment when login page is available
+    }
+}
+
 // Load chat history
 async function loadChatHistory() {
     const sessionId = getOrCreateSessionId();
@@ -176,6 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSessions();  // Load chat sessions in sidebar
     loadExecutionMode();
     setupExecutionModeListeners();
+    setupUserProfileMenu();  // Set up user profile dropdown
 
     // Set up form submission
     document.getElementById('requestForm').addEventListener('submit', async (e) => {
@@ -2341,13 +2408,23 @@ async function loadSessions() {
                             data-session-id="${session.session_id}"
                             onclick="switchSession('${session.session_id}')">
                         <span class="session-title">${escapeHtml(session.title || 'Untitled')}</span>
-                        <button class="session-delete"
-                                onclick="event.stopPropagation(); deleteSession('${session.session_id}')"
-                                title="Delete session">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                            </svg>
-                        </button>
+                        <div class="session-actions">
+                            <button class="session-edit"
+                                    onclick="event.stopPropagation(); editSessionTitle('${session.session_id}', '${escapeHtml(session.title || 'Untitled').replace(/'/g, "\\'")}')"
+                                    title="Edit session title">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                            </button>
+                            <button class="session-delete"
+                                    onclick="event.stopPropagation(); deleteSession('${session.session_id}')"
+                                    title="Delete session">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                </svg>
+                            </button>
+                        </div>
                     </button>
                 `;
             });
@@ -2382,6 +2459,12 @@ async function switchSession(newSessionId) {
     document.querySelectorAll('.session-item').forEach(item => {
         if (item.dataset.sessionId === newSessionId) {
             item.classList.add('active');
+            // Update chat header title from session item
+            const sessionTitle = item.querySelector('.session-title');
+            const chatTitle = document.querySelector('.chat-title');
+            if (sessionTitle && chatTitle) {
+                chatTitle.textContent = sessionTitle.textContent;
+            }
         } else {
             item.classList.remove('active');
         }
@@ -2446,6 +2529,47 @@ async function startNewChat() {
     }
 }
 
+// Edit session title
+async function editSessionTitle(sessionIdToEdit, currentTitle) {
+    const newTitle = prompt('Enter new title for this conversation:', currentTitle);
+
+    if (newTitle === null || newTitle.trim() === '' || newTitle === currentTitle) {
+        return; // User cancelled or didn't change the title
+    }
+
+    try {
+        const response = await fetch(`/api/sessions/${sessionIdToEdit}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: newTitle.trim()
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Reload the sessions list to show the updated title
+            await loadSessions();
+
+            // Update chat header if this is the current session
+            if (sessionIdToEdit === getOrCreateSessionId()) {
+                const chatTitle = document.querySelector('.chat-title');
+                if (chatTitle) {
+                    chatTitle.textContent = newTitle.trim();
+                }
+            }
+        } else {
+            alert('Failed to update session title: ' + (data.detail || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error updating session title:', error);
+        alert('Error updating session title: ' + error.message);
+    }
+}
+
 // Delete a session
 async function deleteSession(sessionIdToDelete) {
     if (!confirm('Are you sure you want to delete this conversation?')) {
@@ -2480,4 +2604,8 @@ async function deleteSession(sessionIdToDelete) {
 window.loadSessions = loadSessions;
 window.switchSession = switchSession;
 window.startNewChat = startNewChat;
+window.editSessionTitle = editSessionTitle;
 window.deleteSession = deleteSession;
+
+// Export user profile functions
+window.handleLogout = handleLogout;
