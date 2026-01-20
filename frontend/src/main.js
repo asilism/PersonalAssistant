@@ -2404,7 +2404,7 @@ async function loadSessions() {
             data.sessions.forEach(session => {
                 const isActive = session.session_id === currentSessionId;
                 html += `
-                    <button class="session-item ${isActive ? 'active' : ''}"
+                    <div class="session-item ${isActive ? 'active' : ''}"
                             data-session-id="${session.session_id}"
                             onclick="switchSession('${session.session_id}')">
                         <span class="session-title">${escapeHtml(session.title || 'Untitled')}</span>
@@ -2425,7 +2425,7 @@ async function loadSessions() {
                                 </svg>
                             </button>
                         </div>
-                    </button>
+                    </div>
                 `;
             });
 
@@ -2506,6 +2506,18 @@ async function startNewChat() {
             sessionId = data.session_id;
             localStorage.setItem('sessionId', data.session_id);
 
+            // Switch to chat tab
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.getElementById('chat-tab')?.classList.add('active');
+
+            // Update chat header title
+            const chatTitle = document.querySelector('.chat-title');
+            if (chatTitle) {
+                chatTitle.textContent = 'New conversation';
+            }
+
             // Clear chat messages
             const chatMessages = document.getElementById('chatMessages');
             chatMessages.innerHTML = `
@@ -2518,8 +2530,14 @@ async function startNewChat() {
             // Clear execution logs
             clearExecutionLogs();
 
-            // Reload sessions list
+            // Reload sessions list to show the new session
             await loadSessions();
+
+            // Focus on the input field
+            const requestText = document.getElementById('requestText');
+            if (requestText) {
+                requestText.focus();
+            }
         } else {
             alert('Failed to create new session: ' + (data.detail || 'Unknown error'));
         }
