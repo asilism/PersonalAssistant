@@ -190,6 +190,11 @@ async function loadChatHistory() {
     const sessionId = getOrCreateSessionId();
     const chatMessages = document.getElementById('chatMessages');
 
+    if (!chatMessages) {
+        console.error('chatMessages element not found');
+        return;
+    }
+
     try {
         const response = await fetch(`/api/chat-history?session_id=${sessionId}`);
         const data = await response.json();
@@ -202,9 +207,24 @@ async function loadChatHistory() {
             data.messages.forEach(msg => {
                 addMessageBubble(msg.role, msg.content, false, false);
             });
+        } else {
+            // No messages - show welcome message
+            chatMessages.innerHTML = `
+                <div class="welcome-message">
+                    <h2>What can I help you with?</h2>
+                    <p>MCP 서버에 등록된 도구들을 활용하여 다양한 작업을 수행할 수 있습니다.</p>
+                </div>
+            `;
         }
     } catch (error) {
         console.error('Failed to load chat history:', error);
+        // Show welcome message on error too
+        chatMessages.innerHTML = `
+            <div class="welcome-message">
+                <h2>What can I help you with?</h2>
+                <p>MCP 서버에 등록된 도구들을 활용하여 다양한 작업을 수행할 수 있습니다.</p>
+            </div>
+        `;
     }
 }
 
@@ -305,8 +325,10 @@ async function executeRequest() {
         });
     } finally {
         submitBtn.disabled = false;
+        // Auto-update session title if it's a new conversation
+        await autoUpdateSessionTitle(currentSessionId, requestText);
         // Reload sessions list to show the new/updated session
-        loadSessions();
+        await loadSessions();
     }
 }
 
@@ -2544,6 +2566,57 @@ async function startNewChat() {
     } catch (error) {
         console.error('Error creating new session:', error);
         alert('Error creating new session: ' + error.message);
+    }
+}
+
+// Auto-update session title based on first message
+async function autoUpdateSessionTitle(sessionIdToUpdate, userMessage) {
+    try {
+        // Get session info first to check current title
+        const response = await fetch(`/api/sessions?user_id=test_user&tenant=test_tenant&limit=50`);
+        const data = await response.json();
+
+        if (!response.ok || !data.sessions) {
+            return; // Failed to get sessions, skip auto-update
+        }
+
+        // Find the current session
+        const currentSession = data.sessions.find(s => s.session_id === sessionIdToUpdate);
+
+        if (!currentSession) {
+            return; // Session not found
+        }
+
+        // Only update if title is default
+        const defaultTitles = ['New conversation', 'Untitled', 'new conversation', 'untitled'];
+        if (!defaultTitles.includes(currentSession.title)) {
+            return; // Title already customized, don't auto-update
+        }
+
+        // Generate title from first message (max 50 characters)
+        const newTitle = userMessage.trim().substring(0, 50) + (userMessage.length > 50 ? '...' : '');
+
+        // Update the session title
+        const updateResponse = await fetch(`/api/sessions/${sessionIdToUpdate}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: newTitle
+            })
+        });
+
+        if (updateResponse.ok) {
+            // Update chat header if this is the current session
+            const chatTitle = document.querySelector('.chat-title');
+            if (chatTitle) {
+                chatTitle.textContent = newTitle;
+            }
+        }
+    } catch (error) {
+        console.error('Error auto-updating session title:', error);
+        // Don't show error to user, this is a background operation
     }
 }
 
