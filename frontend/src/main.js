@@ -190,8 +190,10 @@ async function loadChatHistory() {
     const sessionId = getOrCreateSessionId();
     const chatMessages = document.getElementById('chatMessages');
 
+    console.log('[loadChatHistory] Loading for session:', sessionId);
+
     if (!chatMessages) {
-        console.error('chatMessages element not found');
+        console.error('[loadChatHistory] chatMessages element not found');
         return;
     }
 
@@ -199,16 +201,21 @@ async function loadChatHistory() {
         const response = await fetch(`/api/chat-history?session_id=${sessionId}`);
         const data = await response.json();
 
+        console.log('[loadChatHistory] Response:', response.ok, 'Messages:', data.messages?.length || 0);
+
         if (response.ok && data.messages && data.messages.length > 0) {
             // Clear existing messages
             chatMessages.innerHTML = '';
 
             // Add each message
             data.messages.forEach(msg => {
+                console.log('[loadChatHistory] Adding message:', msg.role, msg.content.substring(0, 50) + '...');
                 addMessageBubble(msg.role, msg.content, false, false);
             });
+            console.log('[loadChatHistory] Added', data.messages.length, 'messages');
         } else {
             // No messages - show welcome message
+            console.log('[loadChatHistory] No messages, showing welcome');
             chatMessages.innerHTML = `
                 <div class="welcome-message">
                     <h2>What can I help you with?</h2>
@@ -217,7 +224,7 @@ async function loadChatHistory() {
             `;
         }
     } catch (error) {
-        console.error('Failed to load chat history:', error);
+        console.error('[loadChatHistory] Error:', error);
         // Show welcome message on error too
         chatMessages.innerHTML = `
             <div class="welcome-message">
@@ -2473,9 +2480,18 @@ async function loadSessions() {
 
 // Switch to a different session
 async function switchSession(newSessionId) {
+    console.log('[switchSession] Switching to session:', newSessionId);
+
     // Update session ID
     sessionId = newSessionId;
     localStorage.setItem('sessionId', newSessionId);
+
+    // Switch to chat tab
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.getElementById('manual-tab')?.classList.add('active');
+    console.log('[switchSession] Switched to chat tab');
 
     // Update UI - mark active session
     document.querySelectorAll('.session-item').forEach(item => {
@@ -2486,6 +2502,7 @@ async function switchSession(newSessionId) {
             const chatTitle = document.querySelector('.chat-title');
             if (sessionTitle && chatTitle) {
                 chatTitle.textContent = sessionTitle.textContent;
+                console.log('[switchSession] Updated title to:', sessionTitle.textContent);
             }
         } else {
             item.classList.remove('active');
@@ -2494,9 +2511,13 @@ async function switchSession(newSessionId) {
 
     // Clear current chat and load new session's history
     const chatMessages = document.getElementById('chatMessages');
-    chatMessages.innerHTML = '';
+    if (chatMessages) {
+        chatMessages.innerHTML = '';
+        console.log('[switchSession] Cleared chat messages');
+    }
 
     await loadChatHistory();
+    console.log('[switchSession] Loaded chat history');
 
     // Clear execution logs
     clearExecutionLogs();
@@ -2532,7 +2553,7 @@ async function startNewChat() {
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
             });
-            document.getElementById('chat-tab')?.classList.add('active');
+            document.getElementById('manual-tab')?.classList.add('active');
 
             // Update chat header title
             const chatTitle = document.querySelector('.chat-title');
@@ -2540,14 +2561,16 @@ async function startNewChat() {
                 chatTitle.textContent = 'New conversation';
             }
 
-            // Clear chat messages
+            // Clear chat messages and show welcome message
             const chatMessages = document.getElementById('chatMessages');
-            chatMessages.innerHTML = `
-                <div class="welcome-message">
-                    <h2>What can I help you with?</h2>
-                    <p>MCP 서버에 등록된 도구들을 활용하여 다양한 작업을 수행할 수 있습니다.</p>
-                </div>
-            `;
+            if (chatMessages) {
+                chatMessages.innerHTML = `
+                    <div class="welcome-message">
+                        <h2>What can I help you with?</h2>
+                        <p>MCP 서버에 등록된 도구들을 활용하여 다양한 작업을 수행할 수 있습니다.</p>
+                    </div>
+                `;
+            }
 
             // Clear execution logs
             clearExecutionLogs();
@@ -2571,12 +2594,17 @@ async function startNewChat() {
 
 // Auto-update session title based on first message
 async function autoUpdateSessionTitle(sessionIdToUpdate, userMessage) {
+    console.log('[autoUpdateSessionTitle] Starting - sessionId:', sessionIdToUpdate, 'message:', userMessage);
+
     try {
         // Get session info first to check current title
         const response = await fetch(`/api/sessions?user_id=test_user&tenant=test_tenant&limit=50`);
         const data = await response.json();
 
+        console.log('[autoUpdateSessionTitle] Fetched sessions:', data.sessions?.length || 0);
+
         if (!response.ok || !data.sessions) {
+            console.log('[autoUpdateSessionTitle] Failed to get sessions');
             return; // Failed to get sessions, skip auto-update
         }
 
@@ -2584,17 +2612,22 @@ async function autoUpdateSessionTitle(sessionIdToUpdate, userMessage) {
         const currentSession = data.sessions.find(s => s.session_id === sessionIdToUpdate);
 
         if (!currentSession) {
+            console.log('[autoUpdateSessionTitle] Session not found in list');
             return; // Session not found
         }
+
+        console.log('[autoUpdateSessionTitle] Current session title:', currentSession.title);
 
         // Only update if title is default
         const defaultTitles = ['New conversation', 'Untitled', 'new conversation', 'untitled'];
         if (!defaultTitles.includes(currentSession.title)) {
+            console.log('[autoUpdateSessionTitle] Title already customized, skipping');
             return; // Title already customized, don't auto-update
         }
 
         // Generate title from first message (max 50 characters)
         const newTitle = userMessage.trim().substring(0, 50) + (userMessage.length > 50 ? '...' : '');
+        console.log('[autoUpdateSessionTitle] New title:', newTitle);
 
         // Update the session title
         const updateResponse = await fetch(`/api/sessions/${sessionIdToUpdate}`, {
@@ -2607,15 +2640,21 @@ async function autoUpdateSessionTitle(sessionIdToUpdate, userMessage) {
             })
         });
 
+        const updateData = await updateResponse.json();
+        console.log('[autoUpdateSessionTitle] Update response:', updateResponse.ok, updateData);
+
         if (updateResponse.ok) {
             // Update chat header if this is the current session
             const chatTitle = document.querySelector('.chat-title');
             if (chatTitle) {
                 chatTitle.textContent = newTitle;
+                console.log('[autoUpdateSessionTitle] Updated chat header');
             }
+        } else {
+            console.error('[autoUpdateSessionTitle] Failed to update:', updateData);
         }
     } catch (error) {
-        console.error('Error auto-updating session title:', error);
+        console.error('[autoUpdateSessionTitle] Error:', error);
         // Don't show error to user, this is a background operation
     }
 }
