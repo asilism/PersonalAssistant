@@ -779,6 +779,126 @@ async def delete_chat_history(session_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ==================== Session Management Endpoints ====================
+
+@app.get("/api/sessions")
+async def get_sessions(
+    user_id: str = "test_user",
+    tenant: str = "test_tenant",
+    limit: Optional[int] = None
+):
+    """Get all sessions for a user"""
+    try:
+        logger.info(f"Getting sessions for user_id={user_id}, tenant={tenant}, limit={limit}")
+        sessions = settings_manager.get_all_sessions(user_id=user_id, tenant=tenant, limit=limit)
+
+        return {
+            "success": True,
+            "sessions": [
+                {
+                    "session_id": session.session_id,
+                    "title": session.title,
+                    "created_at": session.created_at,
+                    "updated_at": session.updated_at
+                }
+                for session in sessions
+            ],
+            "count": len(sessions)
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting sessions: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class CreateSessionRequest(BaseModel):
+    session_id: Optional[str] = None
+    user_id: str = "test_user"
+    tenant: str = "test_tenant"
+    title: Optional[str] = None
+
+
+@app.post("/api/sessions")
+async def create_session(request: CreateSessionRequest):
+    """Create a new session"""
+    try:
+        session_id = request.session_id or str(uuid.uuid4())
+        logger.info(f"Creating session with session_id={session_id}, title={request.title}")
+
+        success = settings_manager.create_session(
+            session_id=session_id,
+            user_id=request.user_id,
+            tenant=request.tenant,
+            title=request.title
+        )
+
+        if success:
+            return {
+                "success": True,
+                "session_id": session_id,
+                "message": "Session created successfully"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to create session")
+
+    except Exception as e:
+        logger.error(f"Error creating session: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class UpdateSessionTitleRequest(BaseModel):
+    title: str
+
+
+@app.put("/api/sessions/{session_id}/title")
+async def update_session_title(session_id: str, request: UpdateSessionTitleRequest):
+    """Update session title"""
+    try:
+        logger.info(f"Updating title for session_id={session_id} to '{request.title}'")
+
+        success = settings_manager.update_session_title(
+            session_id=session_id,
+            title=request.title
+        )
+
+        if success:
+            return {
+                "success": True,
+                "message": "Session title updated successfully"
+            }
+        else:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+    except Exception as e:
+        logger.error(f"Error updating session title: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """Delete a session and all related data"""
+    try:
+        logger.info(f"Deleting session_id={session_id}")
+
+        success = settings_manager.delete_session(session_id=session_id)
+
+        if success:
+            return {
+                "success": True,
+                "message": "Session deleted successfully"
+            }
+        else:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+    except Exception as e:
+        logger.error(f"Error deleting session: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== Manus Endpoints ====================
 
 class ManusRequest(BaseModel):
@@ -798,6 +918,26 @@ async def manus_stream(request: ManusRequest):
         coordinator = get_manus_coordinator(request.user_id, request.tenant)
         session_id = request.session_id or str(uuid.uuid4())
         trace_id = session_id  # Use session_id as trace_id for Manus
+
+        # Check if this is a new session and create/update session metadata
+        existing_session = settings_manager.get_session(session_id)
+        if not existing_session:
+            # Extract title from first message (first 60 chars, remove newlines)
+            title = request.request_text.replace('\n', ' ')[:60]
+            if len(request.request_text) > 60:
+                title += "..."
+
+            # Create new session with auto-generated title
+            settings_manager.create_session(
+                session_id=session_id,
+                user_id=request.user_id,
+                tenant=request.tenant,
+                title=title
+            )
+            logger.info(f"Created new session {session_id} with title: {title}")
+        else:
+            # Update session timestamp to move it to top of list
+            settings_manager.update_session_timestamp(session_id)
 
         event_emitter = get_event_emitter()
 
@@ -868,11 +1008,30 @@ async def manus_run(request: ManusRequest):
         start_time = datetime.now()
         coordinator = get_manus_coordinator(request.user_id, request.tenant)
 
+        # Handle session creation/update (similar to manus_stream)
+        session_id = request.session_id or str(uuid.uuid4())
+        existing_session = settings_manager.get_session(session_id)
+        if not existing_session:
+            # Extract title from first message
+            title = request.request_text.replace('\n', ' ')[:60]
+            if len(request.request_text) > 60:
+                title += "..."
+
+            settings_manager.create_session(
+                session_id=session_id,
+                user_id=request.user_id,
+                tenant=request.tenant,
+                title=title
+            )
+            logger.info(f"Created new session {session_id} with title: {title}")
+        else:
+            settings_manager.update_session_timestamp(session_id)
+
         logger.info(f"[Manus] Processing request: {request.request_text[:100]}...")
 
         result = await coordinator.run(
             request=request.request_text,
-            session_id=request.session_id,
+            session_id=session_id,
             max_wait_time=request.max_wait_time
         )
 
