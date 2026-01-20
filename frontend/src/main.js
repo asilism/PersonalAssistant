@@ -2630,8 +2630,8 @@ async function autoUpdateSessionTitle(sessionIdToUpdate, userMessage) {
         console.log('[autoUpdateSessionTitle] New title:', newTitle);
 
         // Update the session title
-        const updateResponse = await fetch(`/api/sessions/${sessionIdToUpdate}`, {
-            method: 'PATCH',
+        const updateResponse = await fetch(`/api/sessions/${sessionIdToUpdate}/title`, {
+            method: 'PUT',
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -2668,8 +2668,8 @@ async function editSessionTitle(sessionIdToEdit, currentTitle) {
     }
 
     try {
-        const response = await fetch(`/api/sessions/${sessionIdToEdit}`, {
-            method: 'PATCH',
+        const response = await fetch(`/api/sessions/${sessionIdToEdit}/title`, {
+            method: 'PUT',
             headers: {
                 'Content-Type': 'application/json'
             },
