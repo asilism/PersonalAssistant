@@ -149,30 +149,18 @@ async function clearChatHistory() {
     }
 
     const currentSessionId = getOrCreateSessionId();
-    const chatMessages = document.getElementById('chatMessages');
 
     try {
-        const response = await fetch(`/api/chat-history?session_id=${currentSessionId}`, {
+        // Delete the entire session (including chat history)
+        const response = await fetch(`/api/sessions/${currentSessionId}`, {
             method: 'DELETE'
         });
 
         const data = await response.json();
 
-        if (response.ok && data.success) {
-            // Clear UI
-            chatMessages.innerHTML = '<div class="welcome-message"><h2>What can I help you with?</h2><p>MCP 서버에 등록된 도구들을 활용하여 다양한 작업을 수행할 수 있습니다.</p></div>';
-
-            // Use new session ID from backend
-            if (data.new_session_id) {
-                sessionId = data.new_session_id;
-                localStorage.setItem('sessionId', sessionId);
-                console.log('New session started with ID:', sessionId);
-            } else {
-                // Fallback: Generate new session ID (backward compatibility)
-                sessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-                localStorage.setItem('sessionId', sessionId);
-            }
-
+        if (response.ok) {
+            // Start a new chat
+            await startNewChat();
             alert('대화 이력이 삭제되었습니다. 새로운 대화가 시작됩니다.');
         }
     } catch (error) {
@@ -185,6 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateModelOptions();
     loadCurrentSettings();
     loadChatHistory();
+    loadSessions();  // Load chat sessions in sidebar
     loadExecutionMode();
     setupExecutionModeListeners();
 
@@ -249,6 +238,8 @@ async function executeRequest() {
         });
     } finally {
         submitBtn.disabled = false;
+        // Reload sessions list to show the new/updated session
+        loadSessions();
     }
 }
 
@@ -2326,3 +2317,167 @@ window.editMCPServer = editMCPServer;
 window.saveMCPServer = saveMCPServer;
 window.deleteMCPServer = deleteMCPServer;
 window.updateMCPTransportFields = updateMCPTransportFields;
+
+// ==================== Session Management ====================
+
+// Load sessions list
+async function loadSessions() {
+    const sessionsList = document.getElementById('sessionsList');
+    const userId = document.getElementById('userId')?.value || 'test_user';
+    const tenant = document.getElementById('tenant')?.value || 'test_tenant';
+
+    try {
+        const response = await fetch(`/api/sessions?user_id=${userId}&tenant=${tenant}&limit=50`);
+        const data = await response.json();
+
+        if (response.ok && data.sessions && data.sessions.length > 0) {
+            const currentSessionId = getOrCreateSessionId();
+
+            let html = '';
+            data.sessions.forEach(session => {
+                const isActive = session.session_id === currentSessionId;
+                html += `
+                    <button class="session-item ${isActive ? 'active' : ''}"
+                            data-session-id="${session.session_id}"
+                            onclick="switchSession('${session.session_id}')">
+                        <span class="session-title">${escapeHtml(session.title || 'Untitled')}</span>
+                        <button class="session-delete"
+                                onclick="event.stopPropagation(); deleteSession('${session.session_id}')"
+                                title="Delete session">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                        </button>
+                    </button>
+                `;
+            });
+
+            sessionsList.innerHTML = html;
+        } else {
+            sessionsList.innerHTML = `
+                <div style="text-align: center; padding: 20px; color: var(--text-tertiary); font-size: 13px; line-height: 1.5;">
+                    <div style="font-size: 24px; margin-bottom: 8px;">💬</div>
+                    <div>No chat history yet</div>
+                    <div style="font-size: 11px; margin-top: 4px;">Start a conversation below</div>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading sessions:', error);
+        sessionsList.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: var(--error-color); font-size: 13px;">
+                Failed to load sessions
+            </div>
+        `;
+    }
+}
+
+// Switch to a different session
+async function switchSession(newSessionId) {
+    // Update session ID
+    sessionId = newSessionId;
+    localStorage.setItem('sessionId', newSessionId);
+
+    // Update UI - mark active session
+    document.querySelectorAll('.session-item').forEach(item => {
+        if (item.dataset.sessionId === newSessionId) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
+        }
+    });
+
+    // Clear current chat and load new session's history
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.innerHTML = '';
+
+    await loadChatHistory();
+
+    // Clear execution logs
+    clearExecutionLogs();
+}
+
+// Start a new chat
+async function startNewChat() {
+    const userId = document.getElementById('userId')?.value || 'test_user';
+    const tenant = document.getElementById('tenant')?.value || 'test_tenant';
+
+    try {
+        // Create new session
+        const response = await fetch('/api/sessions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                tenant: tenant,
+                title: 'New conversation'
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Update session ID
+            sessionId = data.session_id;
+            localStorage.setItem('sessionId', data.session_id);
+
+            // Clear chat messages
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.innerHTML = `
+                <div class="welcome-message">
+                    <h2>What can I help you with?</h2>
+                    <p>MCP 서버에 등록된 도구들을 활용하여 다양한 작업을 수행할 수 있습니다.</p>
+                </div>
+            `;
+
+            // Clear execution logs
+            clearExecutionLogs();
+
+            // Reload sessions list
+            await loadSessions();
+        } else {
+            alert('Failed to create new session: ' + (data.detail || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error creating new session:', error);
+        alert('Error creating new session: ' + error.message);
+    }
+}
+
+// Delete a session
+async function deleteSession(sessionIdToDelete) {
+    if (!confirm('Are you sure you want to delete this conversation?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/sessions/${sessionIdToDelete}`, {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // If we deleted the current session, start a new one
+            if (sessionIdToDelete === getOrCreateSessionId()) {
+                await startNewChat();
+            } else {
+                // Just reload the sessions list
+                await loadSessions();
+            }
+        } else {
+            alert('Failed to delete session: ' + (data.detail || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error deleting session:', error);
+        alert('Error deleting session: ' + error.message);
+    }
+}
+
+// Export session management functions
+window.loadSessions = loadSessions;
+window.switchSession = switchSession;
+window.startNewChat = startNewChat;
+window.deleteSession = deleteSession;
