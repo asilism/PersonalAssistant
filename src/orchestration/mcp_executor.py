@@ -20,7 +20,7 @@ from .settings_manager import SettingsManager
 class MCPExecutor:
     """MCPExecutor - Executes MCP tools via Streamable-HTTP or SSE using FastMCP 2.0"""
 
-    def __init__(self, user_id: str = "test_user", tenant: str = "test_tenant"):
+    def __init__(self, user_id: str = "test_user", tenant: str = "test_tenant", session_id: Optional[str] = None, workspace_path: Optional[str] = None):
         self._execution_count = 0
         self._servers: Dict[str, Dict[str, Any]] = {}
         self._clients: Dict[str, Client] = {}
@@ -28,7 +28,15 @@ class MCPExecutor:
         self._tool_server_map: Dict[str, str] = {}  # Dynamic tool-to-server mapping
         self._user_id = user_id
         self._tenant = tenant
+        self._session_id = session_id
+        self._workspace_path = workspace_path
         self._settings_manager = SettingsManager()
+
+    def set_workspace(self, session_id: str, workspace_path: str):
+        """Set workspace path for file operations"""
+        self._session_id = session_id
+        self._workspace_path = workspace_path
+        print(f"[MCPExecutor] Workspace set to: {workspace_path}")
 
     async def initialize_servers(self):
         """Initialize connections to all MCP servers from database settings"""
@@ -412,7 +420,14 @@ class MCPExecutor:
         transport_type = config.get("transport", "streamable-http")
 
         # Create transport with headers support
-        headers = config.get("headers", {})
+        headers = config.get("headers", {}).copy()  # Make a copy to avoid modifying the original
+
+        # Add workspace path and session ID as custom headers for MCP servers to use
+        if self._workspace_path:
+            headers["X-Workspace-Path"] = self._workspace_path
+        if self._session_id:
+            headers["X-Session-ID"] = self._session_id
+
         if transport_type == "sse":
             transport = SSETransport(config["url"], headers=headers) if headers else SSETransport(config["url"])
         else:

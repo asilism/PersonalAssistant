@@ -479,6 +479,16 @@ class Orchestrator:
         if not self.graph:
             self.graph = self._build_graph()
 
+        # Set up session workspace for file operations
+        workspace_base = Path(__file__).parent.parent.parent / "workspaces"
+        workspace_path = workspace_base / session_id
+        workspace_path.mkdir(parents=True, exist_ok=True)
+
+        # Configure MCP executor to use session workspace
+        if self.mcp_executor:
+            self.mcp_executor.set_workspace(session_id, str(workspace_path))
+            print(f"[Orchestrator] Configured workspace for session {session_id}: {workspace_path}")
+
         # Generate trace ID if not provided
         if not trace_id:
             import uuid
