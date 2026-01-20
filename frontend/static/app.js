@@ -141,6 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateModelOptions();
     loadCurrentSettings();
     loadChatHistory();
+    loadSessions();  // Load chat sessions in sidebar
 
     // Set up form submission
     document.getElementById('requestForm').addEventListener('submit', async (e) => {
@@ -303,6 +304,8 @@ async function executeRequest() {
         });
     } finally {
         submitBtn.disabled = false;
+        // Reload sessions list to show the new/updated session
+        loadSessions();
     }
 }
 
@@ -2031,8 +2034,10 @@ async function loadSessions() {
             sessionsList.innerHTML = html;
         } else {
             sessionsList.innerHTML = `
-                <div style="text-align: center; padding: 20px; color: var(--text-tertiary); font-size: 13px;">
-                    No chat history yet
+                <div style="text-align: center; padding: 20px; color: var(--text-tertiary); font-size: 13px; line-height: 1.5;">
+                    <div style="font-size: 24px; margin-bottom: 8px;">💬</div>
+                    <div>No chat history yet</div>
+                    <div style="font-size: 11px; margin-top: 4px;">Start a conversation below</div>
                 </div>
             `;
         }
@@ -2149,8 +2154,3 @@ async function deleteSession(sessionIdToDelete) {
         alert('Error deleting session: ' + error.message);
     }
 }
-
-// Load sessions on page load
-document.addEventListener('DOMContentLoaded', () => {
-    loadSessions();
-});
