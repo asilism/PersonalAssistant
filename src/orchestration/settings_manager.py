@@ -36,6 +36,16 @@ class MCPServerSettings(BaseModel):
     headers: Optional[Dict[str, str]] = None  # Custom headers for HTTP/SSE transport (e.g., API keys)
 
 
+class ChatSession(BaseModel):
+    """Chat session model"""
+    session_id: str
+    user_id: str
+    tenant: str
+    title: Optional[str] = None  # Auto-generated from first message
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
 class ChatMessage(BaseModel):
     """Chat message model"""
     id: Optional[int] = None
@@ -260,6 +270,24 @@ class SettingsManager:
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_mcp_user_tenant
                 ON mcp_server_settings(user_id, tenant)
+            """)
+
+            # Create sessions table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS sessions (
+                    session_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    tenant TEXT NOT NULL,
+                    title TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Create index for sessions (for fast user/tenant lookups)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_sessions_user_tenant
+                ON sessions(user_id, tenant, updated_at DESC)
             """)
 
             # Create chat history table
@@ -872,6 +900,156 @@ class SettingsManager:
 
             cursor.execute("""
                 DELETE FROM execution_results
+                WHERE session_id = ?
+            """, (session_id,))
+
+            deleted = cursor.rowcount > 0
+            conn.commit()
+
+        return deleted
+
+    # Session Management Methods
+    def create_session(
+        self,
+        session_id: str,
+        user_id: str,
+        tenant: str,
+        title: Optional[str] = None
+    ) -> bool:
+        """Create a new chat session"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT OR IGNORE INTO sessions (session_id, user_id, tenant, title)
+                VALUES (?, ?, ?, ?)
+            """, (session_id, user_id, tenant, title))
+
+            conn.commit()
+
+        return True
+
+    def get_session(self, session_id: str) -> Optional[ChatSession]:
+        """Get a specific session"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT session_id, user_id, tenant, title, created_at, updated_at
+                FROM sessions
+                WHERE session_id = ?
+            """, (session_id,))
+
+            row = cursor.fetchone()
+
+            if row:
+                session_id, user_id, tenant, title, created_at, updated_at = row
+                return ChatSession(
+                    session_id=session_id,
+                    user_id=user_id,
+                    tenant=tenant,
+                    title=title,
+                    created_at=created_at,
+                    updated_at=updated_at
+                )
+
+        return None
+
+    def get_all_sessions(
+        self,
+        user_id: str,
+        tenant: str,
+        limit: Optional[int] = None
+    ) -> list[ChatSession]:
+        """Get all sessions for a user/tenant, ordered by most recent"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            if limit:
+                cursor.execute("""
+                    SELECT session_id, user_id, tenant, title, created_at, updated_at
+                    FROM sessions
+                    WHERE user_id = ? AND tenant = ?
+                    ORDER BY updated_at DESC
+                    LIMIT ?
+                """, (user_id, tenant, limit))
+            else:
+                cursor.execute("""
+                    SELECT session_id, user_id, tenant, title, created_at, updated_at
+                    FROM sessions
+                    WHERE user_id = ? AND tenant = ?
+                    ORDER BY updated_at DESC
+                """, (user_id, tenant))
+
+            sessions = []
+            for row in cursor.fetchall():
+                session_id, user_id, tenant, title, created_at, updated_at = row
+                sessions.append(ChatSession(
+                    session_id=session_id,
+                    user_id=user_id,
+                    tenant=tenant,
+                    title=title,
+                    created_at=created_at,
+                    updated_at=updated_at
+                ))
+
+            return sessions
+
+    def update_session_title(
+        self,
+        session_id: str,
+        title: str
+    ) -> bool:
+        """Update session title"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                UPDATE sessions
+                SET title = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE session_id = ?
+            """, (title, session_id))
+
+            updated = cursor.rowcount > 0
+            conn.commit()
+
+        return updated
+
+    def update_session_timestamp(self, session_id: str) -> bool:
+        """Update session timestamp (when new message is added)"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                UPDATE sessions
+                SET updated_at = CURRENT_TIMESTAMP
+                WHERE session_id = ?
+            """, (session_id,))
+
+            conn.commit()
+
+        return True
+
+    def delete_session(self, session_id: str) -> bool:
+        """Delete a session and all its related data"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            # Delete chat history
+            cursor.execute("""
+                DELETE FROM chat_history
+                WHERE session_id = ?
+            """, (session_id,))
+
+            # Delete execution results
+            cursor.execute("""
+                DELETE FROM execution_results
+                WHERE session_id = ?
+            """, (session_id,))
+
+            # Delete session
+            cursor.execute("""
+                DELETE FROM sessions
                 WHERE session_id = ?
             """, (session_id,))
 
