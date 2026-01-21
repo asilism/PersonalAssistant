@@ -130,7 +130,21 @@ Analysis:"""
         tool_schemas_doc = self._build_tool_schemas_documentation()
         placeholder_rules = self._format_placeholder_rules()
 
+        # Get current date/time for date calculations in planning
+        now = datetime.now()
+        current_datetime = now.strftime("%Y-%m-%d %H:%M:%S")
+        current_date = now.strftime("%Y-%m-%d")
+        current_time = now.strftime("%H:%M:%S")
+        current_year = now.year
+        current_month = now.month
+        current_day = now.day
+
         prompt = f"""You are a supervisor agent coordinating multiple specialized agents.
+
+CURRENT DATETIME: {current_datetime}
+- Date: {current_date}
+- Time: {current_time}
+- Year: {current_year}, Month: {current_month}, Day: {current_day}
 
 User Request: {request}
 
@@ -196,6 +210,14 @@ CRITICAL RULES:
 3. Use output field names from the previous task's output schema
 4. Always add dependencies when using placeholders
 5. Return ONLY valid JSON, no markdown code blocks or explanations
+6. For date/time calculations:
+   - You have CURRENT DATETIME above - use it to calculate dates directly
+   - Calculate date strings yourself and put them directly in parameters
+   - Example: If today is 2026-01-21 and user wants "this month", use start="2026-01-01", end="2026-01-31"
+   - Example: If today is 2026-01-21 and user wants "this week", use start="2026-01-21", end="2026-01-28"
+   - NEVER use shell commands (date, tr, awk, sed) - they don't work cross-platform
+   - If you absolutely need to run code, use Python with appropriate tools
+   - But preferably: Just calculate dates yourself and include them as literal strings in parameters
 """
 
         try:
