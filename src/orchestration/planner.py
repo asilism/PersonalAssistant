@@ -315,8 +315,17 @@ class Planner:
         steps_exceeded_retries = []
         steps_with_non_retryable_errors = []
 
+        # Get IDs of steps that eventually succeeded
+        completed_step_ids = {step.step_id for step in results.completed_steps}
+
         for failed_step in results.failed_steps:
             step_id = failed_step.step_id
+
+            # Skip retry limit check if this step eventually succeeded
+            if step_id in completed_step_ids:
+                print(f"[Planner] Step {step_id} eventually succeeded, skipping retry limit check")
+                continue
+
             error_msg = failed_step.error or ""
 
             # Check for non-retryable errors (e.g., tool not found)
@@ -353,15 +362,19 @@ class Planner:
             state.error = error_msg
             return state
 
-        # Increment retry counts for failed steps (excluding non-retryable)
+        # Increment retry counts for failed steps (excluding non-retryable and eventually succeeded)
         for failed_step in results.failed_steps:
             step_id = failed_step.step_id
+            # Don't increment retry count if step eventually succeeded
+            if step_id in completed_step_ids:
+                print(f"[Planner] Step {step_id} eventually succeeded, not incrementing retry count")
+                continue
             if step_id not in steps_with_non_retryable_errors:
                 state.retry_counts[step_id] = state.retry_counts.get(step_id, 0) + 1
                 print(f"[Planner] Incremented retry count for {step_id}: {state.retry_counts[step_id]}")
 
         # Check if there are pending steps (not yet executed)
-        completed_step_ids = {step.step_id for step in results.completed_steps}
+        # Note: completed_step_ids already defined above for retry limit check
         failed_step_ids = {step.step_id for step in results.failed_steps}
         pending_steps = [
             step for step in state.plan.steps
