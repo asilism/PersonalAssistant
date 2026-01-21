@@ -167,13 +167,22 @@ class TaskTracker:
         content: str
     ) -> bool:
         """Save user message to chat history"""
-        return self._settings_manager.save_chat_message(
-            session_id=session_id,
-            user_id=user_id,
-            tenant=tenant,
-            role="user",
-            content=content
-        )
+        print(f"[TaskTracker] Saving user message - session_id={session_id}, user_id={user_id}, tenant={tenant}, content_length={len(content)}")
+        try:
+            result = self._settings_manager.save_chat_message(
+                session_id=session_id,
+                user_id=user_id,
+                tenant=tenant,
+                role="user",
+                content=content
+            )
+            print(f"[TaskTracker] User message saved successfully: {result}")
+            return result
+        except Exception as e:
+            print(f"[TaskTracker] ERROR saving user message: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     async def save_assistant_message(
         self,
@@ -183,13 +192,22 @@ class TaskTracker:
         content: str
     ) -> bool:
         """Save assistant message to chat history"""
-        return self._settings_manager.save_chat_message(
-            session_id=session_id,
-            user_id=user_id,
-            tenant=tenant,
-            role="assistant",
-            content=content
-        )
+        print(f"[TaskTracker] Saving assistant message - session_id={session_id}, user_id={user_id}, tenant={tenant}, content_length={len(content)}")
+        try:
+            result = self._settings_manager.save_chat_message(
+                session_id=session_id,
+                user_id=user_id,
+                tenant=tenant,
+                role="assistant",
+                content=content
+            )
+            print(f"[TaskTracker] Assistant message saved successfully: {result}")
+            return result
+        except Exception as e:
+            print(f"[TaskTracker] ERROR saving assistant message: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     async def load_chat_history(
         self,

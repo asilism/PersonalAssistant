@@ -745,17 +745,25 @@ class SettingsManager:
         content: str
     ) -> bool:
         """Save a chat message to history"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
+        print(f"[SettingsManager] Attempting to save {role} message to DB - session_id={session_id}, db_path={self.db_path}")
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
 
-            cursor.execute("""
-                INSERT INTO chat_history (session_id, user_id, tenant, role, content)
-                VALUES (?, ?, ?, ?, ?)
-            """, (session_id, user_id, tenant, role, content))
+                cursor.execute("""
+                    INSERT INTO chat_history (session_id, user_id, tenant, role, content)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (session_id, user_id, tenant, role, content))
 
-            conn.commit()
+                conn.commit()
 
-        return True
+            print(f"[SettingsManager] {role} message saved to DB successfully")
+            return True
+        except Exception as e:
+            print(f"[SettingsManager] ERROR saving message to DB: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     def get_chat_history(
         self,
@@ -763,47 +771,56 @@ class SettingsManager:
         limit: Optional[int] = None
     ) -> list[ChatMessage]:
         """Get chat history for a session"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
+        print(f"[SettingsManager] Getting chat history - session_id={session_id}, limit={limit}, db_path={self.db_path}")
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
 
-            if limit:
-                # Get last N messages
-                cursor.execute("""
-                    SELECT id, session_id, user_id, tenant, role, content, created_at
-                    FROM chat_history
-                    WHERE session_id = ?
-                    ORDER BY created_at DESC
-                    LIMIT ?
-                """, (session_id, limit))
-            else:
-                # Get all messages
-                cursor.execute("""
-                    SELECT id, session_id, user_id, tenant, role, content, created_at
-                    FROM chat_history
-                    WHERE session_id = ?
-                    ORDER BY created_at ASC
-                """, (session_id,))
+                if limit:
+                    # Get last N messages
+                    cursor.execute("""
+                        SELECT id, session_id, user_id, tenant, role, content, created_at
+                        FROM chat_history
+                        WHERE session_id = ?
+                        ORDER BY created_at DESC
+                        LIMIT ?
+                    """, (session_id, limit))
+                else:
+                    # Get all messages
+                    cursor.execute("""
+                        SELECT id, session_id, user_id, tenant, role, content, created_at
+                        FROM chat_history
+                        WHERE session_id = ?
+                        ORDER BY created_at ASC
+                    """, (session_id,))
 
-            messages = []
-            rows = cursor.fetchall()
+                messages = []
+                rows = cursor.fetchall()
+                print(f"[SettingsManager] Found {len(rows)} messages in DB")
 
-            # If we used LIMIT with DESC, reverse to get chronological order
-            if limit:
-                rows = reversed(rows)
+                # If we used LIMIT with DESC, reverse to get chronological order
+                if limit:
+                    rows = reversed(rows)
 
-            for row in rows:
-                msg_id, session_id, user_id, tenant, role, content, created_at = row
-                messages.append(ChatMessage(
-                    id=msg_id,
-                    session_id=session_id,
-                    user_id=user_id,
-                    tenant=tenant,
-                    role=role,
-                    content=content,
-                    created_at=created_at
-                ))
+                for row in rows:
+                    msg_id, session_id, user_id, tenant, role, content, created_at = row
+                    messages.append(ChatMessage(
+                        id=msg_id,
+                        session_id=session_id,
+                        user_id=user_id,
+                        tenant=tenant,
+                        role=role,
+                        content=content,
+                        created_at=created_at
+                    ))
 
-            return messages
+                print(f"[SettingsManager] Returning {len(messages)} messages")
+                return messages
+        except Exception as e:
+            print(f"[SettingsManager] ERROR getting chat history: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     def delete_chat_history(self, session_id: str) -> bool:
         """Delete all chat history for a session"""
