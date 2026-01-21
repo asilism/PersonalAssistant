@@ -13,6 +13,7 @@ from orchestration.config import ConfigLoader
 from orchestration.types import OrchestrationSettings, ToolDefinition, ExecutionEvent, ExecutionEventType
 from orchestration.placeholder_resolver import PlaceholderResolver
 from orchestration.event_emitter import get_event_emitter
+from orchestration.tracker import TaskTracker
 
 from .md_communicator import MDCommunicator
 from .supervisor import SupervisorAgent
@@ -74,6 +75,9 @@ class ManusCoordinator:
         # Config loader
         self.config_loader = ConfigLoader()
 
+        # Task tracker for chat history
+        self.tracker = TaskTracker()
+
         print(f"[ManusCoordinator] Initialized for {user_id}@{tenant}")
 
     async def run(
@@ -106,6 +110,16 @@ class ManusCoordinator:
 
         # Initialize session
         await self._initialize_session(session_id)
+
+        # Save user message to chat history
+        print(f"[ManusCoordinator] Saving user message - session_id={self.session_id}")
+        await self.tracker.save_user_message(
+            session_id=self.session_id,
+            user_id=self.user_id,
+            tenant=self.tenant,
+            content=request
+        )
+        print(f"[ManusCoordinator] User message saved")
 
         print(f"[ManusCoordinator] Processing request: {request[:100]}...")
 
@@ -271,6 +285,15 @@ class ManusCoordinator:
 
                             await self.agent_pool.stop_all()
 
+                            # Save assistant message
+                            print(f"[ManusCoordinator] Saving assistant message (non-retryable error)")
+                            await self.tracker.save_assistant_message(
+                                session_id=self.session_id,
+                                user_id=self.user_id,
+                                tenant=self.tenant,
+                                content=final_response
+                            )
+
                             return {
                                 'success': False,
                                 'message': f'Task {task_id} failed with non-retryable error: {error[:200]}',
@@ -293,6 +316,16 @@ class ManusCoordinator:
                             )
 
                             await self.agent_pool.stop_all()
+
+                            # Save assistant message
+                            print(f"[ManusCoordinator] Saving assistant message (duplicate error)")
+                            await self.tracker.save_assistant_message(
+                                session_id=self.session_id,
+                                user_id=self.user_id,
+                                tenant=self.tenant,
+                                content=final_response
+                            )
+                            print(f"[ManusCoordinator] Assistant message saved (duplicate error)")
 
                             return {
                                 'success': False,
@@ -481,6 +514,16 @@ class ManusCoordinator:
                 }
             )
 
+            # Save assistant message to chat history
+            print(f"[ManusCoordinator] Saving assistant message - session_id={self.session_id}")
+            await self.tracker.save_assistant_message(
+                session_id=self.session_id,
+                user_id=self.user_id,
+                tenant=self.tenant,
+                content=final_response if final_response else user_message
+            )
+            print(f"[ManusCoordinator] Assistant message saved")
+
             return {
                 'success': completed,
                 'message': user_message,
@@ -507,9 +550,23 @@ class ManusCoordinator:
             if self.agent_pool:
                 await self.agent_pool.stop_all()
 
+            # Save error message to chat history
+            error_message = f"Execution failed: {str(e)}"
+            print(f"[ManusCoordinator] Saving error message - session_id={self.session_id}")
+            try:
+                await self.tracker.save_assistant_message(
+                    session_id=self.session_id,
+                    user_id=self.user_id,
+                    tenant=self.tenant,
+                    content=error_message
+                )
+                print(f"[ManusCoordinator] Error message saved")
+            except Exception as save_error:
+                print(f"[ManusCoordinator] Failed to save error message: {save_error}")
+
             return {
                 'success': False,
-                'message': f"Execution failed: {str(e)}",
+                'message': error_message,
                 'results': {},
                 'session_id': self.session_id,
                 'error': str(e)
