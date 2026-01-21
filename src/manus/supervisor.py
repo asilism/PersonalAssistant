@@ -390,6 +390,27 @@ Return ONLY the JSON object, nothing else."""
 
         return results
 
+    async def collect_tasks_and_results(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Collect both tasks and results from all agents
+
+        Returns:
+            Dictionary with agent_name -> {'task': task_data, 'result': result_data}
+        """
+        collected = {}
+        agents_with_tasks = await self.md_comm.list_agents_with_tasks()
+
+        for agent_name in agents_with_tasks:
+            task_data = await self.md_comm.read_task(agent_name)
+            result_data = await self.md_comm.read_result(agent_name)
+
+            collected[agent_name] = {
+                'task': task_data,
+                'result': result_data
+            }
+
+        return collected
+
     async def synthesize_final_response(
         self,
         request: str,
@@ -407,20 +428,26 @@ Return ONLY the JSON object, nothing else."""
         Returns:
             Final response text
         """
-        # Build results summary
-        results_summary = self._format_results_summary(results)
+        # Collect both tasks and results for full context
+        tasks_and_results = await self.collect_tasks_and_results()
+
+        # Build comprehensive summary with task assignments AND results
+        full_summary = self._format_tasks_and_results_summary(tasks_and_results)
 
         prompt = f"""You are a supervisor agent. You coordinated multiple specialized agents to complete a user's request.
 
-Original Request: {request}
+Original User Request: {request}
 
-Results from Agents:
-{results_summary}
+Tasks Assigned and Execution Results:
+{full_summary}
 
 Please synthesize a clear, concise final response to the user that:
-1. Confirms what was accomplished
-2. Provides key information/results
-3. Mentions any issues or limitations
+1. Confirms what was accomplished based on the ACTUAL task assignments and results
+2. Provides key information/results using the ACTUAL data from tool outputs
+3. Uses accurate dates, times, and other details from the actual tool outputs
+4. Mentions any issues or limitations if present
+
+IMPORTANT: Base your response on the actual task descriptions, tool parameters, and tool outputs shown above. Do not make up or guess any information.
 
 Final Response:"""
 
@@ -433,7 +460,7 @@ Final Response:"""
         except Exception as e:
             print(f"[SupervisorAgent] Error synthesizing response: {e}")
             # Fallback: return raw results
-            return f"Tasks completed. Results:\n{results_summary}"
+            return f"Tasks completed. Full details:\n{full_summary}"
 
     async def replan(
         self,
@@ -1027,7 +1054,7 @@ When a task needs to use the output from a previous task:
         return "\n".join(summary_lines)
 
     def _format_results_summary(self, results: Dict[str, Any]) -> str:
-        """Format results dictionary as readable text"""
+        """Format results dictionary as readable text (legacy method for backward compatibility)"""
         if not results:
             return "No results available."
 
@@ -1064,6 +1091,88 @@ When a task needs to use the output from a previous task:
 
             if errors:
                 summary_lines.append(f"  Errors: {errors}")
+            summary_lines.append("")
+
+        return "\n".join(summary_lines)
+
+    def _format_tasks_and_results_summary(self, collected: Dict[str, Dict[str, Any]]) -> str:
+        """
+        Format tasks and results together for better context
+
+        Args:
+            collected: Dictionary with agent_name -> {'task': task_data, 'result': result_data}
+
+        Returns:
+            Formatted string with task assignments and results
+        """
+        if not collected:
+            return "No tasks or results available."
+
+        import json
+        summary_lines = []
+
+        for agent_name, data in collected.items():
+            task_data = data.get('task') or {}
+            result_data = data.get('result') or {}
+
+            summary_lines.append(f"**Agent: {agent_name}**")
+            summary_lines.append("")
+
+            # Task information
+            task_description = task_data.get('description', '')
+            tool_calls = task_data.get('tool_calls', [])
+
+            if task_description or tool_calls:
+                summary_lines.append(f"  Task Assignment:")
+                if task_description:
+                    summary_lines.append(f"    Description: {task_description}")
+                if tool_calls:
+                    summary_lines.append(f"    Requested Tool Calls:")
+                    for i, call in enumerate(tool_calls, 1):
+                        tool_name = call.get('tool', 'unknown')
+                        params = call.get('params', {})
+                        summary_lines.append(f"      [{i}] {tool_name}")
+                        try:
+                            params_str = json.dumps(params, indent=8, ensure_ascii=False)
+                            summary_lines.append(f"        Parameters:")
+                            for line in params_str.split('\n'):
+                                summary_lines.append(f"          {line}")
+                        except (TypeError, ValueError):
+                            summary_lines.append(f"          {params}")
+                summary_lines.append("")
+
+            # Result information
+            status = result_data.get('status', 'unknown')
+            summary = result_data.get('summary', '')
+            errors = result_data.get('errors', '')
+            actual_results = result_data.get('results', [])
+
+            summary_lines.append(f"  Execution Result:")
+            summary_lines.append(f"    Status: {status}")
+            if summary:
+                summary_lines.append(f"    Summary: {summary}")
+
+            # Include actual tool results with the detailed output
+            if actual_results:
+                summary_lines.append(f"    Actual Tool Outputs:")
+                for i, result_item in enumerate(actual_results, 1):
+                    tool_name = result_item.get('tool', 'unknown')
+                    tool_output = result_item.get('output', {})
+
+                    summary_lines.append(f"      [{i}] Tool: {tool_name}")
+                    try:
+                        output_str = json.dumps(tool_output, indent=10, ensure_ascii=False)
+                        summary_lines.append(f"        Output:")
+                        for line in output_str.split('\n'):
+                            summary_lines.append(f"          {line}")
+                    except (TypeError, ValueError):
+                        summary_lines.append(f"          {tool_output}")
+
+            if errors:
+                summary_lines.append(f"    Errors: {errors}")
+
+            summary_lines.append("")
+            summary_lines.append("---")
             summary_lines.append("")
 
         return "\n".join(summary_lines)
