@@ -483,9 +483,6 @@ async function executeManusMode(requestText, userId, tenant, sessionId, loadingI
             try {
                 const eventData = JSON.parse(dataMatch[1]);
 
-                // DEBUG: Log all events
-                console.log('[SSE Event]', eventData.event_type, eventData);
-
                 // Check for done signal
                 if (eventData.done) {
                     executionCompleted = true;
@@ -497,8 +494,6 @@ async function executeManusMode(requestText, userId, tenant, sessionId, loadingI
                     const step = eventData.data?.step || 'create_plan';
                     const content = eventData.data?.content || '';
                     const isComplete = eventData.data?.is_complete || false;
-
-                    console.log('[Chat Streaming]', step, 'length:', content.length, 'complete:', isComplete);
 
                     // Update loading bubble with streaming content
                     if (loadingId) {
@@ -681,8 +676,6 @@ function updateMessageBubble(messageId, content, isComplete = false) {
         return;
     }
 
-    console.log('[updateMessageBubble]', 'id:', messageId, 'content length:', content.length, 'complete:', isComplete);
-
     if (isComplete) {
         // Final message - convert to normal assistant message with markdown rendering
         const renderedContent = window.marked ? window.marked.parse(content) : escapeHtml(content);
@@ -695,9 +688,9 @@ function updateMessageBubble(messageId, content, isComplete = false) {
         timestamp.textContent = new Date().toLocaleTimeString();
         element.appendChild(timestamp);
     } else {
-        // Streaming content - show with typing indicator
+        // Streaming content - show with robot icon
         element.innerHTML = `
-            <div class="message-icon">⚡</div>
+            <div class="message-icon">🤖</div>
             <div class="message-content" style="font-family: monospace; white-space: pre-wrap; font-size: 13px; color: #555;">${escapeHtml(content)}</div>
         `;
     }
