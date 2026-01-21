@@ -434,7 +434,17 @@ Return ONLY the JSON object, nothing else."""
         # Build comprehensive summary with task assignments AND results
         full_summary = self._format_tasks_and_results_summary(tasks_and_results)
 
+        # Get current date and time to provide temporal context
+        now = datetime.now()
+        current_datetime = now.strftime("%Y-%m-%d %H:%M:%S")
+        current_date = now.strftime("%Y-%m-%d")
+        current_time = now.strftime("%H:%M:%S")
+
         prompt = f"""You are a supervisor agent. You coordinated multiple specialized agents to complete a user's request.
+
+CURRENT DATETIME: {current_datetime}
+- Current Date: {current_date}
+- Current Time: {current_time}
 
 Original User Request: {request}
 
@@ -444,10 +454,11 @@ Tasks Assigned and Execution Results:
 Please synthesize a clear, concise final response to the user that:
 1. Confirms what was accomplished based on the ACTUAL task assignments and results
 2. Provides key information/results using the ACTUAL data from tool outputs
-3. Uses accurate dates, times, and other details from the actual tool outputs
-4. Mentions any issues or limitations if present
+3. Uses accurate dates, times, and other details from the actual tool outputs (not made-up dates)
+4. When referring to time periods (e.g., "this week", "this month"), use the CURRENT DATETIME provided above
+5. Mentions any issues or limitations if present
 
-IMPORTANT: Base your response on the actual task descriptions, tool parameters, and tool outputs shown above. Do not make up or guess any information.
+IMPORTANT: Base your response on the actual task descriptions, tool parameters, and tool outputs shown above. Do not make up or guess any information, especially dates and times.
 
 Final Response:"""
 
