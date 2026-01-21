@@ -2695,30 +2695,40 @@ async function editSessionTitle(sessionIdToEdit, currentTitle) {
 
 // Delete a session
 async function deleteSession(sessionIdToDelete) {
+    console.log('[deleteSession] Attempting to delete session:', sessionIdToDelete);
+
     if (!confirm('Are you sure you want to delete this conversation?')) {
+        console.log('[deleteSession] User cancelled deletion');
         return;
     }
 
     try {
+        console.log('[deleteSession] Sending DELETE request to:', `/api/sessions/${sessionIdToDelete}`);
         const response = await fetch(`/api/sessions/${sessionIdToDelete}`, {
             method: 'DELETE'
         });
 
+        console.log('[deleteSession] Response status:', response.status);
         const data = await response.json();
+        console.log('[deleteSession] Response data:', data);
 
         if (response.ok) {
+            console.log('[deleteSession] Session deleted successfully');
             // If we deleted the current session, start a new one
             if (sessionIdToDelete === getOrCreateSessionId()) {
+                console.log('[deleteSession] Deleted current session, starting new chat');
                 await startNewChat();
             } else {
                 // Just reload the sessions list
+                console.log('[deleteSession] Reloading sessions list');
                 await loadSessions();
             }
         } else {
+            console.error('[deleteSession] Failed to delete:', data);
             alert('Failed to delete session: ' + (data.detail || 'Unknown error'));
         }
     } catch (error) {
-        console.error('Error deleting session:', error);
+        console.error('[deleteSession] Error:', error);
         alert('Error deleting session: ' + error.message);
     }
 }
