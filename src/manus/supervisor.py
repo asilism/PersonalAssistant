@@ -1037,11 +1037,31 @@ When a task needs to use the output from a previous task:
             status = result_data.get('status', 'unknown')
             summary = result_data.get('summary', '')
             errors = result_data.get('errors', '')
+            actual_results = result_data.get('results', [])
 
             summary_lines.append(f"**{agent_name}**:")
             summary_lines.append(f"  Status: {status}")
             if summary:
                 summary_lines.append(f"  Summary: {summary}")
+
+            # Include actual tool results so LLM can see the detailed data
+            if actual_results:
+                summary_lines.append(f"  Detailed Results:")
+                for i, result_item in enumerate(actual_results, 1):
+                    tool_name = result_item.get('tool', 'unknown')
+                    tool_output = result_item.get('output', {})
+
+                    summary_lines.append(f"    [{i}] Tool: {tool_name}")
+                    # Format the output in a readable way
+                    import json
+                    try:
+                        output_str = json.dumps(tool_output, indent=6, ensure_ascii=False)
+                        summary_lines.append(f"    Output:")
+                        for line in output_str.split('\n'):
+                            summary_lines.append(f"      {line}")
+                    except (TypeError, ValueError):
+                        summary_lines.append(f"      {tool_output}")
+
             if errors:
                 summary_lines.append(f"  Errors: {errors}")
             summary_lines.append("")
