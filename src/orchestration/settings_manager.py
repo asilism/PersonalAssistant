@@ -1049,6 +1049,8 @@ class SettingsManager:
 
     def delete_session(self, session_id: str) -> bool:
         """Delete a session and all its related data"""
+        print(f"[SettingsManager] Attempting to delete session - session_id={session_id}, db_path={self.db_path}")
+
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
@@ -1057,20 +1059,27 @@ class SettingsManager:
                 DELETE FROM chat_history
                 WHERE session_id = ?
             """, (session_id,))
+            chat_deleted = cursor.rowcount
+            print(f"[SettingsManager] Deleted {chat_deleted} chat messages")
 
             # Delete execution results
             cursor.execute("""
                 DELETE FROM execution_results
                 WHERE session_id = ?
             """, (session_id,))
+            results_deleted = cursor.rowcount
+            print(f"[SettingsManager] Deleted {results_deleted} execution results")
 
             # Delete session
             cursor.execute("""
                 DELETE FROM sessions
                 WHERE session_id = ?
             """, (session_id,))
+            session_deleted = cursor.rowcount
+            print(f"[SettingsManager] Deleted {session_deleted} session records")
 
-            deleted = cursor.rowcount > 0
+            deleted = session_deleted > 0
             conn.commit()
 
+        print(f"[SettingsManager] Delete operation result: {deleted}")
         return deleted
