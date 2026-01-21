@@ -77,6 +77,15 @@ function updateModelOptions() {
 // Session ID management
 let sessionId = null;
 
+// Get session ID without creating a new one
+function getSessionId() {
+    if (!sessionId) {
+        sessionId = localStorage.getItem('sessionId');
+    }
+    return sessionId;
+}
+
+// Get or create session ID (only used when sending messages)
 function getOrCreateSessionId() {
     if (!sessionId) {
         // Try to get from localStorage
@@ -88,6 +97,12 @@ function getOrCreateSessionId() {
         }
     }
     return sessionId;
+}
+
+// Clear current session
+function clearSession() {
+    sessionId = null;
+    localStorage.removeItem('sessionId');
 }
 
 // Execution mode management
@@ -187,18 +202,33 @@ function handleLogout() {
 
 // Load chat history
 async function loadChatHistory() {
-    const sessionId = getOrCreateSessionId();
+    const currentSessionId = getSessionId();
     const chatMessages = document.getElementById('chatMessages');
 
-    console.log('[loadChatHistory] Loading for session:', sessionId);
+    console.log('[loadChatHistory] Loading for session:', currentSessionId);
 
     if (!chatMessages) {
         console.error('[loadChatHistory] chatMessages element not found');
         return;
     }
 
+    // If no session exists, show welcome message
+    if (!currentSessionId) {
+        console.log('[loadChatHistory] No session exists, showing empty state');
+        chatMessages.innerHTML = `
+            <div class="welcome-message">
+                <h2>대화를 시작해보세요</h2>
+                <p>아래 입력창에 메시지를 입력하면 새로운 대화가 시작됩니다.</p>
+                <p style="font-size: 14px; color: var(--text-tertiary); margin-top: 16px;">
+                    MCP 서버에 등록된 도구들을 활용하여 다양한 작업을 수행할 수 있습니다.
+                </p>
+            </div>
+        `;
+        return;
+    }
+
     try {
-        const response = await fetch(`/api/chat-history?session_id=${sessionId}`);
+        const response = await fetch(`/api/chat-history?session_id=${currentSessionId}`);
         const data = await response.json();
 
         console.log('[loadChatHistory] Response:', response.ok, 'Messages:', data.messages?.length || 0);
@@ -278,6 +308,51 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// Ensure session exists in database
+async function ensureSessionExists(userId, tenant) {
+    const currentSessionId = getSessionId();
+
+    // If no session exists, create a new one
+    if (!currentSessionId) {
+        console.log('[ensureSessionExists] No session exists, creating new session');
+        const response = await fetch('/api/sessions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                tenant: tenant,
+                title: 'New conversation'
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Update session ID
+            sessionId = data.session_id;
+            localStorage.setItem('sessionId', data.session_id);
+
+            // Update chat title
+            const chatTitle = document.querySelector('.chat-title');
+            if (chatTitle) {
+                chatTitle.textContent = 'New conversation';
+            }
+
+            // Reload sessions list to show the new session
+            await loadSessions();
+
+            console.log('[ensureSessionExists] New session created:', sessionId);
+            return sessionId;
+        } else {
+            throw new Error('Failed to create session: ' + (data.detail || 'Unknown error'));
+        }
+    }
+
+    return currentSessionId;
+}
+
 // Execute orchestration request - supports both LangGraph and Manus modes
 async function executeRequest() {
     const requestText = document.getElementById('requestText').value;
@@ -288,8 +363,8 @@ async function executeRequest() {
 
     if (!requestText.trim()) return;
 
-    // Get session ID and execution mode
-    const currentSessionId = getOrCreateSessionId();
+    // Ensure session exists before sending request
+    const currentSessionId = await ensureSessionExists(userId, tenant);
     const executionMode = getExecutionMode();
 
     // Remove placeholder or welcome message if exists
@@ -2420,11 +2495,11 @@ async function loadSessions() {
         const data = await response.json();
 
         if (response.ok && data.sessions && data.sessions.length > 0) {
-            const currentSessionId = getOrCreateSessionId();
+            const currentSessionId = getSessionId();
 
             let html = '';
             data.sessions.forEach(session => {
-                const isActive = session.session_id === currentSessionId;
+                const isActive = currentSessionId && session.session_id === currentSessionId;
                 html += `
                     <div class="session-item ${isActive ? 'active' : ''}"
                             data-session-id="${session.session_id}"
@@ -2714,15 +2789,25 @@ async function deleteSession(sessionIdToDelete) {
 
         if (response.ok) {
             console.log('[deleteSession] Session deleted successfully');
-            // If we deleted the current session, start a new one
-            if (sessionIdToDelete === getOrCreateSessionId()) {
-                console.log('[deleteSession] Deleted current session, starting new chat');
-                await startNewChat();
-            } else {
-                // Just reload the sessions list
-                console.log('[deleteSession] Reloading sessions list');
-                await loadSessions();
+            // If we deleted the current session, clear it and show empty state
+            const currentSessionId = getSessionId();
+            if (sessionIdToDelete === currentSessionId) {
+                console.log('[deleteSession] Deleted current session, clearing session and showing empty state');
+                clearSession();
+
+                // Update chat title
+                const chatTitle = document.querySelector('.chat-title');
+                if (chatTitle) {
+                    chatTitle.textContent = 'Personal Assistant';
+                }
+
+                // Show welcome message
+                await loadChatHistory();
             }
+
+            // Reload sessions list
+            console.log('[deleteSession] Reloading sessions list');
+            await loadSessions();
         } else {
             console.error('[deleteSession] Failed to delete:', data);
             alert('Failed to delete session: ' + (data.detail || 'Unknown error'));
