@@ -422,7 +422,7 @@ Return ONLY the JSON object, nothing else."""
 
         Args:
             request: Original user request
-            plan_data: Execution plan
+            plan_data: Execution plan (CRITICAL: contains the intended response strategy)
             results: Collected results from agents
 
         Returns:
@@ -433,6 +433,9 @@ Return ONLY the JSON object, nothing else."""
 
         # Build comprehensive summary with task assignments AND results
         full_summary = self._format_tasks_and_results_summary(tasks_and_results)
+
+        # Format the original plan for context
+        plan_summary = self._format_plan_summary(plan_data)
 
         # Get current date and time to provide temporal context
         now = datetime.now()
@@ -448,17 +451,32 @@ CURRENT DATETIME: {current_datetime}
 
 Original User Request: {request}
 
+ORIGINAL EXECUTION PLAN (YOUR INTENDED STRATEGY):
+{plan_summary}
+
 Tasks Assigned and Execution Results:
 {full_summary}
 
 Please synthesize a clear, concise final response to the user that:
-1. Confirms what was accomplished based on the ACTUAL task assignments and results
-2. Provides key information/results using the ACTUAL data from tool outputs
-3. Uses accurate dates, times, and other details from the actual tool outputs (not made-up dates)
-4. When referring to time periods (e.g., "this week", "this month"), use the CURRENT DATETIME provided above
-5. Mentions any issues or limitations if present
+1. FOLLOWS THE ORIGINAL PLAN'S INTENT - If the plan intended to filter, summarize, or format data in a specific way, do that in your response
+2. Confirms what was accomplished based on the ACTUAL task assignments and results
+3. Provides key information/results using the ACTUAL data from tool outputs
+4. Uses accurate dates, times, and other details from the actual tool outputs (not made-up dates)
+5. When referring to time periods (e.g., "this week", "this month"), use the CURRENT DATETIME provided above
+6. Applies any filtering, formatting, or processing that was described in the original plan
+7. Mentions any issues or limitations if present
 
-IMPORTANT: Base your response on the actual task descriptions, tool parameters, and tool outputs shown above. Do not make up or guess any information, especially dates and times.
+CRITICAL: The original plan describes the INTENT of how to present results to the user. For example:
+- If the plan says "fetch all events then show only this month", filter the results to this month even if the tool returned all events
+- If the plan says "summarize", provide a summary not full details
+- If the plan says "list top 5", show only 5 items even if more are available
+
+Base your response on:
+1. The INTENT described in the original plan
+2. The actual task descriptions and tool parameters
+3. The actual tool outputs
+
+Do not make up or guess any information, especially dates and times.
 
 Final Response:"""
 
@@ -1185,5 +1203,76 @@ When a task needs to use the output from a previous task:
             summary_lines.append("")
             summary_lines.append("---")
             summary_lines.append("")
+
+        return "\n".join(summary_lines)
+
+    def _format_plan_summary(self, plan_data: Dict[str, Any]) -> str:
+        """
+        Format the execution plan to show the original intent
+
+        Args:
+            plan_data: The execution plan dictionary
+
+        Returns:
+            Formatted string showing the plan's intent
+        """
+        if not plan_data:
+            return "No plan available."
+
+        import json
+        summary_lines = []
+
+        # Overall strategy
+        strategy = plan_data.get('execution_strategy', 'unknown')
+        estimated_steps = plan_data.get('estimated_steps', 0)
+
+        summary_lines.append(f"Execution Strategy: {strategy}")
+        summary_lines.append(f"Estimated Steps: {estimated_steps}")
+        summary_lines.append("")
+
+        # Task breakdown with intent
+        tasks = plan_data.get('tasks', [])
+        if tasks:
+            summary_lines.append("Planned Tasks (showing the original intent):")
+            summary_lines.append("")
+
+            for i, task in enumerate(tasks, 1):
+                task_id = task.get('task_id', 'unknown')
+                name = task.get('name', 'Unnamed task')
+                description = task.get('description', '')
+                agent = task.get('agent', 'unknown')
+                dependencies = task.get('dependencies', [])
+                priority = task.get('priority', 'medium')
+
+                summary_lines.append(f"  Task {i}: {name}")
+                summary_lines.append(f"    ID: {task_id}")
+                summary_lines.append(f"    Agent: {agent}")
+                summary_lines.append(f"    Priority: {priority}")
+
+                if description:
+                    summary_lines.append(f"    Intent/Description: {description}")
+
+                if dependencies:
+                    summary_lines.append(f"    Dependencies: {', '.join(dependencies)}")
+
+                # Show tool calls to understand what was planned
+                tool_calls = task.get('tool_calls', [])
+                if tool_calls:
+                    summary_lines.append(f"    Planned Tool Calls:")
+                    for j, call in enumerate(tool_calls, 1):
+                        tool_name = call.get('tool', 'unknown')
+                        params = call.get('params', {})
+                        summary_lines.append(f"      [{j}] {tool_name}")
+                        # Show key parameters to understand intent
+                        if params:
+                            try:
+                                params_str = json.dumps(params, indent=10, ensure_ascii=False)
+                                summary_lines.append(f"        Params:")
+                                for line in params_str.split('\n'):
+                                    summary_lines.append(f"          {line}")
+                            except (TypeError, ValueError):
+                                summary_lines.append(f"          {params}")
+
+                summary_lines.append("")
 
         return "\n".join(summary_lines)
