@@ -495,12 +495,14 @@ class Orchestrator:
             trace_id = str(uuid.uuid4())
 
         # Save user message to chat history
+        print(f"[Orchestrator] About to save user message - session_id={session_id}, user_id={self.user_id}, tenant={self.tenant}")
         await self.tracker.save_user_message(
             session_id=session_id,
             user_id=self.user_id,
             tenant=self.tenant,
             content=request_text
         )
+        print(f"[Orchestrator] User message saved successfully")
 
         # Load chat history for context (last 10 messages)
         chat_history = await self.tracker.load_chat_history(
