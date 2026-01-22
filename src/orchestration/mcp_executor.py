@@ -118,6 +118,18 @@ class MCPExecutor:
             return
 
         try:
+            # Check if browser_use tool is enabled in settings
+            browser_use_settings = self._settings_manager.get_builtin_tool_settings(
+                self._user_id, self._tenant, "browser_use"
+            )
+
+            # Default to enabled if no settings found
+            is_enabled = browser_use_settings.enabled if browser_use_settings else True
+
+            if not is_enabled:
+                print("[MCPExecutor] browser_use tool is disabled in settings, skipping")
+                return
+
             # Get LLM settings from database
             db_settings = self._settings_manager.get_llm_settings(self._user_id, self._tenant)
 
