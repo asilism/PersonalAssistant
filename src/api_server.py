@@ -719,6 +719,96 @@ async def get_mcp_servers_status(user_id: str = "test_user", tenant: str = "test
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ==================== Built-in Tools Settings ====================
+
+@app.get("/api/builtin-tools")
+async def get_builtin_tools(user_id: str = "test_user", tenant: str = "test_tenant"):
+    """Get all built-in tool settings"""
+    try:
+        settings = settings_manager.get_all_builtin_tool_settings(user_id, tenant)
+
+        # Define available built-in tools
+        available_tools = [
+            {
+                "tool_name": "browser_use",
+                "display_name": "Browser Use (AI Agent)",
+                "description": "AI 에이전트가 웹 브라우저를 제어하여 복잡한 작업을 자동으로 수행합니다.",
+                "category": "automation",
+                "requires_llm": True
+            }
+        ]
+
+        # Merge with saved settings
+        result = []
+        for tool in available_tools:
+            saved = next((s for s in settings if s.tool_name == tool["tool_name"]), None)
+            result.append({
+                **tool,
+                "enabled": saved.enabled if saved else True,  # Default enabled
+                "config": saved.config if saved else None
+            })
+
+        return {
+            "success": True,
+            "tools": result
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting built-in tools: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/builtin-tools/{tool_name}/toggle")
+async def toggle_builtin_tool(tool_name: str, user_id: str = "test_user", tenant: str = "test_tenant"):
+    """Toggle built-in tool enabled status"""
+    try:
+        success = settings_manager.toggle_builtin_tool(user_id, tenant, tool_name)
+
+        if success:
+            # Clear orchestrator cache to force reload
+            key = f"{tenant}:{user_id}"
+            if key in orchestrators:
+                del orchestrators[key]
+
+            return {"success": True, "message": f"Built-in tool '{tool_name}' toggled successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to toggle built-in tool")
+
+    except Exception as e:
+        logger.error(f"Error toggling built-in tool {tool_name}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/builtin-tools/{tool_name}")
+async def save_builtin_tool_settings(tool_name: str, request: dict, user_id: str = "test_user", tenant: str = "test_tenant"):
+    """Save built-in tool settings"""
+    try:
+        enabled = request.get("enabled", True)
+        config = request.get("config")
+
+        success = settings_manager.save_builtin_tool_settings(
+            user_id=user_id,
+            tenant=tenant,
+            tool_name=tool_name,
+            enabled=enabled,
+            config=config
+        )
+
+        if success:
+            # Clear orchestrator cache
+            key = f"{tenant}:{user_id}"
+            if key in orchestrators:
+                del orchestrators[key]
+
+            return {"success": True, "message": f"Built-in tool '{tool_name}' settings saved successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save built-in tool settings")
+
+    except Exception as e:
+        logger.error(f"Error saving built-in tool {tool_name}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/chat-history")
 async def get_chat_history(session_id: str, limit: Optional[int] = None):
     """Get chat history for a session"""

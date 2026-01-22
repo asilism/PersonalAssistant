@@ -36,6 +36,13 @@ class MCPServerSettings(BaseModel):
     headers: Optional[Dict[str, str]] = None  # Custom headers for HTTP/SSE transport (e.g., API keys)
 
 
+class BuiltInToolSettings(BaseModel):
+    """Built-in Tool Settings model"""
+    tool_name: str  # e.g., "browser_use"
+    enabled: bool = True
+    config: Optional[Dict[str, Any]] = None  # Tool-specific configuration
+
+
 class ChatSession(BaseModel):
     """Chat session model"""
     session_id: str
@@ -331,6 +338,27 @@ class SettingsManager:
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_execution_session
                 ON execution_results(session_id, created_at)
+            """)
+
+            # Create built-in tools settings table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS builtin_tool_settings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    tenant TEXT NOT NULL,
+                    tool_name TEXT NOT NULL,
+                    enabled INTEGER DEFAULT 1,
+                    config TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, tenant, tool_name)
+                )
+            """)
+
+            # Create index for built-in tools settings
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_builtin_tools_user_tenant
+                ON builtin_tool_settings(user_id, tenant)
             """)
 
             conn.commit()
@@ -1082,4 +1110,134 @@ class SettingsManager:
             conn.commit()
 
         print(f"[SettingsManager] Delete operation result: {deleted}")
+        return deleted
+
+    # ==================== Built-in Tools Settings ====================
+
+    def save_builtin_tool_settings(
+        self,
+        user_id: str,
+        tenant: str,
+        tool_name: str,
+        enabled: bool = True,
+        config: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """Save or update built-in tool settings"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            config_json = json.dumps(config) if config else None
+
+            # Upsert (insert or update)
+            cursor.execute("""
+                INSERT INTO builtin_tool_settings (user_id, tenant, tool_name, enabled, config)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, tenant, tool_name)
+                DO UPDATE SET
+                    enabled = excluded.enabled,
+                    config = excluded.config,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (user_id, tenant, tool_name, 1 if enabled else 0, config_json))
+
+            conn.commit()
+
+        return True
+
+    def get_builtin_tool_settings(self, user_id: str, tenant: str, tool_name: str) -> Optional[BuiltInToolSettings]:
+        """Get settings for a specific built-in tool"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT tool_name, enabled, config
+                FROM builtin_tool_settings
+                WHERE user_id = ? AND tenant = ? AND tool_name = ?
+            """, (user_id, tenant, tool_name))
+
+            row = cursor.fetchone()
+
+            if row:
+                tool_name, enabled, config_json = row
+                config = json.loads(config_json) if config_json else None
+
+                return BuiltInToolSettings(
+                    tool_name=tool_name,
+                    enabled=bool(enabled),
+                    config=config
+                )
+
+        return None
+
+    def get_all_builtin_tool_settings(self, user_id: str, tenant: str) -> list[BuiltInToolSettings]:
+        """Get all built-in tool settings for a user"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT tool_name, enabled, config
+                FROM builtin_tool_settings
+                WHERE user_id = ? AND tenant = ?
+                ORDER BY tool_name
+            """, (user_id, tenant))
+
+            rows = cursor.fetchall()
+
+            settings = []
+            for row in rows:
+                tool_name, enabled, config_json = row
+                config = json.loads(config_json) if config_json else None
+
+                settings.append(BuiltInToolSettings(
+                    tool_name=tool_name,
+                    enabled=bool(enabled),
+                    config=config
+                ))
+
+            return settings
+
+    def toggle_builtin_tool(self, user_id: str, tenant: str, tool_name: str) -> bool:
+        """Toggle built-in tool enabled status"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            # Get current status
+            cursor.execute("""
+                SELECT enabled FROM builtin_tool_settings
+                WHERE user_id = ? AND tenant = ? AND tool_name = ?
+            """, (user_id, tenant, tool_name))
+
+            row = cursor.fetchone()
+
+            if row:
+                # Toggle
+                new_enabled = 0 if row[0] else 1
+                cursor.execute("""
+                    UPDATE builtin_tool_settings
+                    SET enabled = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE user_id = ? AND tenant = ? AND tool_name = ?
+                """, (new_enabled, user_id, tenant, tool_name))
+            else:
+                # Create with enabled=True
+                cursor.execute("""
+                    INSERT INTO builtin_tool_settings (user_id, tenant, tool_name, enabled)
+                    VALUES (?, ?, ?, 1)
+                """, (user_id, tenant, tool_name))
+
+            conn.commit()
+
+        return True
+
+    def delete_builtin_tool_settings(self, user_id: str, tenant: str, tool_name: str) -> bool:
+        """Delete built-in tool settings"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                DELETE FROM builtin_tool_settings
+                WHERE user_id = ? AND tenant = ? AND tool_name = ?
+            """, (user_id, tenant, tool_name))
+
+            deleted = cursor.rowcount > 0
+            conn.commit()
+
         return deleted

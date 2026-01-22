@@ -21,6 +21,8 @@ function switchTab(tabName) {
     } else if (tabName === 'mcp') {
         loadMCPServers();
         loadMCPTools();
+    } else if (tabName === 'builtin-tools') {
+        loadBuiltinTools();
     }
 }
 
@@ -2461,6 +2463,105 @@ function renderPlanMarkdown(planData) {
     return html || '<p class="plan-empty">No plan data available</p>';
 }
 
+// ==================== Built-in Tools Management ====================
+
+async function loadBuiltinTools() {
+    const toolsList = document.getElementById('builtinToolsList');
+    const userId = document.getElementById('userId')?.value || 'test_user';
+    const tenant = document.getElementById('tenant')?.value || 'test_tenant';
+    const loadBtn = document.getElementById('loadBuiltinToolsBtn');
+
+    if (loadBtn) {
+        loadBtn.disabled = true;
+        loadBtn.textContent = 'Loading...';
+    }
+
+    try {
+        const response = await fetch(`/api/builtin-tools?user_id=${userId}&tenant=${tenant}`);
+        const data = await response.json();
+
+        if (response.ok && data.success && data.tools && data.tools.length > 0) {
+            let html = '<div class="tools-grid">';
+
+            data.tools.forEach(tool => {
+                const statusClass = tool.enabled ? 'tool-enabled' : 'tool-disabled';
+                const statusText = tool.enabled ? 'Enabled' : 'Disabled';
+                const toggleText = tool.enabled ? 'Disable' : 'Enable';
+                const requiresLLMBadge = tool.requires_llm ? '<span class="badge badge-warning">Requires LLM</span>' : '';
+
+                html += `
+                    <div class="tool-card ${statusClass}">
+                        <div class="tool-header">
+                            <h4>${escapeHtml(tool.display_name)}</h4>
+                            <div class="tool-badges">
+                                <span class="badge ${tool.enabled ? 'badge-success' : 'badge-secondary'}">${statusText}</span>
+                                ${requiresLLMBadge}
+                            </div>
+                        </div>
+                        <p class="tool-description">${escapeHtml(tool.description)}</p>
+                        <div class="tool-meta">
+                            <span class="tool-category">${escapeHtml(tool.category || 'general')}</span>
+                        </div>
+                        <div class="tool-actions">
+                            <button onclick="toggleBuiltinTool('${escapeHtml(tool.tool_name)}')" class="btn ${tool.enabled ? 'btn-secondary' : 'btn-primary'}">
+                                ${toggleText}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            toolsList.innerHTML = html;
+        } else {
+            toolsList.innerHTML = '<p class="empty-state">No built-in tools available</p>';
+        }
+    } catch (error) {
+        toolsList.innerHTML = `<div class="error-message">Error loading built-in tools: ${error.message}</div>`;
+    } finally {
+        if (loadBtn) {
+            loadBtn.disabled = false;
+            loadBtn.textContent = 'Refresh';
+        }
+    }
+}
+
+async function toggleBuiltinTool(toolName) {
+    const userId = document.getElementById('userId')?.value || 'test_user';
+    const tenant = document.getElementById('tenant')?.value || 'test_tenant';
+
+    try {
+        const response = await fetch(`/api/builtin-tools/${toolName}/toggle?user_id=${userId}&tenant=${tenant}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            // Reload tools list
+            await loadBuiltinTools();
+
+            // Show success message
+            const toolsList = document.getElementById('builtinToolsList');
+            const successMsg = document.createElement('div');
+            successMsg.className = 'result-success';
+            successMsg.textContent = data.message;
+            toolsList.insertBefore(successMsg, toolsList.firstChild);
+
+            setTimeout(() => {
+                successMsg.remove();
+            }, 3000);
+        } else {
+            alert(`Failed to toggle tool: ${data.detail || data.message || 'Unknown error'}`);
+        }
+    } catch (error) {
+        alert(`Error toggling tool: ${error.message}`);
+    }
+}
+
 window.switchTab = switchTab;
 window.clearChatHistory = clearChatHistory;
 window.showAddConfigForm = showAddConfigForm;
@@ -2481,6 +2582,8 @@ window.editMCPServer = editMCPServer;
 window.saveMCPServer = saveMCPServer;
 window.deleteMCPServer = deleteMCPServer;
 window.updateMCPTransportFields = updateMCPTransportFields;
+window.loadBuiltinTools = loadBuiltinTools;
+window.toggleBuiltinTool = toggleBuiltinTool;
 
 // ==================== Session Management ====================
 
