@@ -16,6 +16,14 @@ from .types import Step, StepResult, ToolDefinition
 from .validators import validate_email
 from .settings_manager import SettingsManager
 
+# Import built-in tools
+try:
+    from ..tools.browser_use_tool import BrowserUseTool
+    BROWSER_USE_TOOL_AVAILABLE = True
+except ImportError:
+    BROWSER_USE_TOOL_AVAILABLE = False
+    print("[MCPExecutor] WARNING: BrowserUseTool not available")
+
 
 class MCPExecutor:
     """MCPExecutor - Executes MCP tools via Streamable-HTTP or SSE using FastMCP 2.0"""
@@ -31,6 +39,7 @@ class MCPExecutor:
         self._session_id = session_id
         self._workspace_path = workspace_path
         self._settings_manager = SettingsManager()
+        self._browser_use_tool: Optional[BrowserUseTool] = None  # Built-in browser-use tool
 
     def set_workspace(self, session_id: str, workspace_path: str):
         """Set workspace path for file operations"""
@@ -41,6 +50,9 @@ class MCPExecutor:
     async def initialize_servers(self):
         """Initialize connections to all MCP servers from database settings"""
         print(f"[MCPExecutor] Initializing MCP servers for {self._user_id}@{self._tenant}...")
+
+        # Initialize built-in browser-use tool
+        await self._initialize_builtin_tools()
 
         # Get MCP servers from database
         db_servers = self._settings_manager.get_all_mcp_servers(self._user_id, self._tenant)
@@ -98,6 +110,52 @@ class MCPExecutor:
         """Initialize default MCP servers (empty - servers are configured via database)"""
         # No default servers - all MCP servers must be registered manually via Settings
         print("[MCPExecutor] No default servers configured. Please register MCP servers via Settings.")
+
+    async def _initialize_builtin_tools(self):
+        """Initialize built-in tools like browser-use"""
+        if not BROWSER_USE_TOOL_AVAILABLE:
+            print("[MCPExecutor] BrowserUseTool not available, skipping")
+            return
+
+        try:
+            # Get LLM settings from database
+            db_settings = self._settings_manager.get_llm_settings(self._user_id, self._tenant)
+
+            if db_settings:
+                llm_provider = db_settings.provider
+                llm_model = db_settings.model
+                llm_api_key = db_settings.api_key
+                llm_base_url = db_settings.base_url
+                print(f"[MCPExecutor] Initializing BrowserUseTool with {llm_provider}/{llm_model}")
+            else:
+                # Fallback to environment variables
+                llm_provider = os.getenv("LLM_PROVIDER", "anthropic")
+                llm_model = os.getenv("LLM_MODEL", "claude-3-5-sonnet-20241022")
+                llm_base_url = os.getenv("LLM_BASE_URL")
+
+                # Get API key based on provider
+                if llm_provider == "anthropic":
+                    llm_api_key = os.getenv("ANTHROPIC_API_KEY", "")
+                elif llm_provider == "openai":
+                    llm_api_key = os.getenv("OPENAI_API_KEY", "")
+                else:
+                    llm_api_key = os.getenv("ANTHROPIC_API_KEY", "")
+
+                print(f"[MCPExecutor] Initializing BrowserUseTool with env settings: {llm_provider}/{llm_model}")
+
+            # Create BrowserUseTool instance
+            self._browser_use_tool = BrowserUseTool(
+                llm_provider=llm_provider,
+                llm_model=llm_model,
+                llm_api_key=llm_api_key,
+                llm_base_url=llm_base_url
+            )
+
+            print("[MCPExecutor] BrowserUseTool initialized successfully")
+
+        except Exception as e:
+            print(f"[MCPExecutor] Error initializing BrowserUseTool: {e}")
+            self._browser_use_tool = None
 
     async def discover_tools(self) -> List[ToolDefinition]:
         """Discover all available tools from MCP servers (in parallel)"""
@@ -177,6 +235,20 @@ class MCPExecutor:
                 all_tools.extend(result)
             elif isinstance(result, Exception):
                 print(f"[MCPExecutor] Exception during parallel discovery: {result}")
+
+        # Add built-in browser-use tool if available
+        if self._browser_use_tool:
+            browser_tool_def_dict = BrowserUseTool.get_tool_definition()
+            browser_tool_def = ToolDefinition(
+                name=browser_tool_def_dict["name"],
+                description=browser_tool_def_dict["description"],
+                input_schema=browser_tool_def_dict["input_schema"],
+                output_schema=browser_tool_def_dict.get("output_schema")
+            )
+            all_tools.append(browser_tool_def)
+            self._available_tools[browser_tool_def.name] = browser_tool_def
+            self._tool_server_map[browser_tool_def.name] = "builtin"
+            print(f"[MCPExecutor] Added built-in browser-use tool: {browser_tool_def.name}")
 
         return all_tools
 
@@ -409,6 +481,16 @@ class MCPExecutor:
         """
         Execute MCP tool via Streamable-HTTP or SSE connection using FastMCP 2.0
         """
+        # Handle built-in tools
+        if server_name == "builtin":
+            if tool_name == "browse_with_agent":
+                if not self._browser_use_tool:
+                    raise RuntimeError("BrowserUseTool is not initialized")
+                print(f"[MCPExecutor] Executing built-in browser-use tool with input: {tool_input}")
+                return await self._browser_use_tool.browse_with_agent(**tool_input)
+            else:
+                raise ValueError(f"Unknown built-in tool: {tool_name}")
+
         if server_name not in self._servers:
             raise ValueError(f"Unknown server: {server_name}")
 
@@ -528,6 +610,14 @@ class MCPExecutor:
     async def cleanup(self):
         """Cleanup connections"""
         print("[MCPExecutor] Cleaning up connections...")
+        # Cleanup browser-use tool
+        if self._browser_use_tool:
+            try:
+                await self._browser_use_tool.close_browser()
+                print("[MCPExecutor] Browser-use tool cleaned up")
+            except Exception as e:
+                print(f"[MCPExecutor] Error cleaning up browser-use tool: {e}")
+            self._browser_use_tool = None
         self._clients.clear()
         self._servers.clear()
         self._available_tools.clear()
