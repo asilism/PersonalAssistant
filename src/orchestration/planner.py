@@ -68,6 +68,11 @@ class Planner:
     async def _create_initial_plan(self, state: State) -> State:
         """Create initial execution plan from user request with streaming"""
 
+        # Debug: Log available tools
+        print(f"[Planner] Available tools: {len(self.settings.available_tools)}")
+        for tool in self.settings.available_tools:
+            print(f"[Planner]   - {tool.name}: {tool.description[:80]}...")
+
         # Build prompt for LLM (provider-specific)
         prompt = self._get_initial_plan_prompt(state)
 

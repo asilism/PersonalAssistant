@@ -93,7 +93,7 @@ class Orchestrator:
             # Initialize MCP executor and discover tools
             from .mcp_executor import MCPExecutor
 
-            self.mcp_executor = MCPExecutor()
+            self.mcp_executor = MCPExecutor(user_id=self.user_id, tenant=self.tenant)
 
             # Use preloaded tools if available, otherwise discover
             if self.preloaded_mcp_tools and self.preloaded_tool_server_map:
