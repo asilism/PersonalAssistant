@@ -55,6 +55,13 @@ class SupervisorAgent:
         print(f"[SupervisorAgent] Initialized with {len(available_agents)} agents")
         print(f"[SupervisorAgent] Using LLM: {settings.llm_provider}/{settings.llm_model}")
 
+        # Debug: Log available tools
+        total_tools = sum(len(tools) for tools in available_agents.values())
+        print(f"[SupervisorAgent] Total available tools: {total_tools}")
+        for agent_name, tools in available_agents.items():
+            tool_names = [t.name for t in tools]
+            print(f"[SupervisorAgent]   {agent_name}: {tool_names}")
+
     async def analyze_request(self, request: str, session_id: Optional[str] = None) -> str:
         """
         Analyze user request and generate high-level understanding

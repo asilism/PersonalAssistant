@@ -90,28 +90,12 @@ class Orchestrator:
             print(f"[Orchestrator] Initialized SQLite checkpointer at {checkpoint_path}")
 
         if not self.settings:
-            # Initialize MCP executor and discover tools
-            from .mcp_executor import MCPExecutor
-
-            self.mcp_executor = MCPExecutor(user_id=self.user_id, tenant=self.tenant)
-
-            # Use preloaded tools if available, otherwise discover
-            if self.preloaded_mcp_tools and self.preloaded_tool_server_map:
-                print(f"[Orchestrator] Using {len(self.preloaded_mcp_tools)} preloaded MCP tools")
-                mcp_tools = self.preloaded_mcp_tools
-                # Initialize servers for execution and set preloaded tool-server mapping
-                await self.mcp_executor.initialize_servers()
-                self.mcp_executor.set_tool_server_map(self.preloaded_tool_server_map)
-                print(f"[Orchestrator] Set preloaded tool-server map with {len(self.preloaded_tool_server_map)} mappings")
-            else:
-                print(f"[Orchestrator] No preloaded tools or map, discovering now...")
-                await self.mcp_executor.initialize_servers()
-                mcp_tools = await self.mcp_executor.discover_tools()
-                print(f"[Orchestrator] Discovered {len(mcp_tools)} MCP tools")
-
-            # Get settings with MCP tools
-            self.settings = await self.config_loader.get_settings(
-                self.user_id, self.tenant, mcp_tools=mcp_tools
+            # Use unified initialization method
+            self.settings, self.mcp_executor = await self.config_loader.initialize_tools_and_settings(
+                user_id=self.user_id,
+                tenant=self.tenant,
+                preloaded_tools=self.preloaded_mcp_tools,
+                preloaded_tool_server_map=self.preloaded_tool_server_map
             )
             self.planner = Planner(self.settings, self.tracker)
             self.dispatcher = TaskDispatcher(self.tracker, self.mcp_executor)
