@@ -1,0 +1,9 @@
+# Browser-Use MCP Server Dependencies
+fastmcp>=0.1.0
+browser-use>=0.11.3
+
+# Optional: For using OpenAI models instead of ChatBrowserUse
+# openai>=1.0.0
+
+# Optional: For using Anthropic Claude models
+# anthropic>=0.7.0
