@@ -588,9 +588,6 @@ class ManusCoordinator:
         self.md_comm = MDCommunicator(self.workspace_path)
         await self.md_comm.initialize()
 
-        # Load settings
-        self.settings = await self.config_loader.get_settings(self.user_id, self.tenant)
-
         # Initialize MCP executor with workspace
         self.mcp_executor = MCPExecutor(self.user_id, self.tenant, session_id, str(self.workspace_path))
         await self.mcp_executor.initialize_servers()
@@ -599,6 +596,9 @@ class ManusCoordinator:
         available_tools = await self.mcp_executor.discover_tools()
         print(f"[ManusCoordinator] Discovered {len(available_tools)} tools from MCP servers")
         print(f"[ManusCoordinator] Configured MCP executor to use workspace: {self.workspace_path}")
+
+        # Load settings with discovered tools
+        self.settings = await self.config_loader.get_settings(self.user_id, self.tenant, mcp_tools=available_tools)
 
         # Group tools by agent (based on tool-server mapping)
         tool_server_map = self.mcp_executor.get_tool_server_map()
