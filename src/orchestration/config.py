@@ -3,11 +3,10 @@ ConfigLoader - Loads settings for the orchestration system
 """
 
 import os
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from dotenv import load_dotenv
 
 from .types import OrchestrationSettings, ToolDefinition
-from .settings_manager import SettingsManager
 
 # Load environment variables
 load_dotenv()
@@ -17,6 +16,7 @@ class ConfigLoader:
     """ConfigLoader - Loads orchestration settings"""
 
     def __init__(self):
+        from .settings_manager import SettingsManager
         self.settings_manager = SettingsManager()
 
     async def get_settings(
@@ -93,3 +93,57 @@ class ConfigLoader:
         Get default MCP tools (empty - tools are dynamically discovered from MCP servers)
         """
         return []
+
+    async def initialize_tools_and_settings(
+        self,
+        user_id: str,
+        tenant: str,
+        session_id: Optional[str] = None,
+        workspace_path: Optional[str] = None,
+        preloaded_tools: Optional[List[ToolDefinition]] = None,
+        preloaded_tool_server_map: Optional[dict] = None
+    ) -> Tuple[OrchestrationSettings, 'MCPExecutor']:
+        """
+        Initialize MCP executor, discover tools, and create settings (unified method for all modes)
+
+        This method ensures consistent tool discovery across Orchestrator and ManusCoordinator:
+        1. Create MCPExecutor with user_id and tenant
+        2. Initialize MCP servers
+        3. Discover tools (including built-in tools like browser-use)
+        4. Create settings with discovered tools
+
+        Args:
+            user_id: User identifier
+            tenant: Tenant identifier
+            session_id: Optional session ID
+            workspace_path: Optional workspace path
+            preloaded_tools: Optional preloaded tools (for performance optimization)
+            preloaded_tool_server_map: Optional preloaded tool-server map
+
+        Returns:
+            Tuple of (OrchestrationSettings, MCPExecutor)
+        """
+        from .mcp_executor import MCPExecutor
+
+        # Create MCP executor with user context
+        mcp_executor = MCPExecutor(user_id, tenant, session_id, workspace_path)
+
+        # Use preloaded tools if available (performance optimization)
+        if preloaded_tools and preloaded_tool_server_map:
+            print(f"[ConfigLoader] Using {len(preloaded_tools)} preloaded tools")
+            available_tools = preloaded_tools
+            # Initialize servers for execution
+            await mcp_executor.initialize_servers()
+            mcp_executor.set_tool_server_map(preloaded_tool_server_map)
+            print(f"[ConfigLoader] Set preloaded tool-server map with {len(preloaded_tool_server_map)} mappings")
+        else:
+            # Discover tools dynamically
+            print(f"[ConfigLoader] Discovering tools for {user_id}@{tenant}...")
+            await mcp_executor.initialize_servers()
+            available_tools = await mcp_executor.discover_tools()
+            print(f"[ConfigLoader] Discovered {len(available_tools)} tools")
+
+        # Create settings with discovered tools
+        settings = await self.get_settings(user_id, tenant, mcp_tools=available_tools)
+
+        return settings, mcp_executor

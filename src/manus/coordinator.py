@@ -588,19 +588,17 @@ class ManusCoordinator:
         self.md_comm = MDCommunicator(self.workspace_path)
         await self.md_comm.initialize()
 
-        # Initialize MCP executor with workspace
-        self.mcp_executor = MCPExecutor(self.user_id, self.tenant, session_id, str(self.workspace_path))
-        await self.mcp_executor.initialize_servers()
-
-        # Discover available tools
-        available_tools = await self.mcp_executor.discover_tools()
-        print(f"[ManusCoordinator] Discovered {len(available_tools)} tools from MCP servers")
+        # Use unified initialization method
+        self.settings, self.mcp_executor = await self.config_loader.initialize_tools_and_settings(
+            user_id=self.user_id,
+            tenant=self.tenant,
+            session_id=session_id,
+            workspace_path=str(self.workspace_path)
+        )
         print(f"[ManusCoordinator] Configured MCP executor to use workspace: {self.workspace_path}")
 
-        # Load settings with discovered tools
-        self.settings = await self.config_loader.get_settings(self.user_id, self.tenant, mcp_tools=available_tools)
-
         # Group tools by agent (based on tool-server mapping)
+        available_tools = self.settings.available_tools
         tool_server_map = self.mcp_executor.get_tool_server_map()
         agent_tools: Dict[str, List[ToolDefinition]] = {}
 
