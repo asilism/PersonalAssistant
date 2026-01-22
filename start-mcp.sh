@@ -35,6 +35,7 @@ MCP_SERVERS["weather"]="mcp_servers/weather/server.py:8012"
 MCP_SERVERS["browser"]="mcp_servers/browser/server.py:8013"
 MCP_SERVERS["computer"]="mcp_servers/computer/server.py:8014"
 MCP_SERVERS["filesystem"]="mcp_servers/filesystem/server.py:8015"
+MCP_SERVERS["browser-use"]="mcp_servers/browser_use/server.py:8016"
 
 # Function to check if a port is in use
 check_port() {
